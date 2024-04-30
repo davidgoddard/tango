@@ -1,25 +1,40 @@
-# Tango
-##Tanda Player
-###Justification
-Tango music is played at social events called 'Milongas'. As for most music events, a Milonga may use live or recorded music played according to an etiquette. For example, a wedding DJ will play some pop-music slowly changing the styles of music until the dancers get up. He will they try to keep them dancing for a while by playing more of the same type of music. After a while he will change the music style to something different such as some Motown or Rock'n'Roll etc. Even slow dances. Milonga DJs have similar goals, get people dancing, keep them dancing and change the music to re-vitalise the dancers or bring other people on etc. Fortunately for Tango DJ's it is expected that the music changes occur almost regularly but what they change to is down to the DJ who watches the floor to work out what they might like to dance to next. 
-Dancers meanwhile need to learn their craft by practicing to music and although not necessary, it is sometimes nice to have the practice with music played in a similar manner to a Milonga. However, having a DJ at a practice evening is not usually an option.
-Music players such as laptops or iPods and similar devices often support playlists where the owner can put the songs to play in a fixed order and this would work very well, particularly the first time. However, when the same playlist is used again and again it becomes too predictable and may only play a few dozen songs out of a collection of possibly thousands.
-Although software such as iTunes can create dynamic playlists, it is difficult to change the rules part way through so you may be able to create a playlist for a given tanda, you would have to create another playlist for the next tanda and so on. That's where the Tanda Player comes in. The Tanda Player is a music player similar to an iPod in nature but which creates playlists on the fly making each time different to the last. 
-The Tanda Player can be programmed with the structure and types of music to play and it can go and find some songs to play from the owner's collection. Milonga etiquette allows for the music to be grouped according to some criteria such as "all the songs are by the same orchestra and from the same period of their career so that they sound good together and have a similar feel to each other". This group of music choices is called a "Tanda" and may be 3 or more pieces of music. Acting as punctuation between the groups of music and allowing dancers to change partners, often a short piece of music of a different music style is played known as a "cortina". The Tanda Player can be configured to insert cortinas between the tandas.
-###Overview
-This project has been developed around a Raspberry Pi with a HiFiBerry DAC sound card to provide superb sound quality. The device acts much like an iPod in that it is simply plugged into the PA system. 
-The Raspberry Pi also acts as a wifi hotspot and hosts a web site which shows what is currently playing and what's next. It also allows a user to remotely tweak the behaviour through controls on a web page which can be changed through a mobile phone or a laptop etc.
-###Setup
-The computer simply reads music from a USB device plugged in. The USB device contains the music and a configuration file. The configuration file gives insight into how the meta-data in the music can be used and also describes the structure of the playlist it is to put together.
-The music is stored in a folder off the root of the USB device as is another folder with short pieces of music to be used as Cortinas.
-The system works reasonably well with just a simple coding system added to each track's "comment" MP3 tag. This is easily managed through software such as iTunes. Music in iTunes can also be easily dragged onto a USB memory stick and this can then be put into the Raspberry Pi, boot up and it will start playing.
-###Raspberry Pi Setup
-There are many web sites around which describe in step-by-step manners how to get the Raspberry Pi up and running. Also how to configure it to be a wifi-hotspot. The Hifi-Berry site describes how to install their DAC and similar sound cards could be used. This project is not about that.
-The music player underlying this project is the MPD and MPC pair. MPD manages the music database and reads all the meta-data in the music files. MPC is used as the control interface used to create and play playlists.
-This project requires one additional component to be installed and that is "node-js". This is used to host the web site.
-Nearly all the code in this project is written in JavaScript and nearly all data files are JSON format. The exceptions are only a few scripts written as shell scripts or python scripts etc.
-##Tanda Concepts
-For the purposes of this project a Tanda can be any number of songs and each Tanda may contain different numbers of songs to the others.
-Etiquette for putting Tandas together is focussed on putting together songs that are musically similar so that dancers can decide if they wish to dance to that music and know that they will have a few songs of this type to dance with a partner. Further the music styles are usually grouped into three broad categories; Tango, Vals and Milonga. This time Milonga is the music style and not the event. 
-The Tanda Player allows tandas to be defined such that they consist of just one type of music or a mix if required. Typically, an evenings music would consist of a pattern of tandas such as "Tango, Tango, Vals, Tango, Tango, Milonga" which repeats. Each Tanda typically containing 3 or 4 songs. 
+# Tanda Player
 
+## Overview
+
+This is a standalone web page app that provides a simple way to DJ at a Milonga or a Practica.  No information is sent to a server - all files are local to your PC.
+
+The application requests access to a music folder which once set, is scanned for all music files and their details are added to a local database.  You can add or change 
+some of the classifications of each track at any time.  
+
+When playing the DJ can select which output devices to use to send music to their amplifier/speakers and which to use for headphones.  When headphones are configured by the user, a symbol appears next to all songs and cortinas allowing the DJ to pre-listen to anything.
+
+## The Philosophy
+
+Milonga's and some Practicas play music in Tandas - a collection of typically 3 or 4 songs - that the DJ puts together around some common properties such as the Orchestra, the year, the mood and tempo etc.
+
+The Tanda Player app allows the DJ to build a library of Tandas over time of any size, music style - anything the DJ wants as a Tanda.
+
+When DJing, the DJ creates a playlist, defines the sequence such as Tango, Tango, Waltz, Tango, Tango, Milonga and repeat.  Then they decide whether to use Cortinas and if so which set of songs to use - Jazz, Salsa or whatever they have set up.  The DJ then simply searches through their collection of Tandas and adds them to a scratch pad for consideration.  As they go, they can move tandas from the scratch pad onto the playlist or take them back off onto the scratch pad or just remove them altogether from the playlist.  Within the constraints of the music style sequence, the DJ can move their tandas around too.
+
+The player will play through the tandas managing the sound levels, silences between songs and the injection of the Cortinas including fading out after a pre-determined playing time whilst showing the DJ the approximate time when each Tanda will play to help with planning out the evening.
+
+Each tanda is, by default, shown as a summary but any tanda can be opened up to see the actual track details within.  This helps keep many tandas on the screen at the same time allowing the DJ to see the artists and orchestras they have already used.
+
+As tandas are added and removed from the playlist or scratch pad, the app will highlight those containing the same songs or simply just the same song titles to help alleviate accidental duplication.
+
+The finding of tandas is supported through simple searches which are tolerant of spelling mistakes and also some quick pre-defined search results such as a list of favourites or recently added etc.
+
+## Going deeper
+
+If the DJ wishes, they can start to add tags to their songs to indicate mood or music styles such as stocato playing.  The searches can then search for songs with similar tags so that once a DJ has found a song, the app can show similar songs which may help to construct new tandas.
+
+Once more information is available, the Auto-DJ feature can be used to create whole or starter playlists.  This is ideal for a quick Sunday afternoon Practica etc. ensuring that playlists are always new and varied without any additional work by the DJ.  These playlists can then be modified as normal should the DJ wish to play something in particular.
+
+## In addition
+
+The app can produce a display board page which if moved to a separate display monitor attached to the computer, shows the dancers what's playing.
+
+In addition the DJ can install a program called MQTT which is a message broker which, when the Tanda Player app opens it looks for, and if found messages are sent to this broker describing what is playing now and next. An additional dedicated display board web page can then be opened and connected to the DJ's PC using the WiFi connection and allows display boards to be set up around the venue.
+
+If there is no local WiFi available the DJ can set their mobile phone as a WiFi hotspot and use that.
