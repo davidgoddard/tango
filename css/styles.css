@@ -1,0 +1,307 @@
+/* style.css */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100vh; /* Use the viewport height to make body take full height */
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-rows: auto 1fr; /* Auto for header and 1fr for the container to take up the rest */
+}
+
+header {
+  background: #353536;
+  text-align: center;
+  border-bottom: 5px solid #ffb30e;
+  color: white;
+  display: flex;
+}
+header > * {
+  flex-grow: 1;
+}
+
+main {
+  display: grid;
+  overflow: hidden;
+}
+main.all {
+  grid-template-columns: minmax(200px, 2fr) minmax(5px, 5px) minmax(100px, 1fr) minmax(
+      5px,
+      5px
+    ) minmax(200px, 2fr);
+}
+
+main.searchOnly {
+  grid-template-columns: minmax(400px, 4fr) minmax(5px, 5px) minmax(100px, 1fr);
+}
+main.playlistOnly {
+  grid-template-columns: minmax(100px, 1fr) minmax(5px, 5px) minmax(400px, 4fr);
+}
+
+.column {
+  overflow-y: auto;
+  background-color: #e9ecef;
+  padding: 10px;
+  display: grid;
+  grid-template-rows: auto 1fr; /* Header size auto, rest is for body */
+}
+
+header button {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  flex-grow: 0;
+  justify-self: flex-start;
+}
+
+header select {
+  flex-grow: 0;
+  background: white;
+  border: none;
+  color: black;
+  font-size: 1.2rem;
+  cursor: pointer;
+  margin: 0.2rem;
+}
+
+.side-panel {
+  height: 100%;
+  width: 250px; /* Fixed width for the panel */
+  position: fixed;
+  z-index: 1;
+  top: 0;
+  left: -250px; /* Start off-screen */
+  background-color: #111;
+  overflow-x: hidden;
+  transition: transform 0.5s ease;
+  color: white;
+  padding: 20px;
+}
+
+.side-panel h2 {
+  padding-left: 25px;
+}
+
+.side-panel #closeBtn {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  font-size: 30px;
+  border: none;
+  background: none;
+  color: white;
+  cursor: pointer;
+}
+
+
+.hidden {
+  display: none;
+}
+
+.column:last-child {
+  border-right: none;
+}
+.column:first-child {
+  border-left: none;
+}
+
+.handle {
+  background-color: orange;
+  cursor: ew-resize;
+  width: 10px;
+}
+
+main.playlistOnly > *:nth-child(1),
+main.playlistOnly > *:nth-child(2) {
+  display: none;
+}
+
+main.searchOnly > *:nth-child(4),
+main.searchOnly > *:nth-child(5) {
+  display: none;
+}
+
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.modal {
+  position: fixed;
+  background: white;
+  padding: 20px;
+  border-radius: 5px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  width: 300px;
+}
+.modal h2 {
+  margin-top: 0;
+}
+.modal button {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  margin-top: 20px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.modal button:hover {
+  background: #0056b3;
+}
+
+.content {
+  padding: 0.5rem;
+}
+
+.tab-headers {
+  display: flex;
+  background: #f0f0f0;
+  padding: 0;
+  cursor: pointer;
+  color: black;
+}
+
+.tab-header {
+  padding: 5px;
+  margin-right: 5px;
+  border: solid 1px white;
+}
+
+.tab-header.active {
+  background-color: orange;
+  border-bottom: 2px solid #353536;
+}
+
+.tab-content {
+  display: none;
+  padding: 20px;
+  border: 1px solid #ccc;
+  border-top: none;
+  background-color: #31404e78;
+}
+
+.tab-content.active {
+  display: grid;
+  grid-template-rows: 1fr;
+}
+
+#search-results span {
+  margin-left: 1rem;
+}
+
+#search {
+  padding: 3px;
+  margin: 4px;
+}
+
+.playlist-settings-icon {
+  cursor: pointer;
+  font-size: 24px;
+}
+
+.playlist-settings-panel {
+  position: fixed;
+  top: 20px;
+  right: -700px; /* Start hidden off-screen */
+  width: 700px;
+  height: 330px;
+  background: #696e7a;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+  transition: right 0.3s ease;
+  border: solid 5px #696e7a;
+  border-radius: 10px;
+  z-index: 99;
+}
+
+.playlist-settings-content {
+  padding: 20px;
+}
+
+.playlist-settings-close-btn {
+  display: block;
+  /* padding: 10px 20px; */
+  margin-right: 10px;
+  border: none;
+  cursor: pointer;
+  color: white;
+  font-size: 3rem;
+}
+
+/* When panel is active, shift it into view */
+.playlist-settings-panel.active {
+  right: 0;
+}
+
+.field-container {
+  display: grid;
+  grid-template-columns: 1fr 2fr; /* 1 part for the label text, 4 parts for the input */
+  align-items: center; /* Aligns the label and input vertically */
+  gap: 10px; /* Optional: Adds space between the label text and the input */
+  width: 100%; /* Ensures the label fills the width of its container */
+  margin: 0.2rem;
+  color: white;
+}
+
+.field-container input {
+  width: 100%; /* Makes the input field take up all available space in its grid area */
+}
+
+form p {
+  color: white;
+  margin-top: 2rem 2rem 2rem 0;
+}
+
+.playlistHeading {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  padding: 0.2rem 0.2rem 0.2rem 0.5rem;
+}
+
+.playlistHeading section {
+  text-align: right;
+}
+
+h2 {
+  text-align: left;
+}
+
+#playlist {
+    overflow-y: auto;
+}
+
+.scrollable {
+  display: grid;
+  grid-template-rows: 1fr auto;
+}
+
+.playlist-settings-panel header {
+  background:#353536;
+  color: white;
+  border: none;
+  display: flex;
+  flex-direction: row;
+}
+.playlist-settings-panel h1 {
+  align-self: center;
+}
+
+tanda-element {
+  border: solid 1px red;
+  margin-bottom: 2rem;
+}

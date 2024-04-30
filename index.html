@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audio File Analyzer</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="./css/styles.css">
+  <script type="module" src="./components/file.element.js"></script>
+  <script type="module" src="./components/track.element.js"></script>
+  <script type="module" src="./components/tanda.element.js"></script>
+  <script type="module" src="./components/playlist.element.js"></script>
+</head>
+
+<body>
+  <header class="content">
+    <button id="hamburger" aria-label="Open menu">&#9776;</button>
+    <h1>Website Title</h1>
+    <select id="modeSelector"></select>
+  </header>
+  <div id="settingsPanel" class="side-panel content">
+    <button id="closeBtn">&times;</button>
+    <h2>Settings</h2>
+    <ul>
+      <li>Links to classification page</li>
+      <li>Define playlist timings: between tracks, after tanda, before tanda</li>
+      <li>Reset column widths to defaults</li>
+      <li>Edit preferred text items</li>
+    </ul>
+
+    <p>To use another folder as the source of music files requires clearing the old database which is stored in the
+      browser. If you wish to save the current library of tandas etc. that goes with the current folder, then use the
+      "Export" feature first.</p>
+    <button id="exportDatabase">Export Database</button>
+    <button id="resetDatabase">Clear Database</button>
+  </div>
+
+  <main class="all">
+    <div id="searchColumn" class="column content">
+      <div class="tabs pre-defined-search-choice">
+        <div class="tab-headers">
+          <div class="tab-header active" data-tab="search-controls">Search</div>
+          <div class="tab-header" data-tab="favourites-results">Favourites<span id="favourites-count"></span></div>
+        </div>
+
+        <div class="tab-contents">
+          <div class="tab-content active" id="search-controls">
+            <label>Query: <input type="search" id="search" placeholder="Search titles, artists etc."></label>
+            <section id="search-results">
+              <div class="tabs tanda-tracks-choice  scrollable">
+                <div class="tab-headers">
+                  <div class="tab-header active" data-tab="tanda-results">Tandas<span id="tandas-count"></span></div>
+                  <div class="tab-header" data-tab="track-results">Tracks<span id="tracks-count"></span></div>
+                </div>
+                <div class="tab-contents">
+                  <div class="tab-content active" id="tanda-results">
+                  </div>
+                  <div class="tab-content" id="track-results">
+                  </div>
+                </div>
+              </div>
+            </section>
+
+          </div>
+          <div class="tab-content" id="favourites-results">
+            <section id="favourites-results">
+              <div class="tabs tanda-tracks-choice  scrollable">
+                <div class="tab-headers">
+                  <div class="tab-header active" data-tab="tanda-results">Tandas<span id="favourites-tandas-count"></span></div>
+                  <div class="tab-header" data-tab="track-results">Tracks<span id="favourites-tracks-count"></span></div>
+                </div>
+                <div class="tab-contents">
+                  <div class="tab-content active" id="favourites-tanda-results">
+                  </div>
+                  <div class="tab-content" id="favourites-track-results">
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+
+      <ul>
+        <li>Basic search</li>
+        <li>Filter results by style and or other tags</li>
+        <li>Via config, show standard lists: favourites, recently added, recently played</li>
+        <li>Each item has click to move to clipboard</li>
+      </ul>
+
+    </div>
+    <div class="handle" id="handle1"></div>
+    <div id="scratchpadColumn" class="column content">
+      <header>
+        <h2>Scratch Pad</h2>
+      </header>
+      <ul>
+        <li>New items added to top</li>
+        <li>User can drag/drop and move items about</li>
+        <li>Allow user to tag tandas or songs and allow grouping by them</li>
+        <li>All tandas can be added to playlist: at current location, to end</li>
+        <li>Content can be filtered by style or other tags</li>
+      </ul>
+    </div>
+    <div class="handle" id="handle2"></div>
+    <div id="playlistColumn" class="column content">
+      <section class="fixedColumnContent">
+        <header class="playlistHeading">
+          <h2>Playlist</h2>
+          <section>
+            <p>Show times:
+              <label>Relative: <input type="radio" name="timingBase" value="relative">
+                Real: <input type="radio" name="timingBase" value="realtime" checked="checked"></label>
+            </p>
+            <div class="playlist-settings-icon">⚙️</div>
+          </section>
+        </header>
+        <div class="playlist-settings-panel">
+          <header>
+            <h1>Current Playlist Settings</h1>
+          <button class="playlist-settings-close-btn">&times;</button>
+        </header>
+          <div class="playlist-settings-content">
+            <form>
+              <label class="field-container">Name: <input type="text" id="playlistName"></label>
+              <label class="field-container">Cortina Set: <input type="text" id="cortinaSetName"></label>
+              <label class="field-container">Tanda Style Sequence: <input type="text" id="tandaStyleSequence"
+                  placeholder="E.g. 4T 4T 3W 4T 4T 3M"></label>
+              <p>Time between tracks causes songs to overlap if a negative value is given and adds silence if positive.
+                Note that songs are already trimmed of any leading and trailing silence.</p>
+              <label class="field-container">Time between tracks: <input type="number" id="playlistTrackSpacing"
+                  placeholder="Time in seconds between tracks"></label>
+              <label class="field-container">Time before cortina: <input type="number" id="playlistPreCortina"
+                  placeholder="Time in seconds before cortina (if used)"></label>
+              <label class="field-container">Time after cortina: <input type="number" id="playlistPostCortina"
+                  placeholder="Time in seconds after cortina (if used)"></label>
+            </form>
+          </div>
+        </div>
+        <ul>
+          <li>Filter by artist, song</li>
+        </ul>
+      </section>
+      <playlist-element id="playlist" scratchpadSelector="#scratchpadColumn">
+      </playlist-element>
+    </div>
+  </main>
+
+
+  <!-- <label>Tempo: <input id="tempo" type="range" min="0.8" max="1.3" step="0.01" value="0"><button id="tempoReset">Reset</button></label>
+  <label>Volume: <input id="volume" type="range" min="0" max="100" step="0.1" value="100"></label> -->
+  <div id="output"></div>
+
+  <div id="permissionModal" class="overlay">
+    <div class="modal">
+      <h2>Permission Request</h2>
+      <p>Tanda Player needs your permission to read your music files folder for all files. Please click 'Allow' to
+        continue.</p>
+      <button id="askUserPermission">Allow</button>
+    </div>
+  </div>
+
+  <script src="./lib/howler.min.js"></script>
+  <script src="./lib/database.js" type="module"></script>
+  <script src="./lib/player.js" type="module"></script>
+  <!-- <script src="./lib/musicmetadata.min.js" type="module"></script> -->
+
+  <!-- Manage core application start-up  -->
+  <script type="module">
+    // import * as id3 from '//unpkg.com/id3js@^2/lib/id3.js';
+    import { DatabaseManager } from './lib/database.js';
+    import { Player, to_time } from './lib/player.js';
+    import { openMusicFolder, getAllFiles, verifyPermission } from './lib/file_system.js';
+    // import * as jsmediatags from './lib/musicmetadata.min.js';
+
+    const SYSTEM = {
+      musicFolder: undefined
+    }
+    const CONFIG_ID = 1
+
+    async function readMetadataFromFileHandle(fileHandle) {
+      try {
+        // Get the File object from the file handle
+        const file = await fileHandle.getFile();
+        let metadata = {}
+
+        // const metadata = jsmediatags.read(file, {
+        //   onSuccess: function (tag) {
+        //     console.log(tag);
+        //   },
+        //   onError: function (error) {
+        //     console.log(':(', error.type, error.info);
+        //   }
+        // });
+
+        // // Output or process the metadata
+        console.log(metadata);
+        return metadata;
+      } catch (error) {
+        console.error('Failed to read metadata:', error);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+
+      // Open and prepare the IndexedDB database
+
+      const dbManager = DatabaseManager;
+      try {
+
+        const config = await dbManager.getDataById('system', CONFIG_ID)
+
+        if (!config) {
+          // Set defaults
+          await dbManager.addData('system', SYSTEM)
+          console.log(`Set default config`)
+        }
+
+      } catch (error) {
+        console.error('Database operation failed', error);
+      }
+
+
+      console.log('Setting up OK button')
+      let askUserPermissionButton = document.querySelector('#askUserPermission');
+      askUserPermissionButton.addEventListener('click', async () => {
+        console.log('Clicked OK button')
+
+        const config = await dbManager.getDataById('system', CONFIG_ID)
+        await openMusicFolder(dbManager, config);
+
+        // verifyPermission(config.musicFolder, 'readonly')
+
+        const modal = document.querySelector('#permissionModal');
+        modal.classList = 'hidden'
+
+        let files = await getAllFiles(config.musicFolder);
+
+        // Store all changes
+
+        const fileHandles = {}
+        for (const file of files) {
+          const original = await dbManager.getDataByName('track', file.relativeFileName)
+          if (!original) {
+            const tags = await readMetadataFromFileHandle(file.fileHandle)
+            await dbManager.addData('track', {
+              name: file.fileHandle.name,
+              relativeFileName: file.relativeFileName,
+              tags: tags,
+              classifiers: {
+                favourite: true,
+              }
+            })
+          } else {
+            console.log('Already had details of ', file)
+          }
+          fileHandles[file.relativeFileName] = file.fileHandle;
+        }
+
+        // Now query database for all tracks
+
+        files = await dbManager.processEntriesInBatches('track', (record) => {
+          console.log(record)
+          return record.relativeFileName.split('/').length > 2
+        })
+
+        // Create a dummy playlist
+
+        const playlistContainer = document.querySelector('#playlist');
+        const items = new Array(100).fill(1)
+        playlistContainer.innerHTML = `${items.map((dummy) => {
+          return `<tanda-element>
+
+    <cortina-element title="Supertrooper" artist="Abba" style="T" duration="2:22" year="1940"></cortina-element>
+    <track-element title="Song 1" artist="Artist A" style="Tango" duration="2:22" year="1940"></track-element>
+    <track-element title="Song 2" artist="Artist B" style="Tango" duration="2:23" year="1940"></track-element>
+    <track-element title="Song 3" artist="Artist C" style="Tango" duration="2:24" year="1940"></track-element>
+</tanda-element><tanda-element>
+    <track-element title="Song 1" artist="Artist A" style="Waltz" duration="2:22" year="1941"></track-element>
+    <track-element title="Song 2" artist="Artist B" style="Waltz" duration="1:33" year="1942"></track-element>
+    <track-element title="Song 3" artist="Artist C" style="Waltz" duration="2:24" year="1943"></track-element>
+</tanda-element>`
+        }).join('')}`
+
+        let tracks = [
+          {
+            fileHandle: fileHandles[files[0].relativeFileName],
+            start: 0,
+            end: 10000,
+            gain: -3
+          }
+          , {
+            fileHandle: fileHandles[files[1].relativeFileName],
+            start: 0,
+            end: 10000,
+            gain: -3
+          },
+
+        ];
+
+        const h = document.querySelector('h1')
+        let now;
+        async function reportProgress(data) {
+          if (!now) now = new Date().getTime();
+          h.textContent = data.display + `    Elapsed from start: ${to_time(new Date().getTime() - now)}`
+        }
+
+        // let tempoControl = document.querySelector('#tempo')
+
+        function nextTrack(N) {
+          // tempoControl.value = 1;
+          if (N < tracks.length) {
+            return { track: tracks[N], silence: 6000 }
+          } else {
+            return { track: null, silence: 0 };
+          }
+        }
+
+        // Assume an output device has been selected
+
+        let player = new Player({
+          systemGain: 0.2, // about -20dB
+          fadeRate: 3000, // time over which to fade out 
+          progress: reportProgress,
+          nextUp: nextTrack
+        })
+
+        // tempoControl.addEventListener('input', ()=>{
+        //   player.setTempo(tempoControl.value)
+        // })
+
+        // let tempoReset = document.querySelector('#tempoReset')
+        // tempoReset.addEventListener('click', ()=>{
+        //   tempoControl.value = 1;
+        //   player.setTempo(1)
+        // })
+
+        // let volumeControl = document.querySelector('#volume')
+        // volumeControl.addEventListener('input', ()=>{
+        //   player.volume(volumeControl.value)
+        // })
+
+
+        await player.updatePosition(-1);
+        player.startNext();
+
+
+
+        window.addEventListener('beforeunload', function (event) {
+          // Set the returnValue property of the event to a custom message.
+          // Modern browsers display a standard message that cannot be customized due to security reasons,
+          // but setting returnValue is still necessary to trigger the dialog.
+          event.returnValue = 'Are you sure you want to leave?';
+        });
+
+      })
+
+    });
+
+    // document.getElementById('folderInput').addEventListener('change', async (event) => {
+    //   files = event.target.files;
+
+    //   for (const file of files) {
+    //     console.log(file.name, file.lastModified, file.lastModifiedDate, file.size, file.webkitRelativePath)
+    //     await readID3Tags(file);
+    //   }
+    // });
+
+    // async function readID3Tags(file) {
+    //   const tags = await id3.fromFile(file);
+
+    //   // Output tags to the div
+    //   const outputDiv = document.getElementById('output');
+    //   outputDiv.innerHTML += `<pre>${file.name}: ${JSON.stringify(tags, null, 2)}</pre><button data-file-name="${file.name}" data-file-type="${file.type}">Play</button>`;
+    //   let button = outputDiv.querySelector('button');
+    //   button.addEventListener('click', () => {
+    //     play(button)
+    //   })
+    //   console.log(button)
+    // }
+
+  </script>
+
+  <!-- handle hamberger menu and settings tabs -->
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+
+      document.getElementById('hamburger').addEventListener('click', function () {
+        document.getElementById('settingsPanel').style.transform = 'translateX(250px)';
+      });
+
+      document.getElementById('closeBtn').addEventListener('click', function () {
+        document.getElementById('settingsPanel').style.transform = 'translateX(-250px)';
+      });
+
+      document.querySelector('.playlist-settings-icon').addEventListener('click', function () {
+        const panel = document.querySelector('.playlist-settings-panel');
+        panel.classList.toggle('active');
+      })
+
+      document.querySelector('.playlist-settings-close-btn').addEventListener('click', function () {
+        const panel = document.querySelector('.playlist-settings-panel');
+        panel.classList.toggle('active');
+      })
+
+    });
+
+  </script>
+
+  <!-- Handle user's choice of visible columns -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const modeSelector = document.getElementById('modeSelector');
+      const searchColumn = document.getElementById('searchColumn');
+      const scratchpadColumn = document.getElementById('scratchpadColumn');
+      const playlistColumn = document.getElementById('playlistColumn');
+      const handle1 = document.getElementById('handle1');
+      const handle2 = document.getElementById('handle2');
+
+      // // Function to load widths from localStorage
+      // function loadWidths(mode) {
+      //   const widths = localStorage.getItem('widths_' + mode);
+      //   if (widths) {
+      //     const { col1Width, col3Width, col5Width } = JSON.parse(widths);
+      //     col1.style.flexGrow = col1Width;
+      //     col3.style.flexGrow = col3Width;
+      //     col5.style.flexGrow = col5Width;
+      //   }
+      // }
+
+      // // Function to save widths to localStorage
+      // function saveWidths(mode) {
+      //   const widths = {
+      //     col1Width: col1.style.flexGrow,
+      //     col3Width: col3.style.flexGrow,
+      //     col5Width: col5.style.flexGrow
+      //   };
+      //   localStorage.setItem('widths_' + mode, JSON.stringify(widths));
+      // }
+
+      // Event listener for mode changes
+      modeSelector.addEventListener('change', function () {
+        const main = document.querySelector('main');
+        const mode = modeSelector.value;
+
+        console.log('Mode', mode)
+        switch (mode) {
+          case 'All columns':
+            main.classList.remove('playlistOnly')
+            main.classList.remove('searchOnly')
+            main.classList.add('all')
+            break;
+          case 'Search':
+            main.classList.remove('playlistOnly')
+            main.classList.add('searchOnly')
+            main.classList.remove('all')
+            break;
+          case 'Playlist':
+            main.classList.add('playlistOnly')
+            main.classList.remove('searchOnly')
+            main.classList.remove('all')
+            break;
+        }
+        // loadWidths(mode);
+      });
+
+      // // Initialize with default mode
+      // modeSelector.value = 'all';
+      // loadWidths('all');
+    });
+  </script>
+
+  <!-- Handle column width adjustments -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const container = document.querySelector('main');
+      let startX, startWidthLeft, startWidthRight, handleBeingDragged;
+
+      const dragStart = (e) => {
+        handleBeingDragged = e.target;
+        startX = e.clientX;
+        const prevCol = handleBeingDragged.previousElementSibling;
+        const nextCol = handleBeingDragged.nextElementSibling;
+        startWidthLeft = prevCol.offsetWidth;
+        startWidthRight = nextCol.offsetWidth;
+        document.addEventListener('mousemove', dragMove);
+        document.addEventListener('mouseup', dragEnd);
+      };
+
+      const dragMove = (e) => {
+        if (!handleBeingDragged) return;
+        const dx = e.clientX - startX;
+        const newLeftWidth = startWidthLeft + dx;
+        const newRightWidth = startWidthRight - dx;
+        const gridTemplateColumns = Array.from(container.children).map(child => {
+          if (child === handleBeingDragged.previousElementSibling) {
+            return `${newLeftWidth}px`;
+          } else if (child === handleBeingDragged) {
+            return '10px'; // handle width
+          } else if (child === handleBeingDragged.nextElementSibling) {
+            return `${newRightWidth}px`;
+          } else {
+            return `${child.style.flexGrow || '1fr'}`;
+          }
+        }).join(' ');
+        container.style.gridTemplateColumns = gridTemplateColumns;
+      };
+
+      const dragEnd = () => {
+        document.removeEventListener('mousemove', dragMove);
+        document.removeEventListener('mouseup', dragEnd);
+        handleBeingDragged = null;
+      };
+
+      const handles = document.querySelectorAll('.handle');
+      handles.forEach(handle => handle.addEventListener('mousedown', dragStart));
+    });
+
+  </script>
+
+  <!-- Handle language preferences -->
+  <script>
+
+    const configurableItems = [
+      {
+        type: 'select', selector: '#modeSelector',
+        textValues: ['All columns', 'Search', 'Playlist'],
+        preferredValues: ['All columns', 'Search', 'Playlist']
+      },
+      {
+        type: 'select', selector: '.style-select',
+        textValues: ['All styles', 'Tango', 'Waltz', 'Milonga'],
+        preferredValues: ['All styles', 'Tango', 'Vals', 'Milonga']
+      }
+    ];
+
+    const configuredItems = localStorage.getItem('Text Preferences') || configurableItems;
+
+    /* Populate the page with user's preferred text */
+    configuredItems.forEach((item) => {
+      switch (item.type) {
+        case 'select':
+          const elements = document.querySelectorAll(item.selector)
+          for (const e of elements) {
+            e.innerHTML = item.textValues.map((value, idx) => {
+              return `<option value="${value}">${item.preferredValues[idx]}</option>`
+            }).join('')
+          }
+          break;
+      }
+    })
+
+  </script>
+
+  <!-- Searches -->
+  <script type="module">
+    import { DatabaseManager } from './lib/database.js';
+
+    const dbManager = DatabaseManager;
+
+    let headers = document.querySelectorAll('.tanda-tracks-choice > .tab-headers > .tab-header');
+    let contents = document.querySelectorAll('.tanda-tracks-choice > .tab-contents > .tab-content');
+
+    headers.forEach(header => {
+      const localHeaders = headers;
+      const localContents = contents;
+      header.addEventListener('click', function () {
+        const targetId = this.getAttribute('data-tab');
+
+        // Remove active class from all headers and contents
+        localHeaders.forEach(h => h.classList.remove('active'));
+        localContents.forEach(c => c.classList.remove('active'));
+
+        // Add active class to clicked header and corresponding content
+        this.classList.add('active');
+        document.getElementById(targetId).classList.add('active');
+      });
+    });
+
+    headers = document.querySelectorAll('.pre-defined-search-choice > .tab-headers > .tab-header');
+    contents = document.querySelectorAll('.pre-defined-search-choice > .tab-contents > .tab-content');
+
+    headers.forEach(header => {
+      const localHeaders = headers;
+      const localContents = contents;
+      header.addEventListener('click', function () {
+        const targetId = this.getAttribute('data-tab');
+
+        // Remove active class from all headers and contents
+        localHeaders.forEach(h => h.classList.remove('active'));
+        localContents.forEach(c => c.classList.remove('active'));
+
+        // Add active class to clicked header and corresponding content
+        this.classList.add('active');
+        document.getElementById(targetId).classList.add('active');
+      });
+    });
+
+    document.addEventListener('DOMContentLoaded', function () {
+      const searchText = document.querySelector('#search');
+      const tandaResults = document.querySelector('#tanda-results');
+      const trackResults = document.querySelector('#track-results');
+      const tandasCount = document.querySelector('#tandas-count');
+      const tracksCount = document.querySelector('#tracks-count');
+
+      searchText.addEventListener('change', async () => {
+        console.log(searchText.value)
+
+        // Clear results
+        tandaResults.innerHTML = '';
+        trackResults.innerHTML = '';
+
+        // Get track results
+        dbManager.processEntriesInBatches('track', (record) => {
+          return true;
+        }).then((tracks) => {
+          tracksCount.textContent = tracks.length;
+          trackResults.innerHTML = tracks.map((result) => {
+            return `<file-display data-file='{
+    "summary": {"name": "${result.relativeFileName}", "size": "14KB"},
+    "details": {"type": "Text File", "created": "2023-01-01"}
+}'></file-display>`
+          }).join('')
+        })
+
+        // Get tanda results
+        dbManager.processEntriesInBatches('tanda', (record) => {
+          return true;
+        }).then((tandas) => {
+          tandasCount.textContent = tandas.length
+          trackResults.innerHTML = tandas.map((result) => {
+            return `<file-display data-file='{
+    "summary": {"name": "${result.relativeFileName}", "size": "14KB"},
+    "details": {"type": "Text File", "created": "2023-01-01"}
+}'></file-display>`
+          }).join('')
+        })
+
+      })
+    
+      const favouriteTracks = document.querySelector('#favourites-track-results');
+      const favouriteTandas = document.querySelector('#favourites-tandas-results');
+      const favouriteTandasCount = document.querySelector('#favourites-tandas-count');
+      const favouriteTracksCount = document.querySelector('#favourites-tracks-count');
+
+      
+
+    });
+  </script>
+
+  <!-- Handle settings -->
+  <script type="module">
+    import { DatabaseManager } from './lib/database.js';
+    import { saveFileWithWritePermission } from './lib/file_system.js'
+
+    document.addEventListener('DOMContentLoaded', function () {
+      const dbManager = DatabaseManager;
+      let libraryFileHandle = null;
+
+      const exportButton = document.querySelector('#exportDatabase');
+      exportButton.addEventListener('click', async () => {
+        console.log('Exporting the database');
+        const allData = await dbManager.exportAllData();
+        console.log(allData)
+        // const blob = new Blob([allData], { type: 'application/json' });
+        // const url = URL.createObjectURL(blob);
+
+        // // Create a link and trigger the download
+        // const a = document.createElement('a');
+        // a.href = url;
+        // a.download = `tanda-player-library-backup.json`;
+        // document.body.appendChild(a);
+        // a.click();
+        // document.body.removeChild(a);
+
+        // // Revoke the blob URL after a delay
+        // setTimeout(() => URL.revokeObjectURL(url), 100);
+
+        libraryFileHandle = saveFileWithWritePermission(libraryFileHandle, allData);
+
+      })
+    });
+  </script>
+</body>
+
+</html>
