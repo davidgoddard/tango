@@ -1,4 +1,4 @@
-# Tanda Player
+# Tanda Player (NOT YET READY FOR USE - IN DEVELOPMENT)
 
 ## Overview
 
