@@ -11,6 +11,7 @@
   <script type="module" src="./components/track.element.js"></script>
   <script type="module" src="./components/tanda.element.js"></script>
   <script type="module" src="./components/playlist.element.js"></script>
+  <script type="module" src="./components/scratch-pad.element.js"></script>
 </head>
 
 <body>
@@ -102,6 +103,7 @@
         <li>All tandas can be added to playlist: at current location, to end</li>
         <li>Content can be filtered by style or other tags</li>
       </ul>
+      <scratch-pad-element id="scratchPad" playlistSelector="#playlist"></scratch-pad-element>
     </div>
     <div class="handle" id="handle2"></div>
     <div id="playlistColumn" class="column content">
@@ -142,7 +144,7 @@
           <li>Filter by artist, song</li>
         </ul>
       </section>
-      <playlist-element id="playlist" scratchpadSelector="#scratchpadColumn">
+      <playlist-element id="playlist" scratchpadSelector="#scratchPad">
       </playlist-element>
     </div>
   </main>
@@ -230,7 +232,7 @@
         const config = await dbManager.getDataById('system', CONFIG_ID)
         await openMusicFolder(dbManager, config);
 
-        // verifyPermission(config.musicFolder, 'readonly')
+        await verifyPermission(config.musicFolder, 'readonly')
 
         const modal = document.querySelector('#permissionModal');
         modal.classList = 'hidden'
