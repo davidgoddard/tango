@@ -23,7 +23,7 @@
     <label>View: <select id="modeSelector"></select></label>
   </header>
   <div id="settingsPanel" class="side-panel content">
-    <button id="closeBtn"  aria-label="Close Settings">&times;</button>
+    <button id="closeBtn" aria-label="Close Settings">&times;</button>
     <h2>Settings</h2>
     <ul>
       <li>Links to classification page</li>
@@ -125,7 +125,7 @@
         <div class="playlist-settings-panel">
           <header>
             <h1>Current Playlist Settings</h1>
-            <button class="playlist-settings-close-btn"  aria-label="Close Playlist Settings">&times;</button>
+            <button class="playlist-settings-close-btn" aria-label="Close Playlist Settings">&times;</button>
           </header>
           <div class="playlist-settings-content">
             <form>
@@ -172,49 +172,108 @@
   <script src="./lib/player.js" type="module"></script>
   <!-- <script src="./lib/musicmetadata.min.js" type="module"></script> -->
 
-  <!-- <script src="./node_modules/@ffmpeg/ffmpeg/dist/umd/ffmpeg.js" type="text/javascript"></script>
-  <script src="./node_modules/@ffmpeg/util/dist/umd/index.js" type="text/javascript"></script> -->
+  <script src="./ffmpeg.min.js"></script>
+  <!-- <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script> -->
+
+  <script type="module">
+  const { createFFmpeg } = FFmpeg;
+    const ffmpeg = createFFmpeg({ log: true });
+
+const initializeFFmpeg = async () => {
+    await ffmpeg.load();
+    console.log('FFmpeg initialized');
+};
+
+const convertFile = async (file) => {
+    // Write the file data to ffmpeg.js virtual file system
+    ffmpeg.FS('writeFile', file.name, await ffmpegFetchFile(file));
+
+    // Run ffmpeg command to convert audio file to WAV format
+    await ffmpeg.run('-i', file.name, 'output.wav');
+
+    // Read the converted file from ffmpeg.js virtual file system
+    const convertedFile = ffmpeg.FS('readFile', 'output.wav');
+
+    // Do something with the converted audio data (e.g., save to disk or process further)
+    console.log('Converted audio:', convertedFile);
+
+    // Clean up
+    await ffmpeg.FS('unlink', file.name);
+    await ffmpeg.FS('unlink', 'output.wav');
+};
+
+const fetchFile = async (file) => {
+    const response = await fetch(file);
+    return new Uint8Array(await response.arrayBuffer());
+};
+
+(async () => {
+    await initializeFFmpeg();
+    // const fileInput = document.getElementById('fileInput');
+    // fileInput.addEventListener('change', async (event) => {
+    //     const file = event.target.files[0];
+    //     if (!file) return;
+    //     await convertFile(file);
+    // });
+})();
+  </script>
+  <!-- 
+  <script src="./node_modules/@ffmpeg/ffmpeg/dist/umd/ffmpeg.js" type="module"></script>
+  <script src="./node_modules/@ffmpeg/util/dist/umd/index.js" type="module"></script>
   <script type="module">
 
-    import { FFmpeg } from './node_modules/@ffmpeg/ffmpeg';
-    import { fetchFile, toBlobURL } from './node_modules/@ffmpeg/util';
+    import { FFmpeg } from './node_modules/@ffmpeg/ffmpeg/dist/umd/ffmpeg.js';
+    import { fetchFile, toBlobURL } from './node_modules/@ffmpeg/util/dist/umd/index.js';
+    
     function testFFMEG() {
-      const [loaded, setLoaded] = useState(false);
-      const ffmpegRef = useRef(new FFmpeg());
-      const videoRef = useRef(null);
-      const messageRef = useRef(null);
 
-      const load = async () => {
-        const baseURL = './node_modules/@ffmpeg/core@0.12.6/dist/umd'
-        const ffmpeg = ffmpegRef.current;
-        ffmpeg.on('log', ({ message }) => {
-          messageRef.current.innerHTML = message;
-          console.log(message);
-        });
-        // toBlobURL is used to bypass CORS issue, urls with the same
-        // domain can be used directly.
-        await ffmpeg.load({
-          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-        });
-        setLoaded(true);
-      }
+      const ffmpeg = new FFmpeg({ log: true });
 
-      const transcode = async () => {
-        const ffmpeg = ffmpegRef.current;
-        await ffmpeg.writeFile('input.webm', await fetchFile('https://raw.githubusercontent.com/ffmpegwasm/testdata/master/Big_Buck_Bunny_180_10s.webm'));
-        await ffmpeg.exec(['-i', 'input.webm', 'output.mp4']);
-        const data = await ffmpeg.readFile('output.mp4');
-        videoRef.current.src =
-          URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
-      }
+      const initializeFFmpeg = async () => {
+        await ffmpeg.load();
+        console.log('FFmpeg initialized');
+      };
+
+      const convertFile = async (file) => {
+        // Write the file data to ffmpeg.js virtual file system
+        ffmpeg.FS('writeFile', file.name, await fetchFile(file));
+
+        // Run ffmpeg command to convert audio file to WAV format
+        await ffmpeg.run('-i', file.name, 'output.wav');
+
+        // Read the converted file from ffmpeg.js virtual file system
+        const convertedFile = ffmpeg.FS('readFile', 'output.wav');
+
+        // Do something with the converted audio data (e.g., save to disk or process further)
+        console.log('Converted audio:', convertedFile);
+
+        // Clean up
+        await ffmpeg.FS('unlink', file.name);
+        await ffmpeg.FS('unlink', 'output.wav');
+      };
+
+      const fetchFile = async (file) => {
+        const response = await fetch(file);
+        return new Uint8Array(await response.arrayBuffer());
+      };
+
+      (async () => {
+        await initializeFFmpeg();
+        // const fileInput = document.getElementById('fileInput');
+        // fileInput.addEventListener('change', async (event) => {
+        //   const file = event.target.files[0];
+        //   if (!file) return;
+        //   await convertFile(file);
+        // });
+      })();
     }
+
 
     testFFMEG();
   </script>
 
 
-
+ -->
 
 
 
