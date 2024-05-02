@@ -4,6 +4,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Author: David Goddard
+  A tanda based music player for Tango DJs">
   <title>Audio File Analyzer</title>
   <link rel="manifest" href="./manifest.json">
   <link rel="stylesheet" href="./css/styles.css">
@@ -18,10 +20,10 @@
   <header class="content">
     <button id="hamburger" aria-label="Open menu">&#9776;</button>
     <h1>Website Title</h1>
-    <select id="modeSelector"></select>
+    <label>View: <select id="modeSelector"></select></label>
   </header>
   <div id="settingsPanel" class="side-panel content">
-    <button id="closeBtn">&times;</button>
+    <button id="closeBtn"  aria-label="Close Settings">&times;</button>
     <h2>Settings</h2>
     <ul>
       <li>Links to classification page</li>
@@ -123,7 +125,7 @@
         <div class="playlist-settings-panel">
           <header>
             <h1>Current Playlist Settings</h1>
-            <button class="playlist-settings-close-btn">&times;</button>
+            <button class="playlist-settings-close-btn"  aria-label="Close Playlist Settings">&times;</button>
           </header>
           <div class="playlist-settings-content">
             <form>

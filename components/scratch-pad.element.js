@@ -34,7 +34,7 @@ class ScratchPadElement extends HTMLElement {
         let actions = tanda.shadowRoot.querySelector('#actions')
 
         let button = document.createElement('button')
-        button.innerHTML = `<img height="15px" width="15px" src="./icons/playlist.PNG"/>`
+        button.innerHTML = `<img alt="Add to playlist" height="15px" width="15px" src="./icons/playlist.PNG"/>`
         button.title = 'Move to playlist'
         button.addEventListener('click', (event) => {
             console.log('Got event to move to scratch pad', tanda)

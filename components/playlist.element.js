@@ -132,6 +132,7 @@ class PlaylistElement extends HTMLElement {
             if (action.title) button.title = action.title;
             if (action.image) {
                 let image = document.createElement('img');
+                image.alt = action.text;
                 image.src = action.image;
                 button.appendChild(image)
             }
@@ -169,7 +170,7 @@ class PlaylistElement extends HTMLElement {
                 }
             </style>
             <slot></slot>
-            <button class="target"><img src='./icons/target.png'></button>
+            <button class="target"><img alt="choose this as the tanda target" src='./icons/target.png'></button>
         `;
 
         // Query all assigned nodes (tanda-elements) and add delete and copy buttons
