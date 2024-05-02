@@ -68,8 +68,10 @@
             <section id="favourites-results">
               <div class="tabs tanda-tracks-choice  scrollable">
                 <div class="tab-headers">
-                  <div class="tab-header active" data-tab="tanda-results">Tandas<span id="favourites-tandas-count"></span></div>
-                  <div class="tab-header" data-tab="track-results">Tracks<span id="favourites-tracks-count"></span></div>
+                  <div class="tab-header active" data-tab="tanda-results">Tandas<span
+                      id="favourites-tandas-count"></span></div>
+                  <div class="tab-header" data-tab="track-results">Tracks<span id="favourites-tracks-count"></span>
+                  </div>
                 </div>
                 <div class="tab-contents">
                   <div class="tab-content active" id="favourites-tanda-results">
@@ -121,8 +123,8 @@
         <div class="playlist-settings-panel">
           <header>
             <h1>Current Playlist Settings</h1>
-          <button class="playlist-settings-close-btn">&times;</button>
-        </header>
+            <button class="playlist-settings-close-btn">&times;</button>
+          </header>
           <div class="playlist-settings-content">
             <form>
               <label class="field-container">Name: <input type="text" id="playlistName"></label>
@@ -168,6 +170,52 @@
   <script src="./lib/player.js" type="module"></script>
   <!-- <script src="./lib/musicmetadata.min.js" type="module"></script> -->
 
+  <!-- <script src="./node_modules/@ffmpeg/ffmpeg/dist/umd/ffmpeg.js" type="text/javascript"></script>
+  <script src="./node_modules/@ffmpeg/util/dist/umd/index.js" type="text/javascript"></script> -->
+  <script type="module">
+
+    import { FFmpeg } from './node_modules/@ffmpeg/ffmpeg';
+    import { fetchFile, toBlobURL } from './node_modules/@ffmpeg/util';
+    function testFFMEG() {
+      const [loaded, setLoaded] = useState(false);
+      const ffmpegRef = useRef(new FFmpeg());
+      const videoRef = useRef(null);
+      const messageRef = useRef(null);
+
+      const load = async () => {
+        const baseURL = './node_modules/@ffmpeg/core@0.12.6/dist/umd'
+        const ffmpeg = ffmpegRef.current;
+        ffmpeg.on('log', ({ message }) => {
+          messageRef.current.innerHTML = message;
+          console.log(message);
+        });
+        // toBlobURL is used to bypass CORS issue, urls with the same
+        // domain can be used directly.
+        await ffmpeg.load({
+          coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+          wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+        });
+        setLoaded(true);
+      }
+
+      const transcode = async () => {
+        const ffmpeg = ffmpegRef.current;
+        await ffmpeg.writeFile('input.webm', await fetchFile('https://raw.githubusercontent.com/ffmpegwasm/testdata/master/Big_Buck_Bunny_180_10s.webm'));
+        await ffmpeg.exec(['-i', 'input.webm', 'output.mp4']);
+        const data = await ffmpeg.readFile('output.mp4');
+        videoRef.current.src =
+          URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
+      }
+    }
+
+    testFFMEG();
+  </script>
+
+
+
+
+
+
   <!-- Manage core application start-up  -->
   <script type="module">
     // import * as id3 from '//unpkg.com/id3js@^2/lib/id3.js';
@@ -197,7 +245,7 @@
         // });
 
         // // Output or process the metadata
-        console.log(metadata);
+        // console.log(metadata);
         return metadata;
       } catch (error) {
         console.error('Failed to read metadata:', error);
@@ -208,7 +256,7 @@
 
       // Open and prepare the IndexedDB database
 
-      const dbManager = DatabaseManager;
+      const dbManager = await DatabaseManager();
       try {
 
         const config = await dbManager.getDataById('system', CONFIG_ID)
@@ -231,7 +279,7 @@
         runApplication();
       })
 
-      async function runApplication(){
+      async function runApplication() {
 
         const config = await dbManager.getDataById('system', CONFIG_ID)
         await openMusicFolder(dbManager, config);
@@ -258,7 +306,7 @@
                 favourite: true,
               }
             })
-          } 
+          }
           // else {
           //   console.log('Already had details of ', file)
           // }
@@ -272,7 +320,7 @@
 
         files = await dbManager.processEntriesInBatches('track', (record) => {
           let extension = record.relativeFileName.split(".")
-          extension = extension[extension.length-1]
+          extension = extension[extension.length - 1]
           return record.relativeFileName.split('/').length > 2 && extension == 'm4a'
         })
 
@@ -282,17 +330,17 @@
 
         const playlistContainer = document.querySelector('#playlist');
         // const items = new Array(100).fill(1)
-        const items = files.slice(0, 1+4 * 3);
+        const items = files.slice(0, 1 + 4 * 3);
         const tandas = []
         let tanda = []
         items.forEach((item, index) => {
-          if ( index > 0 && index % 4 == 0 ){
+          if (index > 0 && index % 4 == 0) {
             tandas.push(tanda);
             tanda = []
           }
           tanda.push(item)
         })
-        
+
         console.log(tandas)
         playlistContainer.innerHTML = `${tandas.map((tanda) => {
 
@@ -306,7 +354,7 @@
         }).join('')}`
 
         let tracks = []
-        for ( let item of items ){ 
+        for (let item of items) {
           const file = await fileHandles[item.relativeFileName].getFile();
           let stats = await analyzeAudioFile(file)
           console.log(stats)
@@ -576,7 +624,7 @@
   <script type="module">
     import { DatabaseManager } from './lib/database.js';
 
-    const dbManager = DatabaseManager;
+    const dbManager = await DatabaseManager();
 
     let headers = document.querySelectorAll('.tanda-tracks-choice > .tab-headers > .tab-header');
     let contents = document.querySelectorAll('.tanda-tracks-choice > .tab-contents > .tab-content');
@@ -657,13 +705,13 @@
         })
 
       })
-    
+
       const favouriteTracks = document.querySelector('#favourites-track-results');
       const favouriteTandas = document.querySelector('#favourites-tandas-results');
       const favouriteTandasCount = document.querySelector('#favourites-tandas-count');
       const favouriteTracksCount = document.querySelector('#favourites-tracks-count');
 
-      
+
 
     });
   </script>
@@ -673,8 +721,8 @@
     import { DatabaseManager } from './lib/database.js';
     import { saveFileWithWritePermission } from './lib/file_system.js'
 
-    document.addEventListener('DOMContentLoaded', function () {
-      const dbManager = DatabaseManager;
+    document.addEventListener('DOMContentLoaded', async function () {
+      const dbManager = await DatabaseManager();
       let libraryFileHandle = null;
 
       const exportButton = document.querySelector('#exportDatabase');
