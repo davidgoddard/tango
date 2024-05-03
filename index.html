@@ -14,6 +14,8 @@
   <script type="module" src="./components/tanda.element.js"></script>
   <script type="module" src="./components/playlist.element.js"></script>
   <script type="module" src="./components/scratch-pad.element.js"></script>
+
+  <script src="./enable_threads.js"></script>
 </head>
 
 <body>
@@ -175,47 +177,88 @@
   <script src="./ffmpeg.min.js"></script>
   <!-- <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script> -->
 
-  <script type="module">
-  const { createFFmpeg } = FFmpeg;
+  <script type="module" id="ffmpeg-module">
+    const { createFFmpeg } = FFmpeg;
     const ffmpeg = createFFmpeg({ log: true });
 
-const initializeFFmpeg = async () => {
-    await ffmpeg.load();
-    console.log('FFmpeg initialized');
-};
+    const initializeFFmpeg = async () => {
+      await ffmpeg.load();
+      console.log('FFmpeg initialized');
+    };
 
-const convertFile = async (file) => {
-    // Write the file data to ffmpeg.js virtual file system
-    ffmpeg.FS('writeFile', file.name, await ffmpegFetchFile(file));
+    async function readFileContents(fileHandle) {
+      try {
+        // Use the file handle to obtain a file
+        const file = await fileHandle.getFile();
 
-    // Run ffmpeg command to convert audio file to WAV format
-    await ffmpeg.run('-i', file.name, 'output.wav');
+        // Use a FileReader to read the file contents
+        const reader = new FileReader();
 
-    // Read the converted file from ffmpeg.js virtual file system
-    const convertedFile = ffmpeg.FS('readFile', 'output.wav');
+        // Define a promise to read the file contents
+        return new Promise((resolve, reject) => {
+          reader.onload = () => {
+            // Resolve with the ArrayBuffer containing the file data
+            console.log('Read size: ', reader.result.length)
+            resolve(reader.result);
+          };
+          reader.onerror = () => {
+            // Reject with the error if FileReader encounters an error
+            reject(reader.error);
+          };
 
-    // Do something with the converted audio data (e.g., save to disk or process further)
-    console.log('Converted audio:', convertedFile);
+          // Read the file as binary data
+          reader.readAsBinaryString(file);
+        });
+      } catch (error) {
+        // Handle any errors that occur during file access
+        console.error("Error accessing file:", error);
+        throw error; // Re-throw the error for further handling
+      }
+    }
+    window.convertFile = async (fileHandle) => {
 
-    // Clean up
-    await ffmpeg.FS('unlink', file.name);
-    await ffmpeg.FS('unlink', 'output.wav');
-};
+      try {
 
-const fetchFile = async (file) => {
-    const response = await fetch(file);
-    return new Uint8Array(await response.arrayBuffer());
-};
+        const fileData = await readFileContents(fileHandle);
 
-(async () => {
-    await initializeFFmpeg();
-    // const fileInput = document.getElementById('fileInput');
-    // fileInput.addEventListener('change', async (event) => {
-    //     const file = event.target.files[0];
-    //     if (!file) return;
-    //     await convertFile(file);
-    // });
-})();
+        // Write the file data to ffmpeg.js virtual file system
+        await ffmpeg.FS('writeFile', fileHandle.name, fileData);
+
+        // Run ffmpeg command to convert audio file to WAV format
+        await ffmpeg.run('-i', fileHandle.name, 'output.wav');
+
+        // Read the converted file from ffmpeg.js virtual file system
+        const convertedFile = ffmpeg.FS('readFile', 'output.wav');
+
+        // Do something with the converted audio data (e.g., save to disk or process further)
+        console.log('Converted audio:', convertedFile);
+
+        // Clean up
+        await ffmpeg.FS('unlink', fileHandle.name);
+        await ffmpeg.FS('unlink', 'output.wav');
+
+      }
+      catch (error) {
+        console.log(error);
+        console.log('Carry on')
+      }
+    };
+
+    const fetchFile = async (file) => {
+      const response = await fetch(file);
+      return new Uint8Array(await response.arrayBuffer());
+    };
+
+
+    (async () => {
+      await initializeFFmpeg();
+      // const fileInput = document.getElementById('fileInput');
+      // fileInput.addEventListener('change', async (event) => {
+      //     const file = event.target.files[0];
+      //     if (!file) return;
+      //     await convertFile(file);
+      // });
+    })();
   </script>
   <!-- 
   <script src="./node_modules/@ffmpeg/ffmpeg/dist/umd/ffmpeg.js" type="module"></script>
@@ -296,6 +339,9 @@ const fetchFile = async (file) => {
         const file = await fileHandle.getFile();
         let metadata = {}
 
+        console.log('Actual size: ', file.size)
+
+        await window.convertFile(fileHandle);
         // const metadata = jsmediatags.read(file, {
         //   onSuccess: function (tag) {
         //     console.log(tag);
