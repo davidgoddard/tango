@@ -260,6 +260,9 @@
         if (silenceEndCommences == 0) {
           silenceEndCommences = duration
         }
+        if ( silenceEndCommences < duration - 20 ){
+          silenceEndCommences = duration
+        }
         console.log('Derived duration', duration)
         console.log('Derived silence at start finishes @', silenceStartFinishes)
         console.log('Derived silence at end starts @', silenceEndCommences)
