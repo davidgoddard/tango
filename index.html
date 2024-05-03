@@ -15,7 +15,14 @@
   <script type="module" src="./components/playlist.element.js"></script>
   <script type="module" src="./components/scratch-pad.element.js"></script>
 
-  <script src="./enable_threads.js"></script>
+  <!-- The following is a hack to allow FFmpeg to use concurrent threads off the main JS thread and share data between themselves -->
+  <script src="./lib/enable_threads.js"></script>
+  <script src="./lib/howler.min.js"></script>
+  <script src="./lib/ffmpeg.min.js"></script>
+
+
+
+
 </head>
 
 <body>
@@ -38,7 +45,7 @@
       browser. If you wish to save the current library of tandas etc. that goes with the current folder, then use the
       "Export" feature first.</p>
     <button id="exportDatabase">Export Database</button>
-    <button id="resetDatabase">Clear Database</button>
+    <button id="rescanButton">Reset Database and Re-scan for files</button>
   </div>
 
   <main class="all">
@@ -169,169 +176,36 @@
     </div>
   </div>
 
-  <script src="./lib/howler.min.js"></script>
-  <script src="./lib/database.js" type="module"></script>
-  <script src="./lib/player.js" type="module"></script>
-  <!-- <script src="./lib/musicmetadata.min.js" type="module"></script> -->
-
-  <script src="./ffmpeg.min.js"></script>
-  <!-- <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script> -->
-
-  <script type="module" id="ffmpeg-module">
-    const { createFFmpeg } = FFmpeg;
-    const ffmpeg = createFFmpeg({ log: true });
-
-    const initializeFFmpeg = async () => {
-      await ffmpeg.load();
-      console.log('FFmpeg initialized');
-    };
-
-    async function readFileContents(fileHandle) {
-      try {
-        // Use the file handle to obtain a file
-        const file = await fileHandle.getFile();
-
-        // Use a FileReader to read the file contents
-        const reader = new FileReader();
-
-        // Define a promise to read the file contents
-        return new Promise((resolve, reject) => {
-          reader.onload = () => {
-            // Resolve with the ArrayBuffer containing the file data
-            console.log('Read size: ', reader.result.length)
-            resolve(reader.result);
-          };
-          reader.onerror = () => {
-            // Reject with the error if FileReader encounters an error
-            reject(reader.error);
-          };
-
-          // Read the file as binary data
-          reader.readAsBinaryString(file);
-        });
-      } catch (error) {
-        // Handle any errors that occur during file access
-        console.error("Error accessing file:", error);
-        throw error; // Re-throw the error for further handling
-      }
-    }
-    window.convertFile = async (fileHandle) => {
-
-      try {
-
-        const fileData = await readFileContents(fileHandle);
-
-        // Write the file data to ffmpeg.js virtual file system
-        await ffmpeg.FS('writeFile', fileHandle.name, fileData);
-
-        // Run ffmpeg command to convert audio file to WAV format
-        await ffmpeg.run('-i', fileHandle.name, 'output.wav');
-
-        // Read the converted file from ffmpeg.js virtual file system
-        const convertedFile = ffmpeg.FS('readFile', 'output.wav');
-
-        // Do something with the converted audio data (e.g., save to disk or process further)
-        console.log('Converted audio:', convertedFile);
-
-        // Clean up
-        await ffmpeg.FS('unlink', fileHandle.name);
-        await ffmpeg.FS('unlink', 'output.wav');
-
-      }
-      catch (error) {
-        console.log(error);
-        console.log('Carry on')
-      }
-    };
-
-    const fetchFile = async (file) => {
-      const response = await fetch(file);
-      return new Uint8Array(await response.arrayBuffer());
-    };
-
-
-    (async () => {
-      await initializeFFmpeg();
-      // const fileInput = document.getElementById('fileInput');
-      // fileInput.addEventListener('change', async (event) => {
-      //     const file = event.target.files[0];
-      //     if (!file) return;
-      //     await convertFile(file);
-      // });
-    })();
-  </script>
-  <!-- 
-  <script src="./node_modules/@ffmpeg/ffmpeg/dist/umd/ffmpeg.js" type="module"></script>
-  <script src="./node_modules/@ffmpeg/util/dist/umd/index.js" type="module"></script>
-  <script type="module">
-
-    import { FFmpeg } from './node_modules/@ffmpeg/ffmpeg/dist/umd/ffmpeg.js';
-    import { fetchFile, toBlobURL } from './node_modules/@ffmpeg/util/dist/umd/index.js';
-    
-    function testFFMEG() {
-
-      const ffmpeg = new FFmpeg({ log: true });
-
-      const initializeFFmpeg = async () => {
-        await ffmpeg.load();
-        console.log('FFmpeg initialized');
-      };
-
-      const convertFile = async (file) => {
-        // Write the file data to ffmpeg.js virtual file system
-        ffmpeg.FS('writeFile', file.name, await fetchFile(file));
-
-        // Run ffmpeg command to convert audio file to WAV format
-        await ffmpeg.run('-i', file.name, 'output.wav');
-
-        // Read the converted file from ffmpeg.js virtual file system
-        const convertedFile = ffmpeg.FS('readFile', 'output.wav');
-
-        // Do something with the converted audio data (e.g., save to disk or process further)
-        console.log('Converted audio:', convertedFile);
-
-        // Clean up
-        await ffmpeg.FS('unlink', file.name);
-        await ffmpeg.FS('unlink', 'output.wav');
-      };
-
-      const fetchFile = async (file) => {
-        const response = await fetch(file);
-        return new Uint8Array(await response.arrayBuffer());
-      };
-
-      (async () => {
-        await initializeFFmpeg();
-        // const fileInput = document.getElementById('fileInput');
-        // fileInput.addEventListener('change', async (event) => {
-        //   const file = event.target.files[0];
-        //   if (!file) return;
-        //   await convertFile(file);
-        // });
-      })();
-    }
-
-
-    testFFMEG();
-  </script>
-
-
- -->
-
-
-
   <!-- Manage core application start-up  -->
   <script type="module">
-    // import * as id3 from '//unpkg.com/id3js@^2/lib/id3.js';
     import { DatabaseManager } from './lib/database.js';
     import { Player, to_time } from './lib/player.js';
     import { openMusicFolder, getAllFiles, verifyPermission, analyzeAudioFile } from './lib/file_system.js';
-    // import * as jsmediatags from './lib/musicmetadata.min.js';
+    import { runFFmpegCommand, initializeFFmpeg } from './lib/ffmpeg-interface.js';
 
     const SYSTEM = {
       musicFolder: undefined
     }
     const CONFIG_ID = 1
+
+    function timeStringToSeconds(timeString) {
+      // Split the time string into hours, minutes, seconds, and milliseconds
+      const [hours, minutes, secondsWithMillis] = timeString.split(':');
+
+      // Split seconds and milliseconds
+      const [seconds, milliseconds] = secondsWithMillis.split('.');
+
+      // Convert hours, minutes, seconds, and milliseconds to numbers
+      const hoursInSeconds = parseInt(hours) * 3600;
+      const minutesInSeconds = parseInt(minutes) * 60;
+      const secondsTotal = parseInt(seconds);
+      const millisecondsTotal = parseInt(milliseconds) / 100; // Convert milliseconds to seconds
+
+      // Calculate total time in seconds
+      const totalTimeInSeconds = hoursInSeconds + minutesInSeconds + secondsTotal + millisecondsTotal;
+
+      return totalTimeInSeconds;
+    }
 
     async function readMetadataFromFileHandle(fileHandle) {
       try {
@@ -339,27 +213,73 @@
         const file = await fileHandle.getFile();
         let metadata = {}
 
-        console.log('Actual size: ', file.size)
+        console.log(file.name, 'Actual size: ', file.size)
 
-        await window.convertFile(fileHandle);
-        // const metadata = jsmediatags.read(file, {
-        //   onSuccess: function (tag) {
-        //     console.log(tag);
-        //   },
-        //   onError: function (error) {
-        //     console.log(':(', error.type, error.info);
-        //   }
-        // });
+        const { convertedFile, outputLines } = await runFFmpegCommand(fileHandle, '-map', '0:a', '-af', 'volumedetect,silencedetect=n=-60dB:d=1', '-f', 'null', '-')
 
-        // // Output or process the metadata
-        // console.log(metadata);
-        return metadata;
+        let silenceStartFinishes = 0
+        let silenceEndCommences = 0
+        let duration = 0
+        let meanVolume = 0
+        let maxVolume = 0
+        for (const line of outputLines) {
+          if (line.match(/Parsed_volumedetect_0.*_volume/)) {
+            console.log('GAIN ', line)
+            const tokens = line.split(' ')
+            console.log(tokens)
+            if (tokens[4] == "mean_volume:") {
+              meanVolume = parseFloat(tokens[5])
+            }
+            if (tokens[4] == "max_volume:") {
+              maxVolume = parseFloat(tokens[5])
+            }
+          }
+          if (line.match(/\[fferr\]   Duration: /i)) {
+            console.log('DURATION', line)
+            const tokens = line.split(' ')
+            console.log(tokens)
+            duration = timeStringToSeconds(tokens[4])
+          }
+          if (line.match(/silencedetect @.* silence_start/)) {
+            console.log('SILENCE START', line)
+            const tokens = line.split(' ')
+            console.log(tokens)
+            silenceEndCommences = parseFloat(tokens[5])
+          }
+          if (line.match(/silencedetect @.* silence_end: .* | silence_duration: .*/)) {
+            console.log('SILENCE END', line)
+            const tokens = line.split(' ')
+            console.log(tokens)
+            let duration = parseFloat(tokens[8])
+            let time = parseFloat(tokens[5])
+            if (time < 10) {
+              silenceStartFinishes = time
+            }
+          }
+        }
+        if (silenceEndCommences == 0) {
+          silenceEndCommences = duration
+        }
+        console.log('Derived duration', duration)
+        console.log('Derived silence at start finishes @', silenceStartFinishes)
+        console.log('Derived silence at end starts @', silenceEndCommences)
+
+        metadata = {
+          duration,
+          start: silenceStartFinishes,
+          end: silenceEndCommences,
+          gain: maxVolume - meanVolume
+        }
+
+        return { size: convertedFile.byteLength, metadata };
       } catch (error) {
         console.error('Failed to read metadata:', error);
       }
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
+      await initializeFFmpeg();
+
 
       // Open and prepare the IndexedDB database
 
@@ -378,6 +298,8 @@
         console.error('Database operation failed', error);
       }
 
+      const config = await dbManager.getDataById('system', CONFIG_ID)
+
 
       console.log('Setting up OK button')
       let askUserPermissionButton = document.querySelector('#askUserPermission');
@@ -386,16 +308,18 @@
         runApplication();
       })
 
-      async function runApplication() {
+      console.log('Setting up Scan button')
+      let scanButton = document.querySelector('#rescanButton')
+      scanButton.addEventListener('click', async () => {
+        console.log('Deleting the database and re-creating')
+        await dbManager.resetDatabase();
+        console.log('Restoring config')
+        await dbManager.addData('system', config)
+        console.log('Re-scanning file system')
+        scanFileSystem()
+      })
 
-        const config = await dbManager.getDataById('system', CONFIG_ID)
-        await openMusicFolder(dbManager, config);
-
-        await verifyPermission(config.musicFolder, 'readonly')
-
-        const modal = document.querySelector('#permissionModal');
-        modal.classList = 'hidden'
-
+      async function scanFileSystem() {
         let files = await getAllFiles(config.musicFolder);
 
         // Store all changes
@@ -404,28 +328,44 @@
         for (const file of files) {
           const original = await dbManager.getDataByName('track', file.relativeFileName)
           if (!original) {
-            const tags = await readMetadataFromFileHandle(file.fileHandle)
-            await dbManager.addData('track', {
-              name: file.fileHandle.name,
-              relativeFileName: file.relativeFileName,
-              tags: tags,
-              classifiers: {
-                favourite: true,
+            const baseFile = await file.fileHandle.getFile();
+            console.log('Base file', file, baseFile)
+            if (baseFile.size > 1000) {
+              const { size, metadata } = await readMetadataFromFileHandle(file.fileHandle)
+              if (size > 1000) {
+                await dbManager.addData('track', {
+                  name: file.fileHandle.name,
+                  fileHandle: file.fileHandle,
+                  relativeFileName: file.relativeFileName,
+                  metadata,
+                  classifiers: {
+                    favourite: true,
+                  }
+                })
               }
-            })
+            }
           }
           // else {
           //   console.log('Already had details of ', file)
           // }
           //
-          fileHandles[file.relativeFileName] = file.fileHandle;
         }
 
         console.log('Have now updated the database with all tracks')
+      }
+
+      async function runApplication() {
+
+        await openMusicFolder(dbManager, config);
+
+        await verifyPermission(config.musicFolder, 'readonly')
+
+        const modal = document.querySelector('#permissionModal');
+        modal.classList = 'hidden'
 
         // Now query database for all tracks
 
-        files = await dbManager.processEntriesInBatches('track', (record) => {
+        const files = await dbManager.processEntriesInBatches('track', (record) => {
           let extension = record.relativeFileName.split(".")
           extension = extension[extension.length - 1]
           return record.relativeFileName.split('/').length > 2 && extension == 'm4a'
@@ -437,15 +377,17 @@
 
         const playlistContainer = document.querySelector('#playlist');
         // const items = new Array(100).fill(1)
-        const items = files.slice(0, 1 + 4 * 3);
+        const items = files
         const tandas = []
         let tanda = []
-        items.forEach((item, index) => {
-          if (index > 0 && index % 4 == 0) {
-            tandas.push(tanda);
-            tanda = []
+        items.forEach((item) => {
+          if (item.metadata.start > 0) {
+            if (tanda.length == 4) {
+              tandas.push(tanda);
+              tanda = []
+            }
+            tanda.push(item)
           }
-          tanda.push(item)
         })
 
         console.log(tandas)
@@ -453,24 +395,26 @@
 
           return `<tanda-element>
     <cortina-element title="Supertrooper" artist="Abba" style="T" duration="2:22" year="1940"></cortina-element>
-    <track-element title="${tanda[0].name}" artist="Artist A" style="Tango" duration="2:22" year="1940"></track-element>
-    <track-element title="${tanda[1].name}" artist="Artist B" style="Tango" duration="2:23" year="1940"></track-element>
-    <track-element title="${tanda[2].name}" artist="Artist C" style="Tango" duration="2:24" year="1940"></track-element>
-    <track-element title="${tanda[3].name}" artist="Artist C" style="Tango" duration="2:24" year="1940"></track-element>
+    <track-element title="${tanda[0].name}" artist="Artist A" style="Tango" duration="${to_time(tanda[0].metadata.duration * 1000)}" year="1940"></track-element>
+    <track-element title="${tanda[1].name}" artist="Artist B" style="Tango" duration="${to_time(tanda[1].metadata.duration * 1000)}" year="1940"></track-element>
+    <track-element title="${tanda[2].name}" artist="Artist C" style="Tango" duration="${to_time(tanda[2].metadata.duration * 1000)}" year="1940"></track-element>
+    <track-element title="${tanda[3].name}" artist="Artist C" style="Tango" duration="${to_time(tanda[3].metadata.duration * 1000)}" year="1940"></track-element>
 </tanda-element>`
         }).join('')}`
 
         let tracks = []
         for (let item of items) {
-          const file = await fileHandles[item.relativeFileName].getFile();
-          let stats = await analyzeAudioFile(file)
-          console.log(stats)
-          tracks.push({
-            fileHandle: fileHandles[item.relativeFileName],
-            start: 0,
-            end: 10000,
-            gain: -3
-          })
+          if (item.metadata.start > 0) {
+            const file = await item.fileHandle.getFile();
+            tracks.push({
+              fileHandle: item.fileHandle,
+              start: 1000 * item.metadata.start,
+              end: 1000 * item.metadata.end,
+              gain: item.metadata.gain
+            })
+          } else {
+            console.log('Skipping', item)
+          }
         }
 
         const h = document.querySelector('h1')
@@ -482,7 +426,7 @@
 
         // let tempoControl = document.querySelector('#tempo')
 
-        function nextTrack(N) {
+        async function nextTrack(N) {
           // tempoControl.value = 1;
           if (N < tracks.length) {
             return { track: tracks[N], silence: -2000 }
