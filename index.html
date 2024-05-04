@@ -411,7 +411,7 @@
 
         function renderTrack(track){
           return `<track-element 
-            title="${track.metadata.tags.find(tag => tag.name == 'title').value || track.name}" 
+            title="${track.metadata.tags.find(tag => tag.name == 'title')?.value || track.name}" 
             artist="${track.metadata.tags.find(tag => tag.name == 'artist')?.value || 'unknown'}" 
             style="Tango" 
             duration="${to_time(track.metadata.duration * 1000)}" 
