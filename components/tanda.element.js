@@ -61,16 +61,24 @@ class TandaElement extends HTMLElement {
 
     findMinMaxYears(years) {
         // Convert all year strings to numbers
-        const numericYears = years.map(Number);
+        let numericYears = years.map(Number);
 
-        // Calculate min and max
-        const minYear = Math.min(...numericYears);
-        const maxYear = Math.max(...numericYears);
+        const hasUnknown = numericYears.find(year => isNaN(year))
+        numericYears = numericYears.filter(year => !isNaN(year))
 
-        if (minYear != maxYear) {
-            return minYear + ' to ' + maxYear
+        if (numericYears.length > 0) {
+
+            // Calculate min and max
+            const minYear = Math.min(...numericYears);
+            const maxYear = Math.max(...numericYears);
+
+            if (minYear != maxYear) {
+                return [(hasUnknown ? 'Unknown' : ''), 'Years ' + minYear + ' to ' + maxYear].filter(x => x).join(', ')
+            } else {
+                return 'Year ' + minYear
+            }
         } else {
-            return 'Year ' + minYear
+            return 'Unknown'
         }
     }
 
@@ -79,7 +87,7 @@ class TandaElement extends HTMLElement {
         const cortina = Array.from(this.querySelectorAll('cortina-element'));
         const titles = tracks.map(track => track.getAttribute('title'));
         const artists = tracks.map(track => track.getAttribute('artist'));
-        const years = tracks.map(track => track.getAttribute('year'));
+        const years = tracks.map(track => track.getAttribute('year').substring(0, 4));
         const styles = new Set(tracks.map(track => track.getAttribute('style')));
         let duration = 0;
         tracks.forEach(track => duration += this.timeStringToSeconds(track.getAttribute('duration')));

@@ -222,7 +222,17 @@
         let duration = 0
         let meanVolume = 0
         let maxVolume = 0
+        let tags = []
+        let tagsContext = '';
         for (const line of outputLines) {
+          console.log(line)
+          if (tagsContext == '' && line.match(/Output.*to 'pipe:'/)) {
+            tagsContext = 'output'
+          }
+          if (tagsContext == 'output' && line.match(/\[fferr\]     /)) {
+            let tag = { name: line.substring("fferr]     ".length).split(':')[0].trim(), value: line.split(':')[1].trim() }
+            tags.push(tag)
+          }
           if (line.match(/Parsed_volumedetect_0.*_volume/)) {
             console.log('GAIN ', line)
             const tokens = line.split(' ')
@@ -260,7 +270,7 @@
         if (silenceEndCommences == 0) {
           silenceEndCommences = duration
         }
-        if ( silenceEndCommences < duration - 20 ){
+        if (silenceEndCommences < duration - 20) {
           silenceEndCommences = duration
         }
         console.log('Derived duration', duration)
@@ -271,7 +281,9 @@
           duration,
           start: silenceStartFinishes,
           end: silenceEndCommences,
-          gain: maxVolume - meanVolume
+          meanVolume,
+          maxVolume,
+          tags
         }
 
         return { size: convertedFile.byteLength, metadata };
@@ -368,13 +380,19 @@
 
         // Now query database for all tracks
 
+        let systemLowestGain = { metadata: {meanVolume: 0, maxVolume: 0 }}
+
         const files = await dbManager.processEntriesInBatches('track', (record) => {
+          let trackLevel = record.metadata.meanVolume - record.metadata.maxVolume
+          let systemLevel = systemLowestGain.metadata.meanVolume - systemLowestGain.metadata.maxVolume
+          console.log(record, trackLevel, systemLevel)
+          if ( trackLevel < systemLevel ) systemLowestGain = record
           let extension = record.relativeFileName.split(".")
           extension = extension[extension.length - 1]
           return record.relativeFileName.split('/').length > 2 && extension == 'm4a'
         })
 
-        console.log('Fetched all files', files.length)
+        console.log('Fetched all files', files.length, 'Lowest gain', systemLowestGain)
 
         // Create a dummy playlist
 
@@ -384,41 +402,40 @@
         const tandas = []
         let tanda = []
         items.forEach((item) => {
-          if (item.metadata.start > 0) {
-            if (tanda.length == 4) {
-              tandas.push(tanda);
-              tanda = []
-            }
-            tanda.push(item)
+          if (tanda.length == 4) {
+            tandas.push(tanda);
+            tanda = []
           }
+          tanda.push(item)
         })
+
+        function renderTrack(track){
+          return `<track-element 
+            title="${track.metadata.tags.find(tag => tag.name == 'title').value || track.name}" 
+            artist="${track.metadata.tags.find(tag => tag.name == 'artist')?.value || 'unknown'}" 
+            style="Tango" 
+            duration="${to_time(track.metadata.duration * 1000)}" 
+            year="${track.metadata.tags.find(tag => tag.name == 'date')?.value.substring(0,10) || 'unknown'}">
+          </track-element>`      
+        }
 
         console.log(tandas)
         playlistContainer.innerHTML = `${tandas.map((tanda) => {
 
           return `<tanda-element>
     <cortina-element title="Supertrooper" artist="Abba" style="T" duration="2:22" year="1940"></cortina-element>
-    <track-element title="${tanda[0].name}" artist="Artist A" style="Tango" duration="${to_time(tanda[0].metadata.duration * 1000)}" year="1940"></track-element>
-    <track-element title="${tanda[1].name}" artist="Artist B" style="Tango" duration="${to_time(tanda[1].metadata.duration * 1000)}" year="1940"></track-element>
-    <track-element title="${tanda[2].name}" artist="Artist C" style="Tango" duration="${to_time(tanda[2].metadata.duration * 1000)}" year="1940"></track-element>
-    <track-element title="${tanda[3].name}" artist="Artist C" style="Tango" duration="${to_time(tanda[3].metadata.duration * 1000)}" year="1940"></track-element>
+    ${renderTrack(tanda[0])}
+    ${renderTrack(tanda[1])}
+    ${renderTrack(tanda[2])}
+    ${renderTrack(tanda[3])}
 </tanda-element>`
         }).join('')}`
 
         let tracks = []
         for (let item of items) {
-          if (item.metadata.start > 0) {
-            const file = await item.fileHandle.getFile();
-            tracks.push({
-              fileHandle: item.fileHandle,
-              start: 1000 * item.metadata.start,
-              end: 1000 * item.metadata.end,
-              gain: item.metadata.gain
-            })
-          } else {
-            console.log('Skipping', item)
-          }
+          tracks.push(item)
         }
+        console.log('Tracks with gain', tracks)
 
         const h = document.querySelector('h1')
         let now;
@@ -432,7 +449,7 @@
         async function nextTrack(N) {
           // tempoControl.value = 1;
           if (N < tracks.length) {
-            return { track: tracks[N], silence: -2000 }
+            return { track: tracks[N], silence: -0 }
           } else {
             return { track: null, silence: 0 };
           }
@@ -441,8 +458,8 @@
         // Assume an output device has been selected
 
         let player = new Player({
-          systemGain: 0.2, // about -20dB
-          fadeRate: 3000, // time over which to fade out 
+          systemLowestGain,
+          fadeRate: 500, // time over which to fade out 
           progress: reportProgress,
           nextUp: nextTrack
         })

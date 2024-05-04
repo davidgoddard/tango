@@ -22,7 +22,8 @@ class TrackElement extends HTMLElement {
         </style>
         <article class="track">
             <h2>${this.getAttribute('title')}</h2>
-            <p>${this.getAttribute('style')} By ${this.getAttribute('artist')} Year ${this.getAttribute('year')} Duration: ${this.getAttribute('duration')}</p>
+            <p>
+                <span class='style'>${this.getAttribute('style')}</span> By <span class='artist'>${this.getAttribute('artist')}</span> Year <span class='year'>${this.getAttribute('year')}</span> Duration: <span class='duration'>${this.getAttribute('duration')}</span></p>
         </article>
         `;
     }
