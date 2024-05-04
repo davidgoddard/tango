@@ -27,6 +27,44 @@ class PlaylistElement extends HTMLElement {
         // this.addDragDropListeners();
     }
 
+    // Method called during playback when track changes
+    playing(N){
+        const trackList = Array.from(this.querySelectorAll('track-element, cortina-element')); // Get all tracks in the playlist
+        const tandaList = Array.from(this.querySelectorAll('tanda-element')); // Get all tandas in the playlist
+
+        trackList.map(track => track.classList.remove('playing'))
+        trackList[N].classList.add('playing')
+
+        tandaList.map(tanda => {
+            tanda.classList.remove('playing')
+            tanda.classList.remove('played')
+        })
+
+        const tanda = trackList[N].parentElement
+
+        let sibling = tanda;
+        while (sibling.previousElementSibling) {
+            sibling = sibling.previousElementSibling;
+            sibling.classList.add('played')
+          }
+
+        tanda.classList.add('playing')
+        tanda.scrollIntoView({
+            behavior: 'smooth', // Smooth scrolling
+            block: 'start',     // Scroll to the top of the element
+            inline: 'nearest'   // Scroll horizontally to the nearest edge of the element
+          });
+
+
+
+        // const currentTanda = tandaList.find(tanda => {
+        //     const tandaTracks = tanda.querySelectorAll('track-element')
+        // })
+
+        
+
+    }
+
     replaceTanda(existingTanda, newTanda) {
         const tandaList = Array.from(this.querySelectorAll('tanda-element')); // Get all tandas in the playlist
 
@@ -79,6 +117,13 @@ class PlaylistElement extends HTMLElement {
     handleTandaAdded(tanda) {
 
         let actions = tanda.shadowRoot.querySelector('#actions')
+        
+        // function clickHandler(){
+        //     console.log('Clicked tanda', tanda)
+        //     const event = new CustomEvent("playTanda", { detail: tanda });
+        //     this.dispatchEvent(event);
+        // }
+        // tanda.addEventListener('clickedTrack', clickHandler.bind(this))
 
         function moveToScratchPad(event) {
             const scratchpadSelector = this.getAttribute('scratchpadSelector');

@@ -31,6 +31,13 @@ class ScratchPadElement extends HTMLElement {
 
     handleTandaAdded(tanda) {
         console.log('Tanda added to scratchpad:', tanda);
+
+        let tracks = tanda.querySelectorAll('track-element,cortina-element')
+        for ( let track of tracks ){
+            track.classList.remove('playing')
+        }
+        
+
         let actions = tanda.shadowRoot.querySelector('#actions')
 
         let button = document.createElement('button')

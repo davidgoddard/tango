@@ -27,12 +27,12 @@
 
 <body>
   <header class="content">
-    <button id="hamburger" aria-label="Open menu">&#9776;</button>
+    <button class="active" id="hamburger" aria-label="Open menu">&#9776;</button>
     <h1>Website Title</h1>
     <label>View: <select id="modeSelector"></select></label>
   </header>
   <div id="settingsPanel" class="side-panel content">
-    <button id="closeBtn" aria-label="Close Settings">&times;</button>
+    <button class="active" id="closeBtn" aria-label="Close Settings">&times;</button>
     <h2>Settings</h2>
     <ul>
       <li>Links to classification page</li>
@@ -44,8 +44,8 @@
     <p>To use another folder as the source of music files requires clearing the old database which is stored in the
       browser. If you wish to save the current library of tandas etc. that goes with the current folder, then use the
       "Export" feature first.</p>
-    <button id="exportDatabase">Export Database</button>
-    <button id="rescanButton">Reset Database and Re-scan for files</button>
+    <button class="active" id="exportDatabase">Export Database</button>
+    <button class="active" id="rescanButton">Reset Database and Re-scan for files</button>
   </div>
 
   <main class="all">
@@ -124,6 +124,9 @@
         <header class="playlistHeading">
           <h2>Playlist</h2>
           <section>
+            <button id="stopButton"><img src="./icons/stopNow.png" alt="stop now"></button>
+          </section>
+          <section>
             <p>Show times:
               <label>Relative: <input type="radio" name="timingBase" value="relative">
                 Real: <input type="radio" name="timingBase" value="realtime" checked="checked"></label>
@@ -134,7 +137,8 @@
         <div class="playlist-settings-panel">
           <header>
             <h1>Current Playlist Settings</h1>
-            <button class="playlist-settings-close-btn" aria-label="Close Playlist Settings">&times;</button>
+            <button class="active playlist-settings-close-btn"
+              aria-label="Close Playlist Settings">&times;</button>
           </header>
           <div class="playlist-settings-content">
             <form>
@@ -172,7 +176,7 @@
       <h2>Permission Request</h2>
       <p>Tanda Player needs your permission to read your music files folder for all files. Please click 'Allow' to
         continue.</p>
-      <button id="askUserPermission">Allow</button>
+      <button class="active" id="askUserPermission">Allow</button>
     </div>
   </div>
 
@@ -380,13 +384,13 @@
 
         // Now query database for all tracks
 
-        let systemLowestGain = { metadata: {meanVolume: 0, maxVolume: 0 }}
+        let systemLowestGain = { metadata: { meanVolume: 0, maxVolume: 0 } }
 
         const files = await dbManager.processEntriesInBatches('track', (record) => {
           let trackLevel = record.metadata.meanVolume - record.metadata.maxVolume
           let systemLevel = systemLowestGain.metadata.meanVolume - systemLowestGain.metadata.maxVolume
           console.log(record, trackLevel, systemLevel)
-          if ( trackLevel < systemLevel ) systemLowestGain = record
+          if (trackLevel < systemLevel) systemLowestGain = record
           let extension = record.relativeFileName.split(".")
           extension = extension[extension.length - 1]
           return record.relativeFileName.split('/').length > 2 && extension == 'm4a'
@@ -397,6 +401,25 @@
         // Create a dummy playlist
 
         const playlistContainer = document.querySelector('#playlist');
+        playlistContainer.addEventListener('clickedTrack', async (event) => {
+          console.log('Clicked on tanda track', event.detail)
+          if (!player.isPlaying) {
+
+            const tracks = playlistContainer.querySelectorAll('track-element, cortina-element')
+            console.log('Tracks', tracks)
+            let N = 0
+            for (let i = 0; i < tracks.length; i++) {
+              if (tracks[i] === event.detail) {
+                N = i;
+                console.log('Clicked on track N ', N)
+              }
+            }
+            console.log('Nothing playing at the moment')
+            await player.updatePosition(N - 1);
+            player.startNext();
+            stopButton.classList.add('active')
+          }
+        })
         // const items = new Array(100).fill(1)
         const items = files
         const tandas = []
@@ -409,33 +432,28 @@
           tanda.push(item)
         })
 
-        function renderTrack(track){
+        function renderTrack(track) {
           return `<track-element 
+            trackId="${track.id}"
             title="${track.metadata.tags.find(tag => tag.name == 'title')?.value || track.name}" 
             artist="${track.metadata.tags.find(tag => tag.name == 'artist')?.value || 'unknown'}" 
             style="Tango" 
             duration="${to_time(track.metadata.duration * 1000)}" 
-            year="${track.metadata.tags.find(tag => tag.name == 'date')?.value.substring(0,10) || 'unknown'}">
-          </track-element>`      
+            year="${track.metadata.tags.find(tag => tag.name == 'date')?.value.substring(0, 10) || 'unknown'}">
+          </track-element>`
         }
 
         console.log(tandas)
         playlistContainer.innerHTML = `${tandas.map((tanda) => {
 
           return `<tanda-element>
-    <cortina-element title="Supertrooper" artist="Abba" style="T" duration="2:22" year="1940"></cortina-element>
+    <cortina-element trackId="12" title="Supertrooper" artist="Abba" style="T" duration="2:22" year="1940"></cortina-element>
     ${renderTrack(tanda[0])}
     ${renderTrack(tanda[1])}
     ${renderTrack(tanda[2])}
     ${renderTrack(tanda[3])}
 </tanda-element>`
         }).join('')}`
-
-        let tracks = []
-        for (let item of items) {
-          tracks.push(item)
-        }
-        console.log('Tracks with gain', tracks)
 
         const h = document.querySelector('h1')
         let now;
@@ -448,20 +466,40 @@
 
         async function nextTrack(N) {
           // tempoControl.value = 1;
+
+          // Find Nth track in playlist
+          const tracks = playlistContainer.querySelectorAll('track-element, cortina-element');
+
           if (N < tracks.length) {
-            return { track: tracks[N], silence: -0 }
+            N--
+            let track;
+            do {
+              N++
+              const trackElement = tracks[N];
+              console.log('Track Element', trackElement, trackElement.tagName)
+              const id = trackElement.getAttribute('trackId');
+              // track = await dbManager.getDataById(trackElement.tagName == 'CORTINA-ELEMENT' ? 'cortina' : 'track', parseInt(id))
+              track = await dbManager.getDataById('track', parseInt(id))
+              console.log('Actual track ', track)
+            } while (!track)
+            return { track, silence: -0 }
           } else {
             return { track: null, silence: 0 };
           }
+        }
+
+        function playing(N) {
+          playlistContainer.playing(N)
         }
 
         // Assume an output device has been selected
 
         let player = new Player({
           systemLowestGain,
-          fadeRate: 500, // time over which to fade out 
+          fadeRate: 2000, // time over which to fade out 
           progress: reportProgress,
-          nextUp: nextTrack
+          nextUp: nextTrack,
+          playing
         })
 
         // tempoControl.addEventListener('input', ()=>{
@@ -480,9 +518,15 @@
         // })
 
 
-        await player.updatePosition(-1);
-        player.startNext();
+        // await player.updatePosition(1);
+        // player.startNext();
 
+        const stopButton = document.querySelector('#stopButton')
+        stopButton.classList.add('active')
+        stopButton.addEventListener('click', () => {
+          stopButton.classList.remove('active');
+          player.stop();
+        })
 
 
         window.addEventListener('beforeunload', function (event) {

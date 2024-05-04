@@ -55,10 +55,20 @@ header button {
   background: none;
   border: none;
   color: white;
-  font-size: 24px;
+  font-size: 30px;
   cursor: pointer;
   flex-grow: 0;
   justify-self: flex-start;
+  display: none;
+}
+
+header button.active {
+  display: flex;
+}
+
+header button img {
+  height: 40px;
+  width: 40px;
 }
 
 header select {

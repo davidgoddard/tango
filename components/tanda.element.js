@@ -75,7 +75,7 @@ class TandaElement extends HTMLElement {
             if (minYear != maxYear) {
                 return [(hasUnknown ? 'Unknown' : ''), 'Years ' + minYear + ' to ' + maxYear].filter(x => x).join(', ')
             } else {
-                return 'Year ' + minYear
+                return [(hasUnknown ? 'Unknown' : ''), 'Year ' + minYear].filter(x => x).join(', ')
             }
         } else {
             return 'Unknown'
@@ -104,7 +104,7 @@ class TandaElement extends HTMLElement {
                     border: solid 2px #ccc;
                     border-radius: 7px;
                     margin-top: 0rem;
-                    margin-bottom: 0.2rem;
+                    margin-bottom: 0rem;
                     padding: 0.2rem;
                 }
                 #actions {
@@ -136,12 +136,23 @@ class TandaElement extends HTMLElement {
                 #actions button.target {
                     display: none;
                     border: none;
-                    margin: 0px;
+                    margin: 0 0 0 1rem;
                     padding: 0px;
                 }
+                :host-context(.playing) #container article {
+                    border: dashed 2px #cf8805;
+                    display: block;
+                    border-radius: 10px;
+                    margin: 1rem!important;
+                }
+                :host-context(.played) {
+                    display: block;
+                    background-color: #777;
+                    border-radius: 10px;
+                }
+                
             </style>
             <div id="container" class="${styles.size == 1 ? [...styles][0] : '?'}">
-                <button class="target"><img src='./icons/target.png'></button>
                 <article>
                     <div id="toggle" class="summary">
                         <header>
