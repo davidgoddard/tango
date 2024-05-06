@@ -21,10 +21,10 @@ img {
 
 header {
   background: #353536;
-  text-align: center;
   border-bottom: 5px solid #ffb30e;
   color: white;
   display: flex;
+  justify-content: space-between;
 }
 header > * {
   flex-grow: 1;
@@ -56,13 +56,19 @@ main.playlistOnly {
   grid-template-rows: auto 1fr; /* Header size auto, rest is for body */
 }
 
+
+header > label {
+  display: flex;
+  align-items: center;
+  justify-content: end;
+}
+
 header button {
   background: none;
   border: none;
   color: white;
   font-size: 30px;
   cursor: pointer;
-  flex-grow: 0;
   justify-self: flex-start;
   display: none;
 }
