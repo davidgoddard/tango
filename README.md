@@ -38,3 +38,19 @@ The app can produce a display board page which if moved to a separate display mo
 In addition the DJ can install a program called MQTT which is a message broker which, when the Tanda Player app opens it looks for, and if found messages are sent to this broker describing what is playing now and next. An additional dedicated display board web page can then be opened and connected to the DJ's PC using the WiFi connection and allows display boards to be set up around the venue.
 
 If there is no local WiFi available the DJ can set their mobile phone as a WiFi hotspot and use that.
+
+# Legacy Support
+
+If you have an Old Tanda Player library, the entire contents can be loaded into this new Tanda Player importing all your tandas, song titles, artists and music classifications and set up all the old playlists.
+
+# Technical Info
+
+This application is built on two huge projects:
+- Howler.js - the music player
+- FFmpeg WASM - an amazing port of the full FFmpeg application for use in web pages!
+
+Using the Web's FileSystemAPI the web page is able to request access to your hard disk or USB flash drives and from there find all the music files.
+
+Each file is then passed to FFmpeg to extract all the ID3 tags (title, artist etc.) and analyse the leading and trailing silences and the mean and maximum volumes.  There is a memory issue with the FFmpeg WASM file in that if you keep running commands it runs out of memory and crashes the web page!  To get around this, every 100 commands the Tanda Player tries to re-create the FFmpeg instance leaving the operating system and browser to clear up the mess but hopefully no out of memory errors will occur.
+
+The playlist is constructed from these tracks and they are fed to Howler.js to play as required.

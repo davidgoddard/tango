@@ -20,7 +20,7 @@ class TandaElement extends HTMLElement {
             // Format MM:SS
             seconds = parts[0] * 60 + parts[1];
         } else {
-            throw new Error('Invalid time format');
+            return '?'
         }
 
         return seconds;
@@ -28,35 +28,39 @@ class TandaElement extends HTMLElement {
 
     to_time(s) {
         // Calculate hours, minutes and seconds
-        let seconds = Math.round(s);
-        let minutes = Math.floor(seconds / 60);
-        let hours = Math.floor(minutes / 60);
-
-        // Reduce minutes and seconds to be within 0-59
-        seconds %= 60;
-        minutes %= 60;
-
-        // Create an array of the time components
-        const parts = [];
-
-        // Format minutes and seconds: always two digits if hours or minutes are included
-        const formattedSeconds = seconds < 10 ? '0' + seconds : seconds;
-        const formattedMinutes = minutes < 10 ? '0' + minutes : minutes;
-
-        // Add hours if non-zero
-        if (hours > 0) {
-            parts.push(hours);  // Add hours if non-zero
-            parts.push(formattedMinutes); // Minutes with leading zero
+        if (isNaN(s)) {
+            return '?'
         } else {
-            parts.push(minutes); // Add minutes as is (no leading zero)
+
+            let seconds = Math.round(s);
+            let minutes = Math.floor(seconds / 60);
+            let hours = Math.floor(minutes / 60);
+
+            // Reduce minutes and seconds to be within 0-59
+            seconds %= 60;
+            minutes %= 60;
+
+            // Create an array of the time components
+            const parts = [];
+
+            // Format minutes and seconds: always two digits if hours or minutes are included
+            const formattedSeconds = seconds < 10 ? '0' + seconds : seconds;
+            const formattedMinutes = minutes < 10 ? '0' + minutes : minutes;
+
+            // Add hours if non-zero
+            if (hours > 0) {
+                parts.push(hours);  // Add hours if non-zero
+                parts.push(formattedMinutes); // Minutes with leading zero
+            } else {
+                parts.push(minutes); // Add minutes as is (no leading zero)
+            }
+
+            // Always add seconds, with leading zero if necessary
+            parts.push(formattedSeconds);
+
+            // Join parts with ':' to form the final time string
+            return parts.join(':');
         }
-
-        // Always add seconds, with leading zero if necessary
-        parts.push(formattedSeconds);
-
-        // Join parts with ':' to form the final time string
-        return parts.join(':');
-
     }
 
     findMinMaxYears(years) {
@@ -99,6 +103,10 @@ class TandaElement extends HTMLElement {
             <style>
                 .summary { cursor: pointer; display: grid; grid-template-columns: 20px 4fr auto auto;}
                 .summary header { display: flex; justify-content: center }
+                .summary header span {
+                    font-size: 1.5rem;
+                    font-weight: bold;
+                }
                 .details { display: none; }
                 #container article {
                     border: solid 2px #ccc;
@@ -117,6 +125,9 @@ class TandaElement extends HTMLElement {
                     padding: 0px;
                     margin-left: 10px;
                     border: none;
+                    background: transparent;
+                    height: 20px;
+                    width: 20px;
                 }
                 .details.expanded {
                     display: block;
@@ -138,6 +149,11 @@ class TandaElement extends HTMLElement {
                     border: none;
                     margin: 0 0 0 1rem;
                     padding: 0px;
+                    background: transparent;
+                }
+                button img {
+                    height: 20px;
+                    width: 20px;
                 }
                 :host-context(.playing) #container article {
                     border: dashed 2px #cf8805;

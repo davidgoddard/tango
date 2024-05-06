@@ -17,6 +17,8 @@
 
   <!-- The following is a hack to allow FFmpeg to use concurrent threads off the main JS thread and share data between themselves -->
   <script src="./lib/enable_threads.js"></script>
+
+  <!-- The following provides the underlying music player and file analyser -->
   <script src="./lib/howler.min.js"></script>
   <script src="./lib/ffmpeg.min.js"></script>
 
@@ -45,7 +47,17 @@
       browser. If you wish to save the current library of tandas etc. that goes with the current folder, then use the
       "Export" feature first.</p>
     <button class="active" id="exportDatabase">Export Database</button>
-    <button class="active" id="rescanButton">Reset Database and Re-scan for files</button>
+    <button class="active" id="rescanButton">Re-scan for new files only</button>
+    <button class="active" id="rescanAnalyzeButton">Re-Analyze</button>
+    <button class="active" id="deleteDBButton">Reset Database</button>
+    <button class="active" id="loadLibraryButton">Open existing Tanda Player Library</button>
+
+    <section id="scannerProgress">
+      <h3>File Scanner Progress</h3>
+      <p id="scanProgress"></p>
+      <p id="scanFilePath"></p>
+      <p id="scanFileName"></p>
+    </section>
   </div>
 
   <main class="all">
@@ -137,8 +149,7 @@
         <div class="playlist-settings-panel">
           <header>
             <h1>Current Playlist Settings</h1>
-            <button class="active playlist-settings-close-btn"
-              aria-label="Close Playlist Settings">&times;</button>
+            <button class="active playlist-settings-close-btn" aria-label="Close Playlist Settings">&times;</button>
           </header>
           <div class="playlist-settings-content">
             <form>
@@ -184,115 +195,26 @@
   <script type="module">
     import { DatabaseManager } from './lib/database.js';
     import { Player, to_time } from './lib/player.js';
-    import { openMusicFolder, getAllFiles, verifyPermission, analyzeAudioFile } from './lib/file_system.js';
-    import { runFFmpegCommand, initializeFFmpeg } from './lib/ffmpeg-interface.js';
+    import { openMusicFolder, getAllFiles, verifyPermission, fetchLibraryFiles } from './lib/file_system.js';
+    import { runFFmpegCommand, initializeFFmpeg, decodeFFmpegOutput } from './lib/ffmpeg-interface.js';
 
     const SYSTEM = {
       musicFolder: undefined
     }
     const CONFIG_ID = 1
 
-    function timeStringToSeconds(timeString) {
-      // Split the time string into hours, minutes, seconds, and milliseconds
-      const [hours, minutes, secondsWithMillis] = timeString.split(':');
 
-      // Split seconds and milliseconds
-      const [seconds, milliseconds] = secondsWithMillis.split('.');
-
-      // Convert hours, minutes, seconds, and milliseconds to numbers
-      const hoursInSeconds = parseInt(hours) * 3600;
-      const minutesInSeconds = parseInt(minutes) * 60;
-      const secondsTotal = parseInt(seconds);
-      const millisecondsTotal = parseInt(milliseconds) / 100; // Convert milliseconds to seconds
-
-      // Calculate total time in seconds
-      const totalTimeInSeconds = hoursInSeconds + minutesInSeconds + secondsTotal + millisecondsTotal;
-
-      return totalTimeInSeconds;
-    }
 
     async function readMetadataFromFileHandle(fileHandle) {
       try {
         // Get the File object from the file handle
         const file = await fileHandle.getFile();
-        let metadata = {}
-
-        console.log(file.name, 'Actual size: ', file.size)
-
         const { convertedFile, outputLines } = await runFFmpegCommand(fileHandle, '-map', '0:a', '-af', 'volumedetect,silencedetect=n=-60dB:d=1', '-f', 'null', '-')
-
-        let silenceStartFinishes = 0
-        let silenceEndCommences = 0
-        let duration = 0
-        let meanVolume = 0
-        let maxVolume = 0
-        let tags = []
-        let tagsContext = '';
-        for (const line of outputLines) {
-          console.log(line)
-          if (tagsContext == '' && line.match(/Output.*to 'pipe:'/)) {
-            tagsContext = 'output'
-          }
-          if (tagsContext == 'output' && line.match(/\[fferr\]     /)) {
-            let tag = { name: line.substring("fferr]     ".length).split(':')[0].trim(), value: line.split(':')[1].trim() }
-            tags.push(tag)
-          }
-          if (line.match(/Parsed_volumedetect_0.*_volume/)) {
-            console.log('GAIN ', line)
-            const tokens = line.split(' ')
-            console.log(tokens)
-            if (tokens[4] == "mean_volume:") {
-              meanVolume = parseFloat(tokens[5])
-            }
-            if (tokens[4] == "max_volume:") {
-              maxVolume = parseFloat(tokens[5])
-            }
-          }
-          if (line.match(/\[fferr\]   Duration: /i)) {
-            console.log('DURATION', line)
-            const tokens = line.split(' ')
-            console.log(tokens)
-            duration = timeStringToSeconds(tokens[4])
-          }
-          if (line.match(/silencedetect @.* silence_start/)) {
-            console.log('SILENCE START', line)
-            const tokens = line.split(' ')
-            console.log(tokens)
-            silenceEndCommences = parseFloat(tokens[5])
-          }
-          if (line.match(/silencedetect @.* silence_end: .* | silence_duration: .*/)) {
-            console.log('SILENCE END', line)
-            const tokens = line.split(' ')
-            console.log(tokens)
-            let duration = parseFloat(tokens[8])
-            let time = parseFloat(tokens[5])
-            if (time < 10) {
-              silenceStartFinishes = time
-            }
-          }
-        }
-        if (silenceEndCommences == 0) {
-          silenceEndCommences = duration
-        }
-        if (silenceEndCommences < duration - 20) {
-          silenceEndCommences = duration
-        }
-        console.log('Derived duration', duration)
-        console.log('Derived silence at start finishes @', silenceStartFinishes)
-        console.log('Derived silence at end starts @', silenceEndCommences)
-
-        metadata = {
-          duration,
-          start: silenceStartFinishes,
-          end: silenceEndCommences,
-          meanVolume,
-          maxVolume,
-          tags
-        }
-
+        const metadata = decodeFFmpegOutput(outputLines);
         return { size: convertedFile.byteLength, metadata };
       } catch (error) {
         console.error('Failed to read metadata:', error);
+        return { size: 0, metadata: {} }
       }
     }
 
@@ -317,42 +239,142 @@
         console.error('Database operation failed', error);
       }
 
-      const config = await dbManager.getDataById('system', CONFIG_ID)
+      let config = await dbManager.getDataById('system', CONFIG_ID)
 
-
-      console.log('Setting up OK button')
       let askUserPermissionButton = document.querySelector('#askUserPermission');
       askUserPermissionButton.addEventListener('click', async () => {
-        console.log('Clicked OK button')
         runApplication();
       })
 
-      console.log('Setting up Scan button')
-      let scanButton = document.querySelector('#rescanButton')
-      scanButton.addEventListener('click', async () => {
-        console.log('Deleting the database and re-creating')
+      let deleteDBButton = document.querySelector('#deleteDBButton')
+      deleteDBButton.addEventListener('click', async () => {
+        console.log('Deleting the database')
         await dbManager.resetDatabase();
         console.log('Restoring config')
-        await dbManager.addData('system', config)
+        await dbManager.addData('system', SYSTEM)
+        config = await dbManager.getDataById('system', CONFIG_ID)
+        await setFolder();
+      })
+      let scanButton = document.querySelector('#rescanButton')
+      scanButton.addEventListener('click', async () => {
         console.log('Re-scanning file system')
-        scanFileSystem()
+        await scanFileSystem(false)
+      })
+      let loadLibraryButton = document.querySelector('#loadLibraryButton')
+      loadLibraryButton.addEventListener('click', async () => {
+        const libraryFileHandles = await fetchLibraryFiles(config.musicFolder);
+        if (libraryFileHandles) {
+          console.log(libraryFileHandles)
+          let file = await libraryFileHandles.library.getFile();
+          const library = JSON.parse(await file.text())
+          console.log(library)
+          file = await libraryFileHandles.cortinas.getFile();
+          const cortinas = JSON.parse(await file.text())
+          console.log('cortinas', cortinas)
+          file = await libraryFileHandles.tandas.getFile();
+          const tandas = JSON.parse(await file.text())
+          console.log('tandas', tandas)
+          file = await libraryFileHandles.playlists.getFile();
+          const playlists = JSON.parse(await file.text())
+          console.log('playlists', playlists)
+
+          let n = 0
+          let keys = Object.keys(library)
+          for (const trackName of keys) {
+            scanFilePath.textContent = trackName;
+            scanProgress.textContent = ++n + '/' + keys.length
+
+            const existing = await dbManager.getDataByName('track', '/' + trackName);
+            if (!existing) {
+              console.log('Missing file', trackName)
+            } else {
+              const libTrack = library[trackName]
+              const metadata = {
+                tags: [
+                  { name: 'title', value: libTrack.track.title },
+                  { name: 'artist', value: libTrack.track.artist },
+                  { name: 'year', value: libTrack.track.date },
+                  { name: 'meanVolume', value: libTrack.analysis.meanGain },
+                  { name: 'maxVolume', value: libTrack.analysis.gain },
+                ],
+                start: libTrack.analysis.start,
+                end: libTrack.analysis.silence,
+                style: libTrack.classifiers?.style,
+                duration: libTrack.analysis.duration,
+
+              }
+              existing.metadata = metadata
+              await dbManager.updateData('track', existing.id, existing)
+            }
+          }
+
+          // for ( let tanda of tandas ){
+          //   tanda.tracks = tanda.tracks.map(track => '/' + track)
+          //   const existing = dbManager.getDataById
+          //   await dbManager.addData('tanda', tanda)
+          // }
+          const playlistContainer = document.querySelector('#playlist');
+
+          function renderTrack(track) {
+            return `<track-element 
+            trackId="${track.id}"
+            title="${track.metadata?.tags?.find(tag => tag.name == 'title')?.value || track.name}" 
+            artist="${track.metadata?.tags?.find(tag => tag.name == 'artist')?.value || 'unknown'}" 
+            style="${track.metadata?.style}"
+            duration="${to_time(track.metadata?.duration * 1000)}" 
+            year="${track.metadata?.tags?.find(tag => tag.name == 'date')?.value.substring(0, 10) || 'unknown'}">
+          </track-element>`
+          }
+          let html = ''
+          for (const tanda of tandas) {
+            let tracks = []
+            for (let i = 0; i < tanda.tracks.length; i++) {
+              const track = await dbManager.getDataByName('track', '/' + tanda.tracks[i])
+              console.log('Track?', track)
+              if ( track )
+                tracks.push(track)
+            }
+            html += `<tanda-element>
+<cortina-element trackId="12" title="Supertrooper" artist="Abba" style="T" duration="2:22" year="1940"></cortina-element>
+${tracks.map(track => renderTrack(track)).join('')}
+</tanda-element>`
+          }
+          playlistContainer.innerHTML = html
+
+        }
       })
 
-      async function scanFileSystem() {
+      // Find all song files and add to the database any not yet known
+
+      const scanProgress = document.querySelector('#scanProgress')
+      const scanFilePath = document.querySelector('#scanFilePath')
+      const scanFileName = document.querySelector('#scanFileName')
+
+      async function scanFileSystem(analyze) {
         let files = await getAllFiles(config.musicFolder);
 
         // Store all changes
 
         const fileHandles = {}
+        let n = 0;
         for (const file of files) {
+          scanFilePath.textContent = file.relativeFileName;
+          scanFileName.textContent = file.name
+          scanProgress.textContent = ++n + '/' + files.length
           const original = await dbManager.getDataByName('track', file.relativeFileName)
           if (!original) {
             const baseFile = await file.fileHandle.getFile();
-            console.log('Base file', file, baseFile)
             if (baseFile.size > 1000) {
-              const { size, metadata } = await readMetadataFromFileHandle(file.fileHandle)
+              let size = baseFile.size;
+              let metadata = { start: 0, end: -1, duration: undefined };
+              if (analyze) {
+                let { s, m } = await readMetadataFromFileHandle(file.fileHandle)
+                size = s
+                metadata = m
+              }
               if (size > 1000) {
-                await dbManager.addData('track', {
+                const table = file.relativeFileName.split(/\/|\\/g)[1] == 'music' ? 'track' : 'cortina'
+                await dbManager.addData(table, {
                   name: file.fileHandle.name,
                   fileHandle: file.fileHandle,
                   relativeFileName: file.relativeFileName,
@@ -373,11 +395,17 @@
         console.log('Have now updated the database with all tracks')
       }
 
-      async function runApplication() {
+      async function setFolder() {
 
         await openMusicFolder(dbManager, config);
 
         await verifyPermission(config.musicFolder, 'readonly')
+
+      }
+
+      async function runApplication() {
+
+        await setFolder();
 
         const modal = document.querySelector('#permissionModal');
         modal.classList = 'hidden'
@@ -389,7 +417,6 @@
         const files = await dbManager.processEntriesInBatches('track', (record) => {
           let trackLevel = record.metadata.meanVolume - record.metadata.maxVolume
           let systemLevel = systemLowestGain.metadata.meanVolume - systemLowestGain.metadata.maxVolume
-          console.log(record, trackLevel, systemLevel)
           if (trackLevel < systemLevel) systemLowestGain = record
           let extension = record.relativeFileName.split(".")
           extension = extension[extension.length - 1]
@@ -402,22 +429,26 @@
 
         const playlistContainer = document.querySelector('#playlist');
         playlistContainer.addEventListener('clickedTrack', async (event) => {
-          console.log('Clicked on tanda track', event.detail)
-          if (!player.isPlaying) {
+          try {
+            console.log('Clicked on tanda track', event.detail)
+            if (!player.isPlaying) {
 
-            const tracks = playlistContainer.querySelectorAll('track-element, cortina-element')
-            console.log('Tracks', tracks)
-            let N = 0
-            for (let i = 0; i < tracks.length; i++) {
-              if (tracks[i] === event.detail) {
-                N = i;
-                console.log('Clicked on track N ', N)
+              const tracks = playlistContainer.querySelectorAll('track-element, cortina-element')
+              console.log('Tracks', tracks)
+              let N = 0
+              for (let i = 0; i < tracks.length; i++) {
+                if (tracks[i] === event.detail) {
+                  N = i;
+                  console.log('Clicked on track N ', N)
+                }
               }
+              console.log('Nothing playing at the moment')
+              await player.updatePosition(N - 1);
+              player.startNext();
+              stopButton.classList.add('active')
             }
-            console.log('Nothing playing at the moment')
-            await player.updatePosition(N - 1);
-            player.startNext();
-            stopButton.classList.add('active')
+          } catch (error) {
+            alert(error)
           }
         })
         // const items = new Array(100).fill(1)
@@ -435,11 +466,11 @@
         function renderTrack(track) {
           return `<track-element 
             trackId="${track.id}"
-            title="${track.metadata.tags.find(tag => tag.name == 'title')?.value || track.name}" 
-            artist="${track.metadata.tags.find(tag => tag.name == 'artist')?.value || 'unknown'}" 
-            style="Tango" 
-            duration="${to_time(track.metadata.duration * 1000)}" 
-            year="${track.metadata.tags.find(tag => tag.name == 'date')?.value.substring(0, 10) || 'unknown'}">
+            title="${track.metadata?.tags?.find(tag => tag.name == 'title')?.value || track.name}" 
+            artist="${track.metadata?.tags?.find(tag => tag.name == 'artist')?.value || 'unknown'}" 
+            style="${track.metadata?.style}"
+            duration="${to_time(track.metadata?.duration * 1000)}" 
+            year="${track.metadata?.tags?.find(tag => tag.name == 'date')?.value.substring(0, 10) || 'unknown'}">
           </track-element>`
         }
 
@@ -459,7 +490,7 @@
         let now;
         async function reportProgress(data) {
           if (!now) now = new Date().getTime();
-          h.textContent = data.display + `    Elapsed from start: ${to_time(new Date().getTime() - now)}`
+          h.textContent = data.display// + `    Elapsed from start: ${to_time(new Date().getTime() - now)}`
         }
 
         // let tempoControl = document.querySelector('#tempo')
@@ -476,11 +507,9 @@
             do {
               N++
               const trackElement = tracks[N];
-              console.log('Track Element', trackElement, trackElement.tagName)
               const id = trackElement.getAttribute('trackId');
               // track = await dbManager.getDataById(trackElement.tagName == 'CORTINA-ELEMENT' ? 'cortina' : 'track', parseInt(id))
               track = await dbManager.getDataById('track', parseInt(id))
-              console.log('Actual track ', track)
             } while (!track)
             return { track, silence: -0 }
           } else {
@@ -569,11 +598,11 @@
     document.addEventListener('DOMContentLoaded', async () => {
 
       document.getElementById('hamburger').addEventListener('click', function () {
-        document.getElementById('settingsPanel').style.transform = 'translateX(250px)';
+        document.getElementById('settingsPanel').style.transform = 'translateX(800px)';
       });
 
       document.getElementById('closeBtn').addEventListener('click', function () {
-        document.getElementById('settingsPanel').style.transform = 'translateX(-250px)';
+        document.getElementById('settingsPanel').style.transform = 'translateX(-800px)';
       });
 
       document.querySelector('.playlist-settings-icon').addEventListener('click', function () {
@@ -593,6 +622,7 @@
   <!-- Handle user's choice of visible columns -->
   <script>
     document.addEventListener('DOMContentLoaded', () => {
+      console.log('Set up handlers for column switching')
       const modeSelector = document.getElementById('modeSelector');
       const searchColumn = document.getElementById('searchColumn');
       const scratchpadColumn = document.getElementById('scratchpadColumn');
@@ -656,6 +686,8 @@
   <!-- Handle column width adjustments -->
   <script>
     document.addEventListener('DOMContentLoaded', function () {
+
+      console.log('Setting up column width handlers')
       const container = document.querySelector('main');
       let startX, startWidthLeft, startWidthRight, handleBeingDragged;
 
@@ -733,13 +765,13 @@
       }
     })
 
+    console.log('Set up language support')
+
   </script>
 
   <!-- Searches -->
   <script type="module">
     import { DatabaseManager } from './lib/database.js';
-
-    const dbManager = await DatabaseManager();
 
     let headers = document.querySelectorAll('.tanda-tracks-choice > .tab-headers > .tab-header');
     let contents = document.querySelectorAll('.tanda-tracks-choice > .tab-contents > .tab-content');
@@ -779,13 +811,17 @@
       });
     });
 
-    document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('DOMContentLoaded', async function () {
+
+      const dbManager = await DatabaseManager();
+
+
       const searchText = document.querySelector('#search');
       const tandaResults = document.querySelector('#tanda-results');
       const trackResults = document.querySelector('#track-results');
       const tandasCount = document.querySelector('#tandas-count');
       const tracksCount = document.querySelector('#tracks-count');
-
+      console.log('About to set up search')
       searchText.addEventListener('change', async () => {
         console.log(searchText.value)
 

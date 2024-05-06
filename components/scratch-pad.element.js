@@ -36,6 +36,12 @@ class ScratchPadElement extends HTMLElement {
         for ( let track of tracks ){
             track.classList.remove('playing')
         }
+
+        tanda.scrollIntoView({
+            behavior: 'smooth', // Smooth scrolling
+            block: 'start',     // Scroll to the top of the element
+            inline: 'nearest'   // Scroll horizontally to the nearest edge of the element
+          });
         
 
         let actions = tanda.shadowRoot.querySelector('#actions')

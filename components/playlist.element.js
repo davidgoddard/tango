@@ -177,7 +177,7 @@ class PlaylistElement extends HTMLElement {
             if (action.title) button.title = action.title;
             if (action.image) {
                 let image = document.createElement('img');
-                image.alt = action.text;
+                image.alt = action.title;
                 image.src = action.image;
                 button.appendChild(image)
             }
@@ -212,6 +212,14 @@ class PlaylistElement extends HTMLElement {
                 }
                 tanda-element button {
                     cursor: pointer;
+                }
+                button.target {
+                    border: none;
+                    background: transparent;
+                }
+                button.target img {
+                    height: 20px;
+                    width: 20px;
                 }
             </style>
             <slot></slot>
