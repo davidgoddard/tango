@@ -7,6 +7,11 @@
   <meta name="description" content="Author: David Goddard
   A tanda based music player for Tango DJs">
   <title>Audio File Analyzer</title>
+
+  <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
+  <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
+
+
   <link rel="manifest" href="./manifest.json">
   <link rel="stylesheet" href="./css/styles.css">
   <script type="module" src="./components/file.element.js"></script>
@@ -16,7 +21,7 @@
   <script type="module" src="./components/scratch-pad.element.js"></script>
 
   <!-- The following is a hack to allow FFmpeg to use concurrent threads off the main JS thread and share data between themselves -->
-  <script src="./lib/enable_threads.js"></script>
+  <!-- <script src="./lib/enable_threads.js"></script> -->
 
   <!-- The following provides the underlying music player and file analyser -->
   <script src="./lib/howler.min.js"></script>
@@ -331,7 +336,7 @@
             for (let i = 0; i < tanda.tracks.length; i++) {
               const track = await dbManager.getDataByName('track', '/' + tanda.tracks[i])
               console.log('Track?', track)
-              if ( track )
+              if (track)
                 tracks.push(track)
             }
             html += `<tanda-element>
