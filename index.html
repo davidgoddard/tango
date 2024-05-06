@@ -225,6 +225,16 @@
     document.addEventListener('DOMContentLoaded', async () => {
       await initializeFFmpeg();
 
+      const searchField = document.querySelector('#search')
+
+
+      searchField.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') {
+          // Remove focus from the input field when Enter is pressed
+          searchField.blur();
+        }
+      });
+
       console.log('Set up handlers for column switching')
       const modeSelector = document.getElementById('modeSelector');
       const searchColumn = document.getElementById('searchColumn');
@@ -280,122 +290,283 @@
       };
 
 
-    // Add event listener for keydown event on the document
-    document.addEventListener('keydown', function (event) {
-      if (event.target.tagName !== 'INPUT' && event.target.tagName !== 'TEXTAREA') {
-        // Check if a specific key or combination of keys is pressed
-        if (event.key.toLowerCase() === 's') {
-          // Perform your action here when CTRL+S is pressed
-          console.log('S pressed');
-          // Prevent the default browser action (e.g., saving the page)
-          event.preventDefault();
-          changeScreenLayout('Search')
-        } else if (event.key.toLowerCase() === 'p') {
-          // Perform your action here when the Escape key is pressed
-          console.log('P key pressed');
-          changeScreenLayout('Playlist')
-        } else if (event.key.toLowerCase() === 'a') {
-          // Perform your action here when the Escape key is pressed
-          console.log('A key pressed');
-          changeScreenLayout('All columns')
-        }
-        // Add more conditions for other key combinations as needed
-      }
-    });
+      // Add event listener for keydown event on the document
+      document.addEventListener('keydown', function (event) {
+        if (event.target.tagName !== 'INPUT' && event.target.tagName !== 'TEXTAREA') {
+          // Check if a specific key or combination of keys is pressed
+          if (event.key.toLowerCase() === 's') {
+            // Perform your action here when CTRL+S is pressed
+            console.log('S pressed');
+            // Prevent the default browser action (e.g., saving the page)
+            event.preventDefault();
+            changeScreenLayout('Search')
+            searchField.focus();
 
-    // Open and prepare the IndexedDB database
-
-    const dbManager = await DatabaseManager();
-    try {
-
-      const config = await dbManager.getDataById('system', CONFIG_ID)
-
-      if (!config) {
-        // Set defaults
-        await dbManager.addData('system', SYSTEM)
-        console.log(`Set default config`)
-      }
-
-    } catch (error) {
-      console.error('Database operation failed', error);
-    }
-
-    let config = await dbManager.getDataById('system', CONFIG_ID)
-
-    let askUserPermissionButton = document.querySelector('#askUserPermission');
-    askUserPermissionButton.addEventListener('click', async () => {
-      runApplication();
-    })
-
-    let deleteDBButton = document.querySelector('#deleteDBButton')
-    deleteDBButton.addEventListener('click', async () => {
-      console.log('Deleting the database')
-      await dbManager.resetDatabase();
-      console.log('Restoring config')
-      await dbManager.addData('system', SYSTEM)
-      config = await dbManager.getDataById('system', CONFIG_ID)
-      await setFolder();
-    })
-    let scanButton = document.querySelector('#rescanButton')
-    scanButton.addEventListener('click', async () => {
-      console.log('Re-scanning file system')
-      await scanFileSystem(false)
-    })
-    let loadLibraryButton = document.querySelector('#loadLibraryButton')
-    loadLibraryButton.addEventListener('click', async () => {
-      const libraryFileHandles = await fetchLibraryFiles(config.musicFolder);
-      if (libraryFileHandles) {
-        console.log(libraryFileHandles)
-        let file = await libraryFileHandles.library.getFile();
-        const library = JSON.parse(await file.text())
-        console.log(library)
-        file = await libraryFileHandles.cortinas.getFile();
-        const cortinas = JSON.parse(await file.text())
-        console.log('cortinas', cortinas)
-        file = await libraryFileHandles.tandas.getFile();
-        const tandas = JSON.parse(await file.text())
-        console.log('tandas', tandas)
-        file = await libraryFileHandles.playlists.getFile();
-        const playlists = JSON.parse(await file.text())
-        console.log('playlists', playlists)
-
-        let n = 0
-        let keys = Object.keys(library)
-        for (const trackName of keys) {
-          scanFilePath.textContent = trackName;
-          scanProgress.textContent = ++n + '/' + keys.length
-
-          const existing = await dbManager.getDataByName('track', '/' + trackName);
-          if (!existing) {
-            console.log('Missing file', trackName)
-          } else {
-            const libTrack = library[trackName]
-            const metadata = {
-              tags: [
-                { name: 'title', value: libTrack.track.title },
-                { name: 'artist', value: libTrack.track.artist },
-                { name: 'year', value: libTrack.track.date },
-                { name: 'meanVolume', value: libTrack.analysis.meanGain },
-                { name: 'maxVolume', value: libTrack.analysis.gain },
-              ],
-              start: libTrack.analysis.start,
-              end: libTrack.analysis.silence,
-              style: libTrack.classifiers?.style,
-              duration: libTrack.analysis.duration,
-
-            }
-            existing.metadata = metadata
-            await dbManager.updateData('track', existing.id, existing)
+          } else if (event.key.toLowerCase() === 'p') {
+            // Perform your action here when the Escape key is pressed
+            console.log('P key pressed');
+            changeScreenLayout('Playlist')
+          } else if (event.key.toLowerCase() === 'a') {
+            // Perform your action here when the Escape key is pressed
+            console.log('A key pressed');
+            changeScreenLayout('All columns')
           }
+          // Add more conditions for other key combinations as needed
+        }
+      });
+
+      // Open and prepare the IndexedDB database
+
+      const dbManager = await DatabaseManager();
+      try {
+
+        const config = await dbManager.getDataById('system', CONFIG_ID)
+
+        if (!config) {
+          // Set defaults
+          await dbManager.addData('system', SYSTEM)
+          console.log(`Set default config`)
         }
 
-        // for ( let tanda of tandas ){
-        //   tanda.tracks = tanda.tracks.map(track => '/' + track)
-        //   const existing = dbManager.getDataById
-        //   await dbManager.addData('tanda', tanda)
-        // }
+      } catch (error) {
+        console.error('Database operation failed', error);
+      }
+
+      let config = await dbManager.getDataById('system', CONFIG_ID)
+
+      let askUserPermissionButton = document.querySelector('#askUserPermission');
+      askUserPermissionButton.addEventListener('click', async () => {
+        runApplication();
+      })
+
+      let deleteDBButton = document.querySelector('#deleteDBButton')
+      deleteDBButton.addEventListener('click', async () => {
+        console.log('Deleting the database')
+        await dbManager.resetDatabase();
+        console.log('Restoring config')
+        await dbManager.addData('system', SYSTEM)
+        config = await dbManager.getDataById('system', CONFIG_ID)
+        await setFolder();
+      })
+      let scanButton = document.querySelector('#rescanButton')
+      scanButton.addEventListener('click', async () => {
+        console.log('Re-scanning file system')
+        await scanFileSystem(false)
+      })
+      let loadLibraryButton = document.querySelector('#loadLibraryButton')
+      loadLibraryButton.addEventListener('click', async () => {
+        const libraryFileHandles = await fetchLibraryFiles(config.musicFolder);
+        if (libraryFileHandles) {
+          console.log(libraryFileHandles)
+          let file = await libraryFileHandles.library.getFile();
+          const library = JSON.parse(await file.text())
+          console.log(library)
+          file = await libraryFileHandles.cortinas.getFile();
+          const cortinas = JSON.parse(await file.text())
+          console.log('cortinas', cortinas)
+          file = await libraryFileHandles.tandas.getFile();
+          const tandas = JSON.parse(await file.text())
+          console.log('tandas', tandas)
+          file = await libraryFileHandles.playlists.getFile();
+          const playlists = JSON.parse(await file.text())
+          console.log('playlists', playlists)
+
+          let n = 0
+          let keys = Object.keys(library)
+          for (const trackName of keys) {
+            scanFilePath.textContent = trackName;
+            scanProgress.textContent = ++n + '/' + keys.length
+
+            const existing = await dbManager.getDataByName('track', '/' + trackName);
+            if (!existing) {
+              console.log('Missing file', trackName)
+            } else {
+              const libTrack = library[trackName]
+              const metadata = {
+                tags: [
+                  { name: 'title', value: libTrack.track.title },
+                  { name: 'artist', value: libTrack.track.artist },
+                  { name: 'year', value: libTrack.track.date },
+                  { name: 'meanVolume', value: libTrack.analysis.meanGain },
+                  { name: 'maxVolume', value: libTrack.analysis.gain },
+                ],
+                start: libTrack.analysis.start,
+                end: libTrack.analysis.silence,
+                style: libTrack.classifiers?.style,
+                duration: libTrack.analysis.duration,
+
+              }
+              existing.metadata = metadata
+              await dbManager.updateData('track', existing.id, existing)
+            }
+          }
+
+          // for ( let tanda of tandas ){
+          //   tanda.tracks = tanda.tracks.map(track => '/' + track)
+          //   const existing = dbManager.getDataById
+          //   await dbManager.addData('tanda', tanda)
+          // }
+          const playlistContainer = document.querySelector('#playlist');
+
+
+          function renderTrack(track) {
+            return `<track-element 
+            trackId="${track.id}"
+            title="${track.metadata?.tags?.find(tag => tag.name == 'title')?.value || track.name}" 
+            artist="${track.metadata?.tags?.find(tag => tag.name == 'artist')?.value || 'unknown'}" 
+            style="${track.metadata?.style}"
+            duration="${to_time(track.metadata?.duration * 1000)}" 
+            year="${track.metadata?.tags?.find(tag => tag.name == 'date')?.value.substring(0, 10) || 'unknown'}">
+          </track-element>`
+          }
+          let html = ''
+          for (const tanda of tandas) {
+            let tracks = []
+            for (let i = 0; i < tanda.tracks.length; i++) {
+              const track = await dbManager.getDataByName('track', '/' + tanda.tracks[i])
+              console.log('Track?', track)
+              if (track)
+                tracks.push(track)
+            }
+            html += `<tanda-element>
+<cortina-element trackId="12" title="Supertrooper" artist="Abba" style="T" duration="2:22" year="1940"></cortina-element>
+${tracks.map(track => renderTrack(track)).join('')}
+</tanda-element>`
+          }
+          playlistContainer.innerHTML = html
+
+        }
+      })
+
+      // Find all song files and add to the database any not yet known
+
+      const scanProgress = document.querySelector('#scanProgress')
+      const scanFilePath = document.querySelector('#scanFilePath')
+      const scanFileName = document.querySelector('#scanFileName')
+
+      async function scanFileSystem(analyze) {
+        let files = await getAllFiles(config.musicFolder);
+
+        // Store all changes
+
+        const fileHandles = {}
+        let n = 0;
+        for (const file of files) {
+          scanFilePath.textContent = file.relativeFileName;
+          scanFileName.textContent = file.name
+          scanProgress.textContent = ++n + '/' + files.length
+          const original = await dbManager.getDataByName('track', file.relativeFileName)
+          if (!original) {
+            const baseFile = await file.fileHandle.getFile();
+            if (baseFile.size > 1000) {
+              let size = baseFile.size;
+              let metadata = { start: 0, end: -1, duration: undefined };
+              if (analyze) {
+                let { s, m } = await readMetadataFromFileHandle(file.fileHandle)
+                size = s
+                metadata = m
+              }
+              if (size > 1000) {
+                const table = file.relativeFileName.split(/\/|\\/g)[1] == 'music' ? 'track' : 'cortina'
+                await dbManager.addData(table, {
+                  name: file.fileHandle.name,
+                  fileHandle: file.fileHandle,
+                  relativeFileName: file.relativeFileName,
+                  metadata,
+                  classifiers: {
+                    favourite: true,
+                  }
+                })
+              }
+            }
+          }
+          // else {
+          //   console.log('Already had details of ', file)
+          // }
+          //
+        }
+
+        console.log('Have now updated the database with all tracks')
+      }
+
+      async function setFolder() {
+
+        await openMusicFolder(dbManager, config);
+
+        await verifyPermission(config.musicFolder, 'readonly')
+
+      }
+
+      async function runApplication() {
+
+        await setFolder();
+
+        const modal = document.querySelector('#permissionModal');
+        modal.classList = 'hidden'
+
+        // Now query database for all tracks
+
+        let systemLowestGain = { metadata: { meanVolume: 0, maxVolume: 0 } }
+
+        const files = await dbManager.processEntriesInBatches('track', (record) => {
+          let trackLevel = record.metadata.meanVolume - record.metadata.maxVolume
+          let systemLevel = systemLowestGain.metadata.meanVolume - systemLowestGain.metadata.maxVolume
+          if (trackLevel < systemLevel) systemLowestGain = record
+          let extension = record.relativeFileName.split(".")
+          extension = extension[extension.length - 1]
+          return record.relativeFileName.split('/').length > 2 && extension == 'm4a'
+        })
+
+        console.log('Fetched all files', files.length, 'Lowest gain', systemLowestGain)
+
         const playlistContainer = document.querySelector('#playlist');
 
+        playlistContainer.addEventListener('playFullCortina', async (event) => {
+          const cortina = await dbManager.getDataById('cortina', event.target.querySelector('cortina-element').getAttribute('trackid'))
+          player.extendEndTime(cortina.metadata.end)
+        })
+        playlistContainer.addEventListener('stopPlayFullCortina', async (event) => {
+          player.extendEndTime(0)
+        })
+
+        playlistContainer.addEventListener('clickedTrack', async (event) => {
+          try {
+            console.log('Playlist detected clicked on tanda track', event.detail)
+            if (!player.isPlaying) {
+              const tracks = playlistContainer.querySelectorAll('track-element, cortina-element')
+              let N = 0
+              for (let i = 0; i < tracks.length; i++) {
+                if (tracks[i] === event.detail) {
+                  N = i;
+                  console.log('Clicked on track N ', N)
+                }
+              }
+              console.log('Nothing playing at the moment')
+              await player.updatePosition(N - 1);
+              player.next.silence = 0
+              player.startNext();
+              stopButton.classList.add('active')
+            }
+          } catch (error) {
+            alert(error)
+          }
+        })
+
+        // Create a dummy playlist
+
+
+
+        // const items = new Array(100).fill(1)
+        const items = files
+        const tandas = []
+        let tanda = []
+        items.forEach((item) => {
+          if (tanda.length == 4) {
+            tandas.push(tanda);
+            tanda = []
+          }
+          tanda.push(item)
+        })
 
         function renderTrack(track) {
           return `<track-element 
@@ -407,284 +578,125 @@
             year="${track.metadata?.tags?.find(tag => tag.name == 'date')?.value.substring(0, 10) || 'unknown'}">
           </track-element>`
         }
-        let html = ''
-        for (const tanda of tandas) {
-          let tracks = []
-          for (let i = 0; i < tanda.tracks.length; i++) {
-            const track = await dbManager.getDataByName('track', '/' + tanda.tracks[i])
-            console.log('Track?', track)
-            if (track)
-              tracks.push(track)
-          }
-          html += `<tanda-element>
-<cortina-element trackId="12" title="Supertrooper" artist="Abba" style="T" duration="2:22" year="1940"></cortina-element>
-${tracks.map(track => renderTrack(track)).join('')}
-</tanda-element>`
-        }
-        playlistContainer.innerHTML = html
 
-      }
-    })
+        console.log(tandas)
+        playlistContainer.innerHTML = `${tandas.map((tanda) => {
 
-    // Find all song files and add to the database any not yet known
-
-    const scanProgress = document.querySelector('#scanProgress')
-    const scanFilePath = document.querySelector('#scanFilePath')
-    const scanFileName = document.querySelector('#scanFileName')
-
-    async function scanFileSystem(analyze) {
-      let files = await getAllFiles(config.musicFolder);
-
-      // Store all changes
-
-      const fileHandles = {}
-      let n = 0;
-      for (const file of files) {
-        scanFilePath.textContent = file.relativeFileName;
-        scanFileName.textContent = file.name
-        scanProgress.textContent = ++n + '/' + files.length
-        const original = await dbManager.getDataByName('track', file.relativeFileName)
-        if (!original) {
-          const baseFile = await file.fileHandle.getFile();
-          if (baseFile.size > 1000) {
-            let size = baseFile.size;
-            let metadata = { start: 0, end: -1, duration: undefined };
-            if (analyze) {
-              let { s, m } = await readMetadataFromFileHandle(file.fileHandle)
-              size = s
-              metadata = m
-            }
-            if (size > 1000) {
-              const table = file.relativeFileName.split(/\/|\\/g)[1] == 'music' ? 'track' : 'cortina'
-              await dbManager.addData(table, {
-                name: file.fileHandle.name,
-                fileHandle: file.fileHandle,
-                relativeFileName: file.relativeFileName,
-                metadata,
-                classifiers: {
-                  favourite: true,
-                }
-              })
-            }
-          }
-        }
-        // else {
-        //   console.log('Already had details of ', file)
-        // }
-        //
-      }
-
-      console.log('Have now updated the database with all tracks')
-    }
-
-    async function setFolder() {
-
-      await openMusicFolder(dbManager, config);
-
-      await verifyPermission(config.musicFolder, 'readonly')
-
-    }
-
-    async function runApplication() {
-
-      await setFolder();
-
-      const modal = document.querySelector('#permissionModal');
-      modal.classList = 'hidden'
-
-      // Now query database for all tracks
-
-      let systemLowestGain = { metadata: { meanVolume: 0, maxVolume: 0 } }
-
-      const files = await dbManager.processEntriesInBatches('track', (record) => {
-        let trackLevel = record.metadata.meanVolume - record.metadata.maxVolume
-        let systemLevel = systemLowestGain.metadata.meanVolume - systemLowestGain.metadata.maxVolume
-        if (trackLevel < systemLevel) systemLowestGain = record
-        let extension = record.relativeFileName.split(".")
-        extension = extension[extension.length - 1]
-        return record.relativeFileName.split('/').length > 2 && extension == 'm4a'
-      })
-
-      console.log('Fetched all files', files.length, 'Lowest gain', systemLowestGain)
-
-      const playlistContainer = document.querySelector('#playlist');
-
-      playlistContainer.addEventListener('playFullCortina', async (event) => {
-        const cortina = await dbManager.getDataById('cortina', event.target.querySelector('cortina-element').getAttribute('trackid'))
-        player.extendEndTime(cortina.metadata.end)
-      })
-      playlistContainer.addEventListener('stopPlayFullCortina', async (event) => {
-        player.extendEndTime(0)
-      })
-
-      playlistContainer.addEventListener('clickedTrack', async (event) => {
-        try {
-          console.log('Playlist detected clicked on tanda track', event.detail)
-          if (!player.isPlaying) {
-            const tracks = playlistContainer.querySelectorAll('track-element, cortina-element')
-            let N = 0
-            for (let i = 0; i < tracks.length; i++) {
-              if (tracks[i] === event.detail) {
-                N = i;
-                console.log('Clicked on track N ', N)
-              }
-            }
-            console.log('Nothing playing at the moment')
-            await player.updatePosition(N - 1);
-            player.next.silence = 0
-            player.startNext();
-            stopButton.classList.add('active')
-          }
-        } catch (error) {
-          alert(error)
-        }
-      })
-
-      // Create a dummy playlist
-
-
-
-      // const items = new Array(100).fill(1)
-      const items = files
-      const tandas = []
-      let tanda = []
-      items.forEach((item) => {
-        if (tanda.length == 4) {
-          tandas.push(tanda);
-          tanda = []
-        }
-        tanda.push(item)
-      })
-
-      function renderTrack(track) {
-        return `<track-element 
-            trackId="${track.id}"
-            title="${track.metadata?.tags?.find(tag => tag.name == 'title')?.value || track.name}" 
-            artist="${track.metadata?.tags?.find(tag => tag.name == 'artist')?.value || 'unknown'}" 
-            style="${track.metadata?.style}"
-            duration="${to_time(track.metadata?.duration * 1000)}" 
-            year="${track.metadata?.tags?.find(tag => tag.name == 'date')?.value.substring(0, 10) || 'unknown'}">
-          </track-element>`
-      }
-
-      console.log(tandas)
-      playlistContainer.innerHTML = `${tandas.map((tanda) => {
-
-        return `<tanda-element>
+          return `<tanda-element>
     <cortina-element trackId="12" title="Supertrooper" artist="Abba" style="T" duration="2:22" year="1940"></cortina-element>
     ${renderTrack(tanda[0])}
     ${renderTrack(tanda[1])}
     ${renderTrack(tanda[2])}
     ${renderTrack(tanda[3])}
 </tanda-element>`
-      }).join('')}`
+        }).join('')}`
 
-      const h = document.querySelector('h1')
-      let now;
-      async function reportProgress(data) {
-        if (!now) now = new Date().getTime();
-        h.textContent = data.display// + `    Elapsed from start: ${to_time(new Date().getTime() - now)}`
-      }
-
-      // let tempoControl = document.querySelector('#tempo')
-
-
-
-      // Need to work out what is currently playing and what should come next.
-      // The what came before determines pre-cortina silences
-      // If new element is the same type as the last one, add normal inter-song silences
-      // if old was track and new is cortina then add pre-cortina
-      // if new is track and old is cortina then add post-cortina
-      async function nextTrack(N) {
-
-        const timings = {
-          playlistPreCortina: 3,
-          playlistPostCortina: 3,
-          playlistInterSong: 2,
-          playlistCortinaDuration: 14
+        const h = document.querySelector('h1')
+        let now;
+        async function reportProgress(data) {
+          if (!now) now = new Date().getTime();
+          h.textContent = data.display// + `    Elapsed from start: ${to_time(new Date().getTime() - now)}`
         }
 
-        // tempoControl.value = 1;
+        // let tempoControl = document.querySelector('#tempo')
 
-        // Find Nth track in playlist
-        const tracks = [...playlistContainer.querySelectorAll('track-element, cortina-element')];
-        if (N < tracks.length) {
-          let track = tracks[N]
-          let previous = tracks[N - 1]
-          if (previous.tagName == 'CORTINA-ELEMENT' && track.tagName == 'TRACK-ELEMENT') {
-            return {
-              track: await dbManager.getDataById('track', parseInt(track.getAttribute('trackid'))),
-              silence: timings.playlistPostCortina
-            }
+
+
+        // Need to work out what is currently playing and what should come next.
+        // The what came before determines pre-cortina silences
+        // If new element is the same type as the last one, add normal inter-song silences
+        // if old was track and new is cortina then add pre-cortina
+        // if new is track and old is cortina then add post-cortina
+        async function nextTrack(N) {
+
+          const timings = {
+            playlistPreCortina: 3,
+            playlistPostCortina: 3,
+            playlistInterSong: 2,
+            playlistCortinaDuration: 14
           }
 
-          // If next is a cortina, modify the playing time
-          if (previous.tagName == 'TRACK-ELEMENT' && track.tagName == 'CORTINA-ELEMENT') {
-            let trackData = await dbManager.getDataById('cortina', parseInt(track.getAttribute('trackid')));
-            trackData.metadata.end = timings.playlistCortinaDuration
-            return {
-              track: trackData,
-              silence: timings.playlistPreCortina
+          // tempoControl.value = 1;
+
+          // Find Nth track in playlist
+          const tracks = [...playlistContainer.querySelectorAll('track-element, cortina-element')];
+          if (N < tracks.length) {
+            let track = tracks[N]
+            let previous = tracks[N - 1]
+            if (previous.tagName == 'CORTINA-ELEMENT' && track.tagName == 'TRACK-ELEMENT') {
+              return {
+                track: await dbManager.getDataById('track', parseInt(track.getAttribute('trackid'))),
+                silence: timings.playlistPostCortina
+              }
             }
+
+            // If next is a cortina, modify the playing time
+            if (previous.tagName == 'TRACK-ELEMENT' && track.tagName == 'CORTINA-ELEMENT') {
+              let trackData = await dbManager.getDataById('cortina', parseInt(track.getAttribute('trackid')));
+              trackData.metadata.end = timings.playlistCortinaDuration
+              return {
+                track: trackData,
+                silence: timings.playlistPreCortina
+              }
+            }
+            return {
+              track: await dbManager.getDataById(track.tagName == 'TRACK-ELEMENT' ? 'track' : 'cortina', parseInt(track.getAttribute('trackid'))),
+              silence: timings.playlistInterSong
+            }
+          } else {
+            return { track: null, silence: null }
           }
-          return {
-            track: await dbManager.getDataById(track.tagName == 'TRACK-ELEMENT' ? 'track' : 'cortina', parseInt(track.getAttribute('trackid'))),
-            silence: timings.playlistInterSong
-          }
-        } else {
-          return { track: null, silence: null }
         }
+
+        function playing(N) {
+          playlistContainer.playing(N)
+        }
+
+        // Assume an output device has been selected
+
+        let player = new Player({
+          systemLowestGain,
+          fadeRate: 2000, // time over which to fade out 
+          progress: reportProgress,
+          nextUp: nextTrack,
+          playing
+        })
+
+        // tempoControl.addEventListener('input', ()=>{
+        //   player.setTempo(tempoControl.value)
+        // })
+
+        // let tempoReset = document.querySelector('#tempoReset')
+        // tempoReset.addEventListener('click', ()=>{
+        //   tempoControl.value = 1;
+        //   player.setTempo(1)
+        // })
+
+        // let volumeControl = document.querySelector('#volume')
+        // volumeControl.addEventListener('input', ()=>{
+        //   player.volume(volumeControl.value)
+        // })
+
+
+        // await player.updatePosition(1);
+        // player.startNext();
+
+        const stopButton = document.querySelector('#stopButton')
+        stopButton.classList.add('active')
+        stopButton.addEventListener('click', () => {
+          stopButton.classList.remove('active');
+          player.stop();
+        })
+
+
+        window.addEventListener('beforeunload', function (event) {
+          // Set the returnValue property of the event to a custom message.
+          // Modern browsers display a standard message that cannot be customized due to security reasons,
+          // but setting returnValue is still necessary to trigger the dialog.
+          event.returnValue = 'Are you sure you want to leave?';
+        });
+
       }
-
-      function playing(N) {
-        playlistContainer.playing(N)
-      }
-
-      // Assume an output device has been selected
-
-      let player = new Player({
-        systemLowestGain,
-        fadeRate: 2000, // time over which to fade out 
-        progress: reportProgress,
-        nextUp: nextTrack,
-        playing
-      })
-
-      // tempoControl.addEventListener('input', ()=>{
-      //   player.setTempo(tempoControl.value)
-      // })
-
-      // let tempoReset = document.querySelector('#tempoReset')
-      // tempoReset.addEventListener('click', ()=>{
-      //   tempoControl.value = 1;
-      //   player.setTempo(1)
-      // })
-
-      // let volumeControl = document.querySelector('#volume')
-      // volumeControl.addEventListener('input', ()=>{
-      //   player.volume(volumeControl.value)
-      // })
-
-
-      // await player.updatePosition(1);
-      // player.startNext();
-
-      const stopButton = document.querySelector('#stopButton')
-      stopButton.classList.add('active')
-      stopButton.addEventListener('click', () => {
-        stopButton.classList.remove('active');
-        player.stop();
-      })
-
-
-      window.addEventListener('beforeunload', function (event) {
-        // Set the returnValue property of the event to a custom message.
-        // Modern browsers display a standard message that cannot be customized due to security reasons,
-        // but setting returnValue is still necessary to trigger the dialog.
-        event.returnValue = 'Are you sure you want to leave?';
-      });
-
-    }
 
     });
 
