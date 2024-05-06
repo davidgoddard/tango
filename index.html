@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Author: David Goddard
   A tanda based music player for Tango DJs">
-  <title>Audio File Analyzer</title>
+  <title>Tanda Player Lite</title>
 
   <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
   <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
@@ -35,7 +35,7 @@
 <body>
   <header class="content">
     <button class="active" id="hamburger" aria-label="Open menu">&#9776;</button>
-    <h1>Website Title</h1>
+    <h1>Tanda Player Lite</h1>
     <label>View: <select id="modeSelector"></select></label>
   </header>
   <div id="settingsPanel" class="side-panel content">
@@ -500,12 +500,15 @@ ${tracks.map(track => renderTrack(track)).join('')}
 
         // let tempoControl = document.querySelector('#tempo')
 
+        const playlistPreCortina = 5
+        const playlistPostCortina = 10
+        const playlistCortinaDuration = 20
+
         async function nextTrack(N) {
           // tempoControl.value = 1;
 
           // Find Nth track in playlist
           const tracks = playlistContainer.querySelectorAll('track-element, cortina-element');
-
           if (N < tracks.length) {
             N--
             let track;
@@ -513,9 +516,13 @@ ${tracks.map(track => renderTrack(track)).join('')}
               N++
               const trackElement = tracks[N];
               const id = trackElement.getAttribute('trackId');
-              // track = await dbManager.getDataById(trackElement.tagName == 'CORTINA-ELEMENT' ? 'cortina' : 'track', parseInt(id))
-              track = await dbManager.getDataById('track', parseInt(id))
+              track = await dbManager.getDataById(trackElement.tagName == 'CORTINA-ELEMENT' ? 'cortina' : 'track', parseInt(id))
+              // track = await dbManager.getDataById('track', parseInt(id))
             } while (!track)
+            if (trackElement.tagName == 'CORTINA-ELEMENT') {
+              track.metadata.end = playlistCortinaDuration;
+              return { track, silence: playlistPreCortina}
+            }
             return { track, silence: -0 }
           } else {
             return { track: null, silence: 0 };
