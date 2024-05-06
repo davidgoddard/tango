@@ -17,6 +17,9 @@ class TrackElement extends HTMLElement {
     render() {
         this.shadowRoot.innerHTML = `
         <style>
+            .track {
+                padding: 0.4rem;
+            }
             h2 {
                 margin: 0px;
                 padding: 0px;
@@ -24,7 +27,7 @@ class TrackElement extends HTMLElement {
             }
             p {
                 padding: 0px;
-                margin: 0.2rem 0.2rem 1rem 0.2rem;
+                margin: 0.2rem 0;
             }
             :host-context(track-element.playing) {
                 border: solid 2px orange;

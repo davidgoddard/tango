@@ -50,11 +50,20 @@ class ScratchPadElement extends HTMLElement {
         button.innerHTML = `<img alt="Add to playlist" height="15px" width="15px" src="./icons/playlist.PNG"/>`
         button.title = 'Move to playlist'
         button.addEventListener('click', (event) => {
-            console.log('Got event to move to scratch pad', tanda)
+            console.log('Got event to move to playlist', tanda)
             const playlistSelector = this.getAttribute('playlistSelector');
             const playlist = document.querySelector(playlistSelector);
             // Move tanda to target list
             playlist.appendChild(tanda);
+        });
+        actions.appendChild(button);  
+
+        button = document.createElement('button')
+        button.innerHTML = `<img alt="Remove from scratchpad" height="15px" width="15px" src="./icons/bin.PNG"/>`
+        button.title = 'Remove from scratch pad'
+        button.addEventListener('click', (event) => {
+            console.log('Got event to remove to scratch pad', tanda)
+            tanda.remove()
         });
         actions.appendChild(button);  
        }

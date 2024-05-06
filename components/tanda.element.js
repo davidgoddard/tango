@@ -97,11 +97,11 @@ class TandaElement extends HTMLElement {
         tracks.forEach(track => duration += this.timeStringToSeconds(track.getAttribute('duration')));
         const summary = `(${titles.length} Tracks; Duration: ${this.to_time(duration)}):  (${this.findMinMaxYears(years)}) - ${artists.join(', ')}`
 
-        const cortinaSummary = cortina.map(track => track.getAttribute('title')).join(', ')
+        const cortinaSummary = cortina.map(track => track.getAttribute('title') + ' / ' + track.getAttribute('artist')).join(', ')
 
         this.shadowRoot.innerHTML = `
             <style>
-                .summary { cursor: pointer; display: grid; grid-template-columns: 20px 4fr auto auto;}
+                .summary { cursor: pointer; display: grid; grid-template-columns: 40px 4fr auto auto;}
                 .summary header { display: flex; justify-content: center }
                 .summary header span {
                     font-size: 1.5rem;
@@ -166,7 +166,20 @@ class TandaElement extends HTMLElement {
                     background-color: #777;
                     border-radius: 10px;
                 }
-                
+                .cortinaControls {
+                    display: none;
+                }
+                .cortinaControls button {
+                    border: none;
+                    background-color:transparent;
+                }
+                .cortinaControls img {
+                    height: 40px;
+                    width: 40px;
+                }
+                .cortinaControls.active {
+                    display: block;
+                }
             </style>
             <div id="container" class="${styles.size == 1 ? [...styles][0] : '?'}">
                 <article>
@@ -178,7 +191,11 @@ class TandaElement extends HTMLElement {
                             <span></span>${summary}                            
                         </main>
                         <section>
-                            <button>${cortinaSummary}</button>
+                        <div class="cortinaControls">
+                            <button class="playAll"><img src="./icons/player_play 2.png" alt="Play whole cortina"></button>
+                            <button class="stopPlayAll"><img src="./icons/player_stop 2.png" alt="Play whole cortina"></button>
+                        </div>
+                        <button>${cortinaSummary}</button>
                         </section>
                         <section id="actions">
                             <button class="target"><img src='./icons/target.png'></button>
@@ -191,6 +208,17 @@ class TandaElement extends HTMLElement {
             </div>
         `;
         this.shadowRoot.querySelector('#toggle main').addEventListener('click', () => this.toggleExpand());
+
+        function notifyPlayAll() {
+            const event = new CustomEvent("playFullCortina", { bubbles: true });
+            this.dispatchEvent(event);
+        }
+        this.shadowRoot.querySelector('.playAll').addEventListener('click', notifyPlayAll.bind(this))
+        function notifyStopPlayAll() {
+            const event = new CustomEvent("stopPlayFullCortina", { bubbles: true });
+            this.dispatchEvent(event);
+        }
+        this.shadowRoot.querySelector('.stopPlayAll').addEventListener('click', notifyStopPlayAll.bind(this))
     }
 
     toggleExpand() {

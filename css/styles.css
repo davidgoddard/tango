@@ -35,17 +35,14 @@ main {
   overflow: hidden;
 }
 main.all {
-  grid-template-columns: minmax(200px, 2fr) minmax(5px, 5px) minmax(100px, 1fr) minmax(
-      5px,
-      5px
-    ) minmax(200px, 2fr);
+  grid-template-columns: minmax(200px, 1fr) minmax(5px, 5px) minmax(100px, 1fr) minmax(5px,5px) minmax(200px, 1fr);
 }
 
 main.searchOnly {
-  grid-template-columns: minmax(400px, 4fr) minmax(5px, 5px) minmax(100px, 1fr);
+  grid-template-columns: minmax(400px, 1fr) minmax(5px, 5px) minmax(100px, 1fr);
 }
 main.playlistOnly {
-  grid-template-columns: minmax(100px, 1fr) minmax(5px, 5px) minmax(400px, 4fr);
+  grid-template-columns: minmax(100px, 1fr) minmax(5px, 5px) minmax(400px, 1fr);
 }
 
 .column {

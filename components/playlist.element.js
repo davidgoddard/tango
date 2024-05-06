@@ -31,16 +31,23 @@ class PlaylistElement extends HTMLElement {
     playing(N){
         const trackList = Array.from(this.querySelectorAll('track-element, cortina-element')); // Get all tracks in the playlist
         const tandaList = Array.from(this.querySelectorAll('tanda-element')); // Get all tandas in the playlist
+        const tanda = trackList[N].parentElement
 
         trackList.map(track => track.classList.remove('playing'))
         trackList[N].classList.add('playing')
+
+        console.log('Playlist', trackList[N].tagName)
+        const cortinaControls = tanda.shadowRoot.querySelector('div.cortinaControls')
+        if ( trackList[N].tagName == 'CORTINA-ELEMENT' ){
+            cortinaControls.classList.add('active')
+        } else {
+            cortinaControls.classList.remove('active')
+        }
 
         tandaList.map(tanda => {
             tanda.classList.remove('playing')
             tanda.classList.remove('played')
         })
-
-        const tanda = trackList[N].parentElement
 
         let sibling = tanda;
         while (sibling.previousElementSibling) {
@@ -213,41 +220,20 @@ class PlaylistElement extends HTMLElement {
                 tanda-element button {
                     cursor: pointer;
                 }
-                button.target {
+                button {
                     border: none;
                     background: transparent;
                 }
-                button.target img {
+                img {
                     height: 20px;
                     width: 20px;
                 }
+
             </style>
             <slot></slot>
             <button class="target"><img alt="choose this as the tanda target" src='./icons/target.png'></button>
         `;
 
-        // Query all assigned nodes (tanda-elements) and add delete and copy buttons
-        this.querySelectorAll('tanda-element').forEach(tanda => {
-
-            console.log('Tanda Element', tanda)
-
-            // const deleteButton = document.createElement('button');
-            // deleteButton.textContent = 'Delete';
-            // deleteButton.onclick = () => this.deleteTanda(tanda);
-
-            // const copyButton = document.createElement('button');
-            // copyButton.textContent = 'Copy to Scratchpad';
-            // copyButton.onclick = () => this.copyToScratchpad(tanda);
-
-            // const actions = document.createElement('div');
-            // actions.className = 'actions';
-            // actions.appendChild(deleteButton);
-            // actions.appendChild(copyButton);
-
-            // if (!tanda.nextElementSibling || tanda.nextElementSibling.tagName.toLowerCase() !== 'div') {
-            //     tanda.appendChild(actions);
-            // }
-        });
     }
 
     addDragDropListeners() {
