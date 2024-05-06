@@ -21,7 +21,7 @@
   <script type="module" src="./components/scratch-pad.element.js"></script>
 
   <!-- The following is a hack to allow FFmpeg to use concurrent threads off the main JS thread and share data between themselves -->
-  <!-- <script src="./lib/enable_threads.js"></script> -->
+  <script src="./lib/enable_threads.js"></script>
 
   <!-- The following provides the underlying music player and file analyser -->
   <script src="./lib/howler.min.js"></script>
@@ -387,13 +387,13 @@
                   { name: 'title', value: libTrack.track.title },
                   { name: 'artist', value: libTrack.track.artist },
                   { name: 'year', value: libTrack.track.date },
-                  { name: 'meanVolume', value: libTrack.analysis.meanGain },
-                  { name: 'maxVolume', value: libTrack.analysis.gain },
                 ],
                 start: libTrack.analysis.start,
                 end: libTrack.analysis.silence,
                 style: libTrack.classifiers?.style,
                 duration: libTrack.analysis.duration,
+                meanVolume: libTrack.analysis.meanGain,
+                maxVolume: libTrack.analysis.gain,
 
               }
               existing.metadata = metadata
@@ -401,11 +401,22 @@
             }
           }
 
-          // for ( let tanda of tandas ){
-          //   tanda.tracks = tanda.tracks.map(track => '/' + track)
-          //   const existing = dbManager.getDataById
-          //   await dbManager.addData('tanda', tanda)
-          // }
+          for (let tanda of tandas) {
+            tanda.tracks = tanda.tracks.map(track => '/' + track)
+            try {
+              const existing = await dbManager.getDataById('tanda', tanda.id)
+              if (!existing) {
+                await dbManager.addData('tanda', tanda)
+              } else {
+                delete tanda.id
+                await dbManager.updateData('tanda', tanda)
+              }
+            } catch (error) {
+              delete tanda.id
+              await dbManager.addData('tanda', tanda)
+            }
+
+          }
           const playlistContainer = document.querySelector('#playlist');
 
 
@@ -548,27 +559,57 @@ ${tracks.map(track => renderTrack(track)).join('')}
               stopButton.classList.add('active')
             }
           } catch (error) {
+            console.error(error)
             alert(error)
           }
         })
 
         // Create a dummy playlist
 
+        dbManager.processEntriesInBatches('tanda', (record) => {
+          return true;
+        }).then(async (tandas) => {
+
+          let html = '';
+          for (let tanda of tandas) {
+
+            console.log(tanda)
+
+            let tandaHTML = '';
+
+            let trackName = tanda.cortina?.[0]?.track
+            let track;
+            if (trackName) {
+              try {
+                console.log('tanda cortina', tanda, trackName)
+                track = await dbManager.getDataByName('cortina', '/' + trackName);
+                if (!track) throw new Error('missing')
+              } catch (error) {
+                // console.error(error)
+                track = await dbManager.getDataById('cortina', 1);
+              }
+              console.log(trackName, track)
+              tandaHTML += `<cortina-element trackId="${track.id}" 
+              title="${track.metadata?.tags?.find(tag => tag.name == 'title')?.value || track.name}" 
+              artist="${track.metadata?.tags?.find(tag => tag.name == 'artist')?.value || 'unknown'}" 
+              duration="${to_time(track.metadata?.duration * 1000)}"></cortina-element>`
+            }
+
+            for (let trackName of tanda.tracks) {
+              const track = await dbManager.getDataByName('track', trackName)
+              if (track) tandaHTML += renderTrack(track)
+            }
+
+            html += `<tanda-element>${tandaHTML}</tanda-element>`
 
 
-        // const items = new Array(100).fill(1)
-        const items = files
-        const tandas = []
-        let tanda = []
-        items.forEach((item) => {
-          if (tanda.length == 4) {
-            tandas.push(tanda);
-            tanda = []
           }
-          tanda.push(item)
+          playlistContainer.innerHTML = html
         })
 
+
         function renderTrack(track) {
+          console.log(track)
           return `<track-element 
             trackId="${track.id}"
             title="${track.metadata?.tags?.find(tag => tag.name == 'title')?.value || track.name}" 
@@ -579,17 +620,6 @@ ${tracks.map(track => renderTrack(track)).join('')}
           </track-element>`
         }
 
-        console.log(tandas)
-        playlistContainer.innerHTML = `${tandas.map((tanda) => {
-
-          return `<tanda-element>
-    <cortina-element trackId="12" title="Supertrooper" artist="Abba" style="T" duration="2:22" year="1940"></cortina-element>
-    ${renderTrack(tanda[0])}
-    ${renderTrack(tanda[1])}
-    ${renderTrack(tanda[2])}
-    ${renderTrack(tanda[3])}
-</tanda-element>`
-        }).join('')}`
 
         const h = document.querySelector('h1')
         let now;
@@ -623,6 +653,7 @@ ${tracks.map(track => renderTrack(track)).join('')}
           if (N < tracks.length) {
             let track = tracks[N]
             let previous = tracks[N - 1]
+            
             if (previous.tagName == 'CORTINA-ELEMENT' && track.tagName == 'TRACK-ELEMENT') {
               return {
                 track: await dbManager.getDataById('track', parseInt(track.getAttribute('trackid'))),
@@ -639,6 +670,7 @@ ${tracks.map(track => renderTrack(track)).join('')}
                 silence: timings.playlistPreCortina
               }
             }
+
             return {
               track: await dbManager.getDataById(track.tagName == 'TRACK-ELEMENT' ? 'track' : 'cortina', parseInt(track.getAttribute('trackid'))),
               silence: timings.playlistInterSong
@@ -699,28 +731,6 @@ ${tracks.map(track => renderTrack(track)).join('')}
       }
 
     });
-
-    // document.getElementById('folderInput').addEventListener('change', async (event) => {
-    //   files = event.target.files;
-
-    //   for (const file of files) {
-    //     console.log(file.name, file.lastModified, file.lastModifiedDate, file.size, file.webkitRelativePath)
-    //     await readID3Tags(file);
-    //   }
-    // });
-
-    // async function readID3Tags(file) {
-    //   const tags = await id3.fromFile(file);
-
-    //   // Output tags to the div
-    //   const outputDiv = document.getElementById('output');
-    //   outputDiv.innerHTML += `<pre>${file.name}: ${JSON.stringify(tags, null, 2)}</pre><button data-file-name="${file.name}" data-file-type="${file.type}">Play</button>`;
-    //   let button = outputDiv.querySelector('button');
-    //   button.addEventListener('click', () => {
-    //     play(button)
-    //   })
-    //   console.log(button)
-    // }
 
   </script>
 

@@ -97,11 +97,24 @@ class TandaElement extends HTMLElement {
         tracks.forEach(track => duration += this.timeStringToSeconds(track.getAttribute('duration')));
         const summary = `(${titles.length} Tracks; Duration: ${this.to_time(duration)}):  (${this.findMinMaxYears(years)}) - ${artists.join(', ')}`
 
-        const cortinaSummary = cortina.map(track => track.getAttribute('title') + ' / ' + track.getAttribute('artist')).join(', ')
+        const track = cortina[0]
+        let cortinaArtist;
+        let cortinaTitle;
+        if ( track ){
+            cortinaTitle = track.getAttribute('title')
+            cortinaArtist = track.getAttribute('artist')
+            if ( cortinaTitle.length > 15 ) cortinaTitle = cortinaTitle.substring(0,15) + '...'
+            if ( cortinaArtist.length > 15 ) cortinaArtist = cortinaArtist.substring(0,15) + '...'
+        } else {
+            cortinaTitle = 'Unknown'
+            cortinaArtist = '';
+        }
+        
+        const cortinaSummary = cortinaTitle.length>0 ? `<button>${cortinaTitle}${cortinaArtist ? '<br/>' + cortinaArtist : ''}</button>` : ''
 
         this.shadowRoot.innerHTML = `
             <style>
-                .summary { cursor: pointer; display: grid; grid-template-columns: 40px 4fr auto auto;}
+                .summary { cursor: pointer; display: grid; grid-template-columns: 40px auto;}
                 .summary header { display: flex; justify-content: center }
                 .summary header span {
                     font-size: 1.5rem;
@@ -118,6 +131,7 @@ class TandaElement extends HTMLElement {
                 #actions {
                     display: flex;
                     flex-direction: row;
+                    justify-content: flex-end;
                 }
                 #actions button {
                     display: flex;
@@ -180,6 +194,16 @@ class TandaElement extends HTMLElement {
                 .cortinaControls.active {
                     display: block;
                 }
+
+                main > section {
+                    float: right;
+                    text-align: right;
+                    min-width: 8rem;
+                }
+                main > section > button {
+                    width: 100%;
+                    margin-bottom: 0.3rem;
+                }
             </style>
             <div id="container" class="${styles.size == 1 ? [...styles][0] : '?'}">
                 <article>
@@ -188,18 +212,20 @@ class TandaElement extends HTMLElement {
                             <span>${styles.size == 1 ? [...styles][0].charAt(0).toUpperCase() : '?'}</span>
                         </header>
                         <main>
-                            <span></span>${summary}                            
+                                                     
+                            <section>
+                                <div class="cortinaControls">
+                                    <button class="playAll"><img src="./icons/player_play 2.png" alt="Play whole cortina"></button>
+                                    <button class="stopPlayAll"><img src="./icons/player_stop 2.png" alt="Play whole cortina"></button>
+                                </div>
+                                ${cortinaSummary}
+                                <section id="actions">
+                                    <button class="target"><img src='./icons/target.png'></button>
+                                </section>
+                            </section>
+
+                            <span></span>${summary}   
                         </main>
-                        <section>
-                        <div class="cortinaControls">
-                            <button class="playAll"><img src="./icons/player_play 2.png" alt="Play whole cortina"></button>
-                            <button class="stopPlayAll"><img src="./icons/player_stop 2.png" alt="Play whole cortina"></button>
-                        </div>
-                        <button>${cortinaSummary}</button>
-                        </section>
-                        <section id="actions">
-                            <button class="target"><img src='./icons/target.png'></button>
-                        </section>
                     </div>
                     <div class="details">   
                         <slot></slot>                 
