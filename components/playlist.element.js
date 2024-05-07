@@ -2,6 +2,10 @@ class PlaylistElement extends HTMLElement {
     constructor() {
         super();
         this.attachShadow({ mode: 'open' });
+        this._data = {
+            sourceTanda: null,
+            sourceTrack: null,
+        }
     }
 
     connectedCallback() {
@@ -23,13 +27,12 @@ class PlaylistElement extends HTMLElement {
         // Start observing changes to the DOM
         observer.observe(this.parentElement || document, { subtree: true, childList: true });
 
-
         // this.addDragDropListeners();
     }
 
     // Method called during playback when track changes
-    playing(N){
-        const trackList = Array.from(this.querySelectorAll('track-element, cortina-element')); // Get all tracks in the playlist
+    playing(N) {
+        const trackList = Array.from(this.querySelectorAll('track-element, cortina-element')).filter(track => track.getAttribute('trackid')); // Get all tracks in the playlist
         const tandaList = Array.from(this.querySelectorAll('tanda-element')); // Get all tandas in the playlist
         const tanda = trackList[N].parentElement
 
@@ -38,7 +41,7 @@ class PlaylistElement extends HTMLElement {
 
         console.log('Playlist', trackList[N].tagName)
         const cortinaControls = tanda.shadowRoot.querySelector('div.cortinaControls')
-        if ( trackList[N].tagName == 'CORTINA-ELEMENT' ){
+        if (trackList[N].tagName == 'CORTINA-ELEMENT') {
             cortinaControls.classList.add('active')
         } else {
             cortinaControls.classList.remove('active')
@@ -53,14 +56,14 @@ class PlaylistElement extends HTMLElement {
         while (sibling.previousElementSibling) {
             sibling = sibling.previousElementSibling;
             sibling.classList.add('played')
-          }
+        }
 
         tanda.classList.add('playing')
         tanda.scrollIntoView({
             behavior: 'smooth', // Smooth scrolling
             block: 'start',     // Scroll to the top of the element
             inline: 'nearest'   // Scroll horizontally to the nearest edge of the element
-          });
+        });
 
 
 
@@ -68,7 +71,7 @@ class PlaylistElement extends HTMLElement {
         //     const tandaTracks = tanda.querySelectorAll('track-element')
         // })
 
-        
+
 
     }
 
@@ -121,10 +124,37 @@ class PlaylistElement extends HTMLElement {
         }
     }
 
+    setTrackTargets(track, enable) {
+        this._data.sourceTrack = track;
+        if (enable && track) {
+            const trackStyle = track.getAttribute('style') || '?'
+            console.log('Set all tracks as targets', trackStyle, track);
+            const tracks = this.querySelectorAll('track-element');
+            console.log(tracks)
+            for (const track of tracks) {
+                if (enable) {
+                    if (trackStyle == '?' || trackStyle == track.style) {
+                        track.classList.add('target')
+                    }
+                } else {
+                    track.classList.remove('target')
+                }
+            }
+        } else {
+            const tracks = this.querySelectorAll('track-element');
+            console.log(tracks)
+            for (const track of tracks) {
+                track.classList.remove('target')
+            }
+        }
+    }
+
     handleTandaAdded(tanda) {
+        const self = this;
+
 
         let actions = tanda.shadowRoot.querySelector('#actions')
-        
+
         // function clickHandler(){
         //     console.log('Clicked tanda', tanda)
         //     const event = new CustomEvent("playTanda", { detail: tanda });
@@ -142,6 +172,8 @@ class PlaylistElement extends HTMLElement {
         }
 
         function copyMove(event) {
+
+            this._data.sourceTanda = tanda;
             const container = tanda.shadowRoot.querySelector('#container')
             container.classList.toggle('moving')
 
@@ -152,9 +184,8 @@ class PlaylistElement extends HTMLElement {
 
             const tandas = this.querySelectorAll('tanda-element');
             for (const t of tandas) {
-                if (t !== tanda) {
-                    const container = t.shadowRoot.querySelector('#container')
-                    container.classList.toggle('target')
+                if (t !== tanda && t.getAttribute('style') == tanda.getAttribute('style')) {
+                    t.classList.add('target')
                 }
             }
 
@@ -172,24 +203,42 @@ class PlaylistElement extends HTMLElement {
 
         }
 
+        function targetHandler(event) {
+            console.log('Fetch source item and move here', this._data.sourceTanda, tanda)
+            this.swapTandas(this._data.sourceTanda, tanda)
+            const tandas = this.querySelectorAll('tanda-element');
+            for (const t of tandas) {
+                t.classList.remove('target')
+            }
+
+        }
+
         let actionList = [
-            { title: 'Move to scratch pad', text: null, image: './icons/notepad.png', handler: moveToScratchPad, margin: null },
-            { title: 'Select this tanda to move', text: null, image: './icons/copy-move.png', handler: copyMove, margin: null },
-            { title: 'Remove', text: null, image: './icons/bin.png', handler: removeTanda, margin: '1rem' }
+            { title: 'Use this tanda as the target for swap/move', class: 'target', text: null, image: './icons/target.png', handler: targetHandler.bind(this), margin: null },
+            { title: 'Move to scratch pad', text: null, image: './icons/notepad.png', handler: moveToScratchPad.bind(this), margin: null },
+            { title: 'Select this tanda to move', text: null, image: './icons/copy-move.png', handler: copyMove.bind(this), margin: null },
+            { title: 'Remove', text: null, image: './icons/bin.png', handler: removeTanda.bind(this), margin: '1rem' },
         ]
 
         actionList.forEach((action) => {
             let button = document.createElement('button')
             if (action.text) button.textContent = action.text;
             if (action.title) button.title = action.title;
+            if (action.class) button.classList.add(action.class)
             if (action.image) {
                 let image = document.createElement('img');
                 image.alt = action.title;
                 image.src = action.image;
                 button.appendChild(image)
             }
+            function handler(event) {
+                event.stopPropagation();
+                event.preventDefault();
+                action.handler(event)
+            }
+
             if (action.handler) {
-                button.addEventListener('click', action.handler.bind(this))
+                button.addEventListener('click', handler)
             }
             if (action.margin) {
                 button.style.marginLeft = '1rem';

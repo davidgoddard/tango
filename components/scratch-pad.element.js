@@ -2,6 +2,11 @@ class ScratchPadElement extends HTMLElement {
     constructor() {
         super();
         this.attachShadow({ mode: 'open' });
+        this._data = {
+            sourceTanda: null,
+            sourceTrack: null,
+        }
+
     }
 
     connectedCallback() {

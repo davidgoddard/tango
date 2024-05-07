@@ -10,6 +10,7 @@ class TandaElement extends HTMLElement {
     }
 
     timeStringToSeconds(timeString) {
+        if ( timeString ){
         const parts = timeString.split(':').map(Number); // Split the string and convert to numbers
         let seconds = 0;
 
@@ -24,6 +25,10 @@ class TandaElement extends HTMLElement {
         }
 
         return seconds;
+    }
+    else {
+        return ''
+    }
     }
 
     to_time(s) {
@@ -77,25 +82,30 @@ class TandaElement extends HTMLElement {
             const maxYear = Math.max(...numericYears);
 
             if (minYear != maxYear) {
-                return [(hasUnknown ? 'Unknown' : ''), 'Years ' + minYear + ' to ' + maxYear].filter(x => x).join(', ')
+                return `(${[(hasUnknown ? 'Unknown' : ''), 'Years ' + minYear + ' to ' + maxYear].filter(x => x).join(', ')})`
             } else {
-                return [(hasUnknown ? 'Unknown' : ''), 'Year ' + minYear].filter(x => x).join(', ')
+                return `(${[(hasUnknown ? 'Unknown' : ''), 'Year ' + minYear].filter(x => x).join(', ')})`
             }
         } else {
-            return 'Unknown'
+            return ''
         }
     }
 
     render() {
         const tracks = Array.from(this.querySelectorAll('track-element'));
         const cortina = Array.from(this.querySelectorAll('cortina-element'));
-        const titles = tracks.map(track => track.getAttribute('title'));
-        const artists = tracks.map(track => track.getAttribute('artist'));
-        const years = tracks.map(track => track.getAttribute('year').substring(0, 4));
-        const styles = new Set(tracks.map(track => track.getAttribute('style')));
+        const titles = tracks.map(track => track.getAttribute('title')).filter(x=>x);
+        const titleSet = new Set(titles);
+        const artists = tracks.map(track => track.getAttribute('artist')).filter(x=>x);
+        const years = tracks.map(track => track.getAttribute('year')?.filter(x=>x)?.substring(0, 4));
+        const styles = new Set(tracks.map(track => track.getAttribute('style'))?.filter(x=>x));
+        if ( styles.size == 0 ){
+            console.log('Getting tanda style from attribute', this.getAttribute('style'))
+            styles.add(this.getAttribute('style'))
+        }
         let duration = 0;
         tracks.forEach(track => duration += this.timeStringToSeconds(track.getAttribute('duration')));
-        const summary = `(${titles.length} Tracks; Duration: ${this.to_time(duration)}):  (${this.findMinMaxYears(years)}) - ${artists.join(', ')}`
+        const summary = `(${titles.length} Tracks; Duration: ${this.to_time(duration)}):  ${[...titleSet][0] == 'place holder' ? 'Place Holder' : ''} ${this.findMinMaxYears(years)} ${artists.join(', ')}`
 
         const track = cortina[0]
         let cortinaArtist;
@@ -154,16 +164,11 @@ class TandaElement extends HTMLElement {
                     border: dashed 2px green;
                     margin: 1rem;
                 }
-                #container.target .target {
+                :host-context(tanda-element.target) #actions button {
                     display: block;
                 }
-                button.target,
                 #actions button.target {
                     display: none;
-                    border: none;
-                    margin: 0 0 0 1rem;
-                    padding: 0px;
-                    background: transparent;
                 }
                 button img {
                     height: 20px;
@@ -205,11 +210,11 @@ class TandaElement extends HTMLElement {
                     margin-bottom: 0.3rem;
                 }
             </style>
-            <div id="container" class="${styles.size == 1 ? [...styles][0] : '?'}">
+            <div id="container">
                 <article>
                     <div id="toggle" class="summary">
                         <header>
-                            <span>${styles.size == 1 ? [...styles][0].charAt(0).toUpperCase() : '?'}</span>
+                            <span>${styles.size == 1 ? [...styles]?.[0]?.charAt(0)?.toUpperCase() : '?'}</span>
                         </header>
                         <main>
                                                      
@@ -219,9 +224,7 @@ class TandaElement extends HTMLElement {
                                     <button class="stopPlayAll"><img src="./icons/player_stop 2.png" alt="Play whole cortina"></button>
                                 </div>
                                 ${cortinaSummary}
-                                <section id="actions">
-                                    <button class="target"><img src='./icons/target.png'></button>
-                                </section>
+                                <section id="actions"></section>
                             </section>
 
                             <span></span>${summary}   
