@@ -97,7 +97,7 @@ class TandaElement extends HTMLElement {
         const titles = tracks.map(track => track.getAttribute('title')).filter(x=>x);
         const titleSet = new Set(titles);
         const artists = tracks.map(track => track.getAttribute('artist')).filter(x=>x);
-        const years = tracks.map(track => track.getAttribute('year')?.filter(x=>x)?.substring(0, 4));
+        const years = tracks.map(track => track.getAttribute('year')).filter(x=>x).map(year => year.substring(0, 4));
         const styles = new Set(tracks.map(track => track.getAttribute('style'))?.filter(x=>x));
         if ( styles.size == 0 ){
             console.log('Getting tanda style from attribute', this.getAttribute('style'))
