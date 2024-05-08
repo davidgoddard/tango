@@ -31,29 +31,40 @@ class SearchElement extends HTMLElement {
           .hidden {
             display: none;
           }
+          section {
+            display: grid;
+            grid-template-rows: auto auto 1fr;
+          }
+          .scrollable {
+            overflow-y: auto;
+          }
         </style>
-        <div>
-          <label for="search-input">Search:</label>
-          <input type="text" id="search-input" placeholder="Enter search string">
-          <label for="filter-select">Style:</label>
-          <select id="filter-select">
-            <option value="all">All</option>
-            <option value="rock">Rock</option>
-            <option value="pop">Pop</option>
-            <option value="jazz">Jazz</option>
-            <!-- Add more options as needed -->
-          </select>
-        </div>
-        <div class="tab-container">
-          <div id="tracks-tab" class="tab active">Tracks (<span id="tracks-count">0</span>)</div>
-          <div id="tandas-tab" class="tab">Tandas (<span id="tandas-count">0</span>)</div>
-        </div>
-        <div id="tracks-content" class="content">
-          <!-- Content for tracks -->
-        </div>
-        <div id="tandas-content" class="content hidden">
-          <!-- Content for tandas -->
-        </div>`;
+        <section>
+          <div>
+            <label for="search-input">Search:</label>
+            <input type="text" id="search-input" placeholder="Enter search string">
+            <label for="filter-select">Style:</label>
+            <select id="filter-select">
+              <option value="all">All</option>
+              <option value="rock">Rock</option>
+              <option value="pop">Pop</option>
+              <option value="jazz">Jazz</option>
+              <!-- Add more options as needed -->
+            </select>
+          </div>
+          <div class="tab-container">
+            <div id="tracks-tab" class="tab active">Tracks (<span id="tracks-count">0</span>)</div>
+            <div id="tandas-tab" class="tab">Tandas (<span id="tandas-count">0</span>)</div>
+          </div>
+          <div class="scrollable">
+            <div id="tracks-content" class="content">
+              <!-- Content for tracks -->
+            </div>
+            <div id="tandas-content" class="content hidden">
+              <!-- Content for tandas -->
+            </div>
+          </div>
+        <section>`;
 
         // Initialize search input and filter select
         this.searchInput = this.shadowRoot.getElementById('search-input');

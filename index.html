@@ -12,8 +12,8 @@
   <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
 
   <!-- The following is a hack to allow FFmpeg to use concurrent threads off the main JS thread and share data between themselves -->
-  <!-- <script src="./lib/enable_threads.js"></script> -->
-
+  <!-- <script src="./lib/enable_threads.js"></script>
+ -->
 
   <link rel="manifest" href="./manifest.json">
   <link rel="stylesheet" href="./css/styles.css">
@@ -40,7 +40,7 @@
 
 <body>
   <header class="content">
-    <button class="active" id="hamburger" aria-label="Open menu">&#9776;</button>
+    <button class="active" id="hamburger" aria-label="Open menu">⚙️</button>
     <h1>Tanda Player Lite</h1>
     <label>View: <select id="modeSelector"></select></label>
   </header>
@@ -153,7 +153,9 @@
                   placeholder="Time in seconds before cortina (if used)"></label>
               <label class="field-container">Time after cortina: <input type="number" id="playlistPostCortina"
                   placeholder="Time in seconds after cortina (if used)"></label>
-            </form>
+              <button id="savePlaylist">Save Playlist</button>
+              <button id="loadPlaylist">Load Playlist</button>
+                </form>
           </div>
         </div>
         <ul>

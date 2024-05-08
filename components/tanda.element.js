@@ -96,7 +96,7 @@ class TandaElement extends HTMLElement {
         const cortina = Array.from(this.querySelectorAll('cortina-element'));
         const titles = tracks.map(track => track.getAttribute('title')).filter(x=>x);
         const titleSet = new Set(titles);
-        const artists = tracks.map(track => track.getAttribute('artist')).filter(x=>x);
+        const artists = new Set(tracks.map(track => track.getAttribute('artist')).filter(x=>x));
         const years = tracks.map(track => track.getAttribute('year')).filter(x=>x).map(year => year.substring(0, 4));
         const styles = new Set(tracks.map(track => track.getAttribute('style'))?.filter(x=>x));
         if ( styles.size == 0 ){
@@ -105,7 +105,11 @@ class TandaElement extends HTMLElement {
         }
         let duration = 0;
         tracks.forEach(track => duration += this.timeStringToSeconds(track.getAttribute('duration')));
-        const summary = `(${titles.length} Tracks; Duration: ${this.to_time(duration)}):  ${[...titleSet][0] == 'place holder' ? 'Place Holder' : ''} ${this.findMinMaxYears(years)} ${artists.join(', ')}`
+        const summary = `(${titles.length} Tracks; Duration: ${
+            this.to_time(duration)}):  ${
+            [...titleSet][0] == 'place holder' ? 'Place Holder' : ''} ${
+            this.findMinMaxYears(years)} ${
+            [...artists].join(', ')}`
 
         const track = cortina[0]
         let cortinaArtist;

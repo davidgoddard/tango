@@ -21,7 +21,7 @@ class TrackElement extends HTMLElement {
             }
         })
 
-        this.addEventListener('click', ()=>{
+        this.shadowRoot.querySelector('main').addEventListener('click', ()=>{
             if ( this.getAttribute('trackid') ){
                 const event = new CustomEvent("clickedTrack", { detail: this, bubbles: true });
                 this.dispatchEvent(event);
@@ -34,6 +34,9 @@ class TrackElement extends HTMLElement {
     render() {
         this.shadowRoot.innerHTML = `
         <style>
+            * {
+                background-color:transparent;
+            }
             .track {
                 padding: 0.4rem;
             }
@@ -50,20 +53,20 @@ class TrackElement extends HTMLElement {
                 border: solid 2px orange;
                 display: block;
                 border-radius: 5px;
-                background-color: #ffe000;
+                background-color: #ffe000a6;
             }
             :host-context(track-element.selected) {
                 border: dashed 2px orange;
                 display: block;
                 border-radius: 5px;
-                background-color: #fffbde;
+                background-color: #fffbdea6;
                 margin: 1rem;
             }
             :host-context(track-element:nth-child(2n)) article{
-                background-color: white;
+                background-color: #ffffffa6;
             }
             :host-context(track-element:nth-child(2n+1)) article{
-                background-color: #f9ede1;
+                background-color: #f9ede1a6;
             }
             :host-context(track-element.target) button.target {
                 display: block;
@@ -85,6 +88,7 @@ class TrackElement extends HTMLElement {
         </style>
         <article class="track">
             <section class="actions"><button class="target"><img src="./icons/target.png" alt="Swap track with this"></button></section>
+            <main>
             <h2>${this.getAttribute('title')}</h2>
             <p>
                 <span class='style'>${this.getAttribute('style')}</span>
@@ -92,6 +96,7 @@ class TrackElement extends HTMLElement {
                 Year <span class='year'>${this.getAttribute('year')}</span>
                 Duration: <span class='duration'>${this.getAttribute('duration')}</span>
             </p>
+            <main>
         </article>
         `;
     }
