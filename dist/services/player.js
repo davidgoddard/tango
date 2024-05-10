@@ -1,5 +1,5 @@
 // @ts-ignore
-import Howl from "../lib/howler.min.js";
+import { Howl } from "../lib/howler.min.js";
 import { formatTime } from "../services/utils";
 import { eventBus } from "../events/event-bus";
 /**
@@ -25,29 +25,32 @@ export class Player {
     constructor(options) {
         this.options = options;
         this.systemGain =
-            options.systemLowestGain.meanVolume -
-                options.systemLowestGain.maxVolume;
+            options.systemLowestGain.meanVolume - options.systemLowestGain.maxVolume;
         console.log("Setting player system gain", this.systemGain, this.options);
         eventBus.on("next-track", this.loadNext.bind(this));
-        this.progressTimer = setInterval(this.checkProgress.bind(this), 100);
+        this.progressTimer = setInterval(this.checkProgress.bind(this), 250);
     }
     checkProgress() {
         if (this.current) {
-            const { player, track, ending, silence, state } = this.current;
+            const { player, track, ending, silence, state, gainReduction } = this.current;
             if (player) {
                 let timeNow = player.seek() * 1000;
                 if (track?.metadata?.end >= 0) {
                     let timeEnd = 1000 * track.metadata.end + Math.min(0, silence ?? 0);
+                    console.log("Check timeEnd", timeEnd, "Time now", timeNow, "Ending?", ending, "Track:", track.fileHandle.name, "Gain", gainReduction);
                     if (timeNow >= timeEnd - 500 && !ending) {
                         this.current.ending = true;
-                        player.fade(Player.dBtoLinear(this.current.gainReduction), 0, this.options.fadeRate);
+                        player.fade(Player.dBtoLinear(gainReduction), 0, this.options.fadeRate);
                         this.reportProgress("Fading");
+                        let obj = this.current;
                         setTimeout(() => {
-                            if (this.current?.unload) {
-                                this.current.unload();
+                            if (obj === this.current) {
+                                player.off("end", this.startNext.bind(this));
+                                if (this.current?.unload) {
+                                    this.current.unload();
+                                }
                             }
                         }, this.options.fadeRate + 1000);
-                        player.off("end", this.startNext.bind(this));
                         this.startNext();
                     }
                     else {
@@ -108,7 +111,7 @@ export class Player {
         }
     }
     requestNext(N) {
-        console.log('Requesting track', N);
+        console.log("Requesting track", N);
         eventBus.emit("track-request", N);
     }
     // Called by event 'next-track'
@@ -117,7 +120,7 @@ export class Player {
             const N = this.playlistPos + 1;
             console.log("Loading next", N);
             const { track, silence } = payload;
-            console.log("Told by playlist to use this", track, "Silence: ", silence);
+            console.log("Told by playlist to use this", track, "Silence: ", silence, "Gain => Mean", track.metadata?.meanVolume, "Max", track.metadata.maxVolume, "system", this.systemGain);
             if (track) {
                 const { player, url } = await this.createPlayer(track);
                 if (player) {
@@ -128,7 +131,8 @@ export class Player {
                         track,
                         player,
                         url,
-                        gainReduction: track.metadata?.meanVolume
+                        gainReduction: track.metadata?.meanVolume !== null &&
+                            track.metadata?.meanVolume !== undefined
                             ? this.systemGain -
                                 (track.metadata.meanVolume - track.metadata.maxVolume)
                             : 1,
@@ -137,6 +141,7 @@ export class Player {
                         ending: false,
                     };
                     next.unload = () => {
+                        console.trace("Unloading", next.track);
                         if (next.player) {
                             if (next.player.playing())
                                 next.player.stop();
@@ -147,6 +152,7 @@ export class Player {
                         next.unload = null;
                     };
                     this.next = next;
+                    eventBus.emit("next-track-ready");
                 }
             }
             else {
@@ -165,7 +171,7 @@ export class Player {
     }
     async createPlayer(track) {
         try {
-            console.log('Trying to create a player', track);
+            console.log("Trying to create a player", track);
             const url = URL.createObjectURL(await track.fileHandle.getFile());
             const player = new Howl({
                 src: [url],
@@ -175,7 +181,7 @@ export class Player {
             });
             player.once("load", () => {
                 player.seek(track.metadata?.start || 0);
-                if (track.metadata?.meanVolume) {
+                if (track.metadata?.meanVolume !== null && track.metadata?.meanVolume !== undefined) {
                     const reduction = this.systemGain -
                         (track.metadata.meanVolume - track.metadata.maxVolume);
                     console.log("Using reduction", reduction);
@@ -184,16 +190,17 @@ export class Player {
             });
             if (track.metadata?.end < 0)
                 player.once("end", this.startNext.bind(this));
-            console.log('Returning', player, url);
+            console.log("Returning", player, url);
             return { player, url };
         }
         catch (error) {
             console.error(error);
-            eventBus.emit('error', error);
+            eventBus.emit("error", error);
             throw error;
         }
     }
     startNext() {
+        console.log("Starting next", this.next);
         if (!this.next)
             return this.reportProgress("Stopped");
         this.current = this.next;
@@ -205,14 +212,14 @@ export class Player {
                 if (this.current?.player) {
                     this.reportProgress("Playing");
                     this.current.player.play();
-                    this.checkProgress();
+                    // this.checkProgress();
                 }
             }, this.current.silence * 1000);
         }
         else {
             this.reportProgress("Playing");
             this.current.player.play();
-            this.checkProgress();
+            // this.checkProgress();
         }
         this.requestNext(this.playlistPos + 1);
     }

@@ -22,6 +22,7 @@ export class PlaylistService {
         });
     }
     extractTracks() {
+        console.log('Extracted tracks', this.trackList);
         for (let tanda of this.tandaList) {
             for (let track of tanda.tracks) {
                 this.trackList.push(track);

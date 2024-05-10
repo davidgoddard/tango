@@ -701,6 +701,14 @@
         delete this.handlers[event];
       }
     }
+    // Subscribe to an event, but only once
+    once(event, handler) {
+      const onceHandler = (payload) => {
+        handler(payload);
+        this.off(event, onceHandler);
+      };
+      this.on(event, onceHandler);
+    }
     // Emit an event with a payload
     emit(event, payload) {
       console.log("DEBUG: Emitting", event, payload == void 0 ? "no payload" : payload);
@@ -758,25 +766,29 @@
       this.systemGain = options.systemLowestGain.meanVolume - options.systemLowestGain.maxVolume;
       console.log("Setting player system gain", this.systemGain, this.options);
       eventBus.on("next-track", this.loadNext.bind(this));
-      this.progressTimer = setInterval(this.checkProgress.bind(this), 100);
+      this.progressTimer = setInterval(this.checkProgress.bind(this), 250);
     }
     checkProgress() {
       if (this.current) {
-        const { player, track, ending, silence, state } = this.current;
+        const { player, track, ending, silence, state, gainReduction } = this.current;
         if (player) {
           let timeNow = player.seek() * 1e3;
           if (track?.metadata?.end >= 0) {
             let timeEnd = 1e3 * track.metadata.end + Math.min(0, silence ?? 0);
+            console.log("Check timeEnd", timeEnd, "Time now", timeNow, "Ending?", ending, "Track:", track.fileHandle.name, "Gain", gainReduction);
             if (timeNow >= timeEnd - 500 && !ending) {
               this.current.ending = true;
-              player.fade(_Player.dBtoLinear(this.current.gainReduction), 0, this.options.fadeRate);
+              player.fade(_Player.dBtoLinear(gainReduction), 0, this.options.fadeRate);
               this.reportProgress("Fading");
+              let obj = this.current;
               setTimeout(() => {
-                if (this.current?.unload) {
-                  this.current.unload();
+                if (obj === this.current) {
+                  player.off("end", this.startNext.bind(this));
+                  if (this.current?.unload) {
+                    this.current.unload();
+                  }
                 }
               }, this.options.fadeRate + 1e3);
-              player.off("end", this.startNext.bind(this));
               this.startNext();
             } else {
               this.reportProgress(state);
@@ -835,7 +847,7 @@
         const N = this.playlistPos + 1;
         console.log("Loading next", N);
         const { track, silence } = payload;
-        console.log("Told by playlist to use this", track, "Silence: ", silence);
+        console.log("Told by playlist to use this", track, "Silence: ", silence, "Gain => Mean", track.metadata?.meanVolume, "Max", track.metadata.maxVolume, "system", this.systemGain);
         if (track) {
           const { player, url } = await this.createPlayer(track);
           if (player) {
@@ -846,12 +858,13 @@
               track,
               player,
               url,
-              gainReduction: track.metadata?.meanVolume ? this.systemGain - (track.metadata.meanVolume - track.metadata.maxVolume) : 1,
+              gainReduction: track.metadata?.meanVolume !== null && track.metadata?.meanVolume !== void 0 ? this.systemGain - (track.metadata.meanVolume - track.metadata.maxVolume) : 1,
               displayName: `${track.metadata?.tags?.title || track.fileHandle?.name} / ${track.metadata?.tags?.artist || "unknown"}`,
               state: "Waiting",
               ending: false
             };
             next.unload = () => {
+              console.trace("Unloading", next.track);
               if (next.player) {
                 if (next.player.playing())
                   next.player.stop();
@@ -862,6 +875,7 @@
               next.unload = null;
             };
             this.next = next;
+            eventBus.emit("next-track-ready");
           }
         } else {
           this.next = null;
@@ -880,7 +894,7 @@
       try {
         console.log("Trying to create a player", track);
         const url = URL.createObjectURL(await track.fileHandle.getFile());
-        const player = new import_howler_min.default({
+        const player = new import_howler_min.Howl({
           src: [url],
           html5: true,
           preload: true,
@@ -888,7 +902,7 @@
         });
         player.once("load", () => {
           player.seek(track.metadata?.start || 0);
-          if (track.metadata?.meanVolume) {
+          if (track.metadata?.meanVolume !== null && track.metadata?.meanVolume !== void 0) {
             const reduction = this.systemGain - (track.metadata.meanVolume - track.metadata.maxVolume);
             console.log("Using reduction", reduction);
             player.volume(_Player.dBtoLinear(reduction));
@@ -905,6 +919,7 @@
       }
     }
     startNext() {
+      console.log("Starting next", this.next);
       if (!this.next)
         return this.reportProgress("Stopped");
       this.current = this.next;
@@ -916,13 +931,11 @@
           if (this.current?.player) {
             this.reportProgress("Playing");
             this.current.player.play();
-            this.checkProgress();
           }
         }, this.current.silence * 1e3);
       } else {
         this.reportProgress("Playing");
         this.current.player.play();
-        this.checkProgress();
       }
       this.requestNext(this.playlistPos + 1);
     }
@@ -976,6 +989,7 @@
       });
     }
     extractTracks() {
+      console.log("Extracted tracks", this.trackList);
       for (let tanda of this.tandaList) {
         for (let track of tanda.tracks) {
           this.trackList.push(track);
@@ -984,13 +998,552 @@
     }
   };
 
+  // dist/services/database.js
+  var IndexedDBManager = class {
+    dbName = "Tanda Player Database";
+    dbVersion = 1;
+    // Increment this for upgrades
+    db = null;
+    constructor() {
+      console.log("Created Database object");
+    }
+    async resetDatabase() {
+      console.log("Closing the database");
+      if (this.db) {
+        this.db.close();
+      }
+      console.log("Removing the database");
+      const deleteRequest = indexedDB.deleteDatabase(this.dbName);
+      deleteRequest.onsuccess = () => {
+        console.log("Database deleted successfully");
+      };
+      deleteRequest.onerror = () => {
+        console.error("Error deleting database");
+      };
+      await this.init();
+    }
+    init() {
+      return new Promise((resolve, reject) => {
+        if (!window.indexedDB) {
+          const errorMsg = "IndexedDB is not supported by this browser.";
+          console.error(errorMsg);
+          reject(errorMsg);
+        }
+        const request = indexedDB.open(this.dbName, this.dbVersion);
+        request.onerror = (event) => {
+          console.error("Database error: " + event.target.error?.message);
+          reject(event.target.error);
+        };
+        request.onupgradeneeded = (event) => {
+          console.log("Upgrade needed");
+          const db = event.target.result;
+          const tables = ["system", "track", "cortina", "tanda", "scratchpad", "playlist"];
+          tables.forEach((table) => {
+            let objectStore;
+            if (!db.objectStoreNames.contains(table)) {
+              objectStore = db.createObjectStore(table, { keyPath: "id", autoIncrement: true });
+            } else {
+              objectStore = event.target.transaction?.objectStore(table);
+            }
+            if (table === "track" || table === "cortina") {
+              if (!objectStore.indexNames.contains("relativeFileName")) {
+                objectStore.createIndex("name", "relativeFileName", { unique: true });
+              }
+            }
+            if (table === "playlist") {
+              if (!objectStore.indexNames.contains("name")) {
+                objectStore.createIndex("name", "name", { unique: true });
+              }
+            }
+          });
+        };
+        request.onsuccess = (event) => {
+          console.log("Success in opening database");
+          this.db = event.target.result;
+          resolve(this);
+        };
+      });
+    }
+    async updateData(table, id, updates) {
+      return new Promise((resolve, reject) => {
+        const transaction = this.db?.transaction([table], "readwrite");
+        const store = transaction?.objectStore(table);
+        const getRequest = store?.get(id);
+        getRequest.onsuccess = () => {
+          const data = getRequest.result;
+          if (data) {
+            Object.assign(data, updates);
+            const putRequest = store.put(data);
+            putRequest.onsuccess = () => {
+              resolve(putRequest.result);
+            };
+            putRequest.onerror = (event) => {
+              console.error("Error updating data: ", event.target.error);
+              reject(event.target.error);
+            };
+          } else {
+            reject(new Error("Record not found"));
+          }
+        };
+        getRequest.onerror = (event) => {
+          console.error("Error retrieving data to update: ", event.target.error);
+          reject(event.target.error);
+        };
+      });
+    }
+    async addData(table, data) {
+      return new Promise((resolve, reject) => {
+        const transaction = this.db?.transaction([table], "readwrite");
+        const store = transaction?.objectStore(table);
+        const request = store?.add(data);
+        request.onsuccess = () => {
+          resolve(request.result);
+        };
+        request.onerror = (event) => {
+          console.error("Error adding data: ", event.target.error);
+          reject(event.target.error);
+        };
+      });
+    }
+    async getDataById(table, id) {
+      return new Promise((resolve, reject) => {
+        const transaction = this.db?.transaction([table]);
+        const store = transaction?.objectStore(table);
+        const request = store?.get(id);
+        request.onsuccess = () => {
+          resolve(request.result);
+        };
+        request.onerror = (event) => {
+          console.error("Error fetching data: ", event.target.error);
+          reject(event.target.error);
+        };
+      });
+    }
+    async getDataByName(table, name) {
+      return new Promise((resolve, reject) => {
+        const transaction = this.db?.transaction([table]);
+        const store = transaction?.objectStore(table);
+        const index = store?.index("name");
+        const request = index?.get(name);
+        request.onsuccess = () => {
+          resolve(request.result);
+        };
+        request.onerror = (event) => {
+          console.error("Error fetching data by name: ", event.target.error);
+          reject(event.target.error);
+        };
+      });
+    }
+    async exportAllData() {
+      const transaction = this.db?.transaction(Array.from(this.db?.objectStoreNames || []), "readonly");
+      const data = {};
+      const getAllRecords = (store) => {
+        return new Promise((resolve, reject) => {
+          const request = store.getAll();
+          request.onerror = () => reject(request.error);
+          request.onsuccess = () => resolve(request.result);
+        });
+      };
+      for (const name of Array.from(this.db?.objectStoreNames || [])) {
+        const store = transaction?.objectStore(name);
+        data[name] = await getAllRecords(store);
+      }
+      return JSON.stringify(data);
+    }
+    async processEntriesInBatches(table, filterFunction, batchSize = 500) {
+      return new Promise((resolve, reject) => {
+        const results = [];
+        const transaction = this.db?.transaction([table]);
+        const store = transaction?.objectStore(table);
+        let totalCount = 0;
+        const getAllRequest = store.getAll();
+        getAllRequest.onsuccess = function() {
+          const allRecords = getAllRequest.result;
+          totalCount = allRecords.length;
+          let processedCount = 0;
+          let startIndex = 0;
+          const processNextBatch = () => {
+            const endIndex = Math.min(startIndex + batchSize, totalCount);
+            console.log("Another batch", startIndex, endIndex);
+            const batch = allRecords.slice(startIndex, endIndex);
+            const filteredBatch = batch.filter(filterFunction);
+            results.push(...filteredBatch);
+            processedCount += filteredBatch.length;
+            startIndex += batchSize;
+            if (startIndex < totalCount) {
+              setTimeout(processNextBatch, 0);
+            } else {
+              console.log("All entries processed");
+              resolve(results);
+            }
+          };
+          processNextBatch();
+        };
+        getAllRequest.onerror = function(event) {
+          console.error("Error retrieving all records: ", event.target.errorCode);
+          reject(event.target);
+        };
+      });
+    }
+  };
+  var databaseManagerInstance = null;
+  var initializationPromise = null;
+  var initializeDatabaseManager = async () => {
+    if (!initializationPromise) {
+      initializationPromise = new Promise(async (resolve) => {
+        const manager = new IndexedDBManager();
+        await manager.init();
+        console.log("Database initialized");
+        databaseManagerInstance = manager;
+        resolve(manager);
+      });
+    }
+    return initializationPromise;
+  };
+  var DatabaseManager = async () => {
+    return await initializeDatabaseManager();
+  };
+  console.log("Running database module");
+
+  // dist/services/file-system.js
+  var CONFIG_ID = 1;
+  async function selectFolder() {
+    if (!window.showDirectoryPicker) {
+      alert("The File System Access API is not supported in your browser.");
+      throw new Error("User has not given access to folder.");
+    }
+    try {
+      const directoryHandle = await window.showDirectoryPicker();
+      return directoryHandle;
+    } catch (err) {
+      console.error(err);
+      alert("Error accessing the directory.");
+      throw err;
+    }
+  }
+  var musicFileExtensions = [
+    ".aac",
+    ".ac3",
+    ".aif",
+    ".aiff",
+    ".alac",
+    ".ape",
+    ".au",
+    ".flac",
+    ".m4a",
+    ".m4b",
+    ".m4p",
+    ".m4r",
+    ".mid",
+    ".midi",
+    ".mp3",
+    ".mpa",
+    ".mpc",
+    ".ogg",
+    ".opus",
+    ".ra",
+    ".ram",
+    ".snd",
+    ".wav",
+    ".wma",
+    ".wv",
+    ".webm"
+    // Add more extensions if needed
+  ];
+  async function fetchLibraryFiles(directoryHandle) {
+    let libraryFileHandles = {};
+    for await (const entry of directoryHandle.values()) {
+      if (entry.kind === "file") {
+        switch (entry.name) {
+          case "library.dat":
+            libraryFileHandles.library = entry;
+            break;
+          case "tandas.dat":
+            libraryFileHandles.tandas = entry;
+            break;
+          case "cortinas.dat":
+            libraryFileHandles.cortinas = entry;
+            break;
+          case "playlists.dat":
+            libraryFileHandles.playlists = entry;
+            break;
+          default:
+            break;
+        }
+      }
+    }
+    return libraryFileHandles;
+  }
+  async function getAllFiles(directoryHandle, relativePath = "", fileList = []) {
+    for await (const entry of directoryHandle.values()) {
+      if (entry.kind === "file" && relativePath.indexOf("/.AppleDouble") < 0) {
+        let extensionBits = entry.name.split(".");
+        let extension = extensionBits[extensionBits.length - 1];
+        if (musicFileExtensions.includes("." + extension) && !entry.name.startsWith("._")) {
+          fileList.push({
+            fileHandle: entry,
+            relativePath,
+            relativeFileName: relativePath + "/" + entry.name
+          });
+        }
+      } else if (entry.kind === "directory") {
+        await getAllFiles(entry, `${relativePath}/${entry.name}`, fileList);
+      }
+    }
+    return fileList;
+  }
+  async function openMusicFolder(dbManager, config) {
+    try {
+      console.log(`Using config ${JSON.stringify(config)}`);
+      const directoryHandleOrUndefined = config.musicFolder;
+      if (directoryHandleOrUndefined) {
+        console.log(`Retrieved directory handle "${directoryHandleOrUndefined.name}" from IndexedDB.`);
+        return;
+      }
+      const directoryHandle = await selectFolder();
+      config.musicFolder = directoryHandle;
+      await dbManager.updateData("system", CONFIG_ID, config);
+      console.log(`Stored directory handle for "${directoryHandle.name}" in IndexedDB.`);
+    } catch (error) {
+      console.error(error);
+      alert(error);
+    }
+  }
+
   // dist/app.js
-  document.addEventListener("DOMContentLoaded", () => {
+  var SYSTEM = {
+    defaultTandaStyleSequence: "4T 4T 3W 4T 3M"
+  };
+  var CONFIG_ID2 = 1;
+  function getDomElement(selector) {
+    return document.querySelector(selector);
+  }
+  async function InitialiseConfig(dbManager) {
+    try {
+      const config = await dbManager.getDataById("system", CONFIG_ID2);
+      if (!config) {
+        await dbManager.addData("system", SYSTEM);
+        console.log(`Set default config`);
+      } else {
+        console.log(config, "Combined", { ...SYSTEM, ...config });
+        await dbManager.updateData("system", config.id, {
+          ...SYSTEM,
+          ...config
+        });
+      }
+    } catch (error) {
+      console.error("Database operation failed", error);
+    }
+    return await dbManager.getDataById("system", CONFIG_ID2);
+  }
+  async function getSystemLevel(dbManager) {
+    let systemLowestGain = { meanVolume: -20, maxVolume: 0 };
+    const files = await dbManager.processEntriesInBatches("track", (record) => {
+      let trackLevel = record.metadata.meanVolume - record.metadata.maxVolume;
+      let systemLevel = systemLowestGain.meanVolume - systemLowestGain.maxVolume;
+      if (trackLevel < systemLevel)
+        systemLowestGain = record.metadata;
+      let extension = record.relativeFileName.split(".");
+      extension = extension[extension.length - 1];
+      return true;
+    });
+    console.log("Fetched all files", files.length, "Lowest gain", systemLowestGain);
+    return systemLowestGain;
+  }
+  async function scanFileSystem(config, dbManager, analyze) {
+    const scanProgress = getDomElement("#scanProgress");
+    const scanFilePath = getDomElement("#scanFilePath");
+    let files = await getAllFiles(config.musicFolder);
+    let n = 0;
+    for (const file of files) {
+      scanFilePath.textContent = file.relativeFileName;
+      scanProgress.textContent = ++n + "/" + files.length;
+      const original = await dbManager.getDataByName("track", file.relativeFileName);
+      if (!original) {
+        const baseFile = await file.fileHandle.getFile();
+        if (baseFile.size > 1e3) {
+          let size = baseFile.size;
+          let metadata = {
+            start: 0,
+            end: -1,
+            duration: void 0,
+            meanVolume: -20,
+            maxVolume: 0
+          };
+          if (size > 1e3) {
+            const table = file.relativeFileName.split(/\/|\\/g)[1] == "music" ? "track" : "cortina";
+            await dbManager.addData(table, {
+              type: "track",
+              fileHandle: file.fileHandle,
+              relativeFileName: file.relativeFileName,
+              metadata,
+              classifiers: {
+                favourite: true
+              }
+            });
+          }
+        }
+      } else {
+        console.log("Already had details of ", file);
+        const baseFile = await file.fileHandle.getFile();
+        if (baseFile.size > 1e3) {
+          let size = baseFile.size;
+          let metadata = original.metadata;
+          metadata.meanVolume = -20;
+          if (size > 1e3) {
+            const table = file.relativeFileName.split(/\/|\\/g)[1] == "music" ? "track" : "cortina";
+            await dbManager.addData(table, {
+              type: "track",
+              fileHandle: file.fileHandle,
+              relativeFileName: file.relativeFileName,
+              metadata,
+              classifiers: {
+                favourite: true
+              }
+            });
+          }
+        }
+      }
+    }
+    console.log("Have now updated the database with all tracks");
+  }
+  async function loadLibraryIntoDB(config, dbManager) {
+    const scanProgress = getDomElement("#scanProgress");
+    const scanFilePath = getDomElement("#scanFilePath");
+    const libraryFileHandles = await fetchLibraryFiles(config.musicFolder);
+    if (libraryFileHandles) {
+      let library;
+      let cortinas;
+      let tandas;
+      let playlists;
+      console.log(libraryFileHandles);
+      if (libraryFileHandles.library) {
+        let file = await libraryFileHandles.library.getFile();
+        library = JSON.parse(await file.text());
+        console.log(library);
+      }
+      if (libraryFileHandles.cortinas) {
+        let file = await libraryFileHandles.cortinas.getFile();
+        cortinas = JSON.parse(await file.text());
+        console.log("cortinas", cortinas);
+      }
+      if (libraryFileHandles.tandas) {
+        let file = await libraryFileHandles.tandas.getFile();
+        tandas = JSON.parse(await file.text());
+        console.log("tandas", tandas);
+      }
+      if (libraryFileHandles.playlists) {
+        let file = await libraryFileHandles.playlists.getFile();
+        playlists = JSON.parse(await file.text());
+        console.log("playlists", playlists);
+      }
+      let n = 0;
+      let keys = Object.keys(library);
+      for (const trackName of keys) {
+        scanFilePath.textContent = trackName;
+        scanProgress.textContent = ++n + "/" + keys.length;
+        const existing = await dbManager.getDataByName("track", "/" + trackName);
+        if (!existing) {
+          console.log("Missing file", trackName);
+        } else {
+          console.log(trackName, existing.id);
+          const libTrack = library[trackName];
+          const metadata = {
+            tags: {
+              title: libTrack.track.title,
+              artist: libTrack.track.artist,
+              year: libTrack.track.date || libTrack.track.notes
+            },
+            start: libTrack.analysis.start,
+            end: libTrack.analysis.silence,
+            style: libTrack.classifiers?.style,
+            duration: libTrack.analysis.duration,
+            meanVolume: libTrack.analysis.meanGain || -20,
+            maxVolume: libTrack.analysis.gain || 0
+          };
+          if (trackName == "music/01 Dance Monkey.m4a") {
+            console.log(trackName, libTrack, metadata);
+          }
+          existing.metadata = metadata;
+          await dbManager.updateData("track", existing.id, existing);
+        }
+      }
+      for (let tanda of tandas) {
+        tanda.tracks = tanda.tracks.map((track) => "/" + track);
+        if (tanda.cortina && tanda.cortina[0]) {
+          tanda.cortina = await dbManager.getDataByName("cortina", tanda.cortina.map((cortina) => "/" + cortina.track)[0]);
+        } else {
+          tanda.cortina = void 0;
+        }
+        try {
+          const existing = await dbManager.getDataById("tanda", tanda.id);
+          if (!existing) {
+            await dbManager.addData("tanda", tanda);
+          } else {
+            await dbManager.updateData("tanda", tanda.id, tanda);
+          }
+        } catch (error) {
+          delete tanda.id;
+          await dbManager.addData("tanda", tanda);
+        }
+      }
+    }
+  }
+  document.addEventListener("DOMContentLoaded", async () => {
     eventBus.on("error", (error) => {
       console.error(error);
     });
-    let systemLowestGain = { meanVolume: -20, maxVolume: 0 };
-    let fadeRate = 3;
+    const headerField = getDomElement("body > header > h1");
+    eventBus.on("track-progress", async (progress) => {
+      headerField.textContent = progress.display;
+    });
+    const dbManager = await DatabaseManager();
+    let config = await InitialiseConfig(dbManager);
+    let quickClickHandlers = {
+      askUserPermission: async () => {
+        runApplication(dbManager, config);
+      },
+      rescanButton: () => {
+        scanFileSystem(config, dbManager, false);
+      },
+      rescanAnalyzeButton: () => {
+        scanFileSystem(config, dbManager, true);
+      },
+      settingsPanelButton: () => {
+        getDomElement("#settingsPanel").classList.remove("hiddenPanel");
+      },
+      settingsPanelButtonClose: () => {
+        getDomElement("#settingsPanel").classList.add("hiddenPanel");
+      },
+      ".playlistSettingsPanelOpenButton": () => {
+        getDomElement(".playlist-settings-panel").classList.remove("hiddenPanel");
+      },
+      playlistSettingsPanelCloseButton: () => {
+        getDomElement(".playlist-settings-panel").classList.add("hiddenPanel");
+      },
+      deleteDBButton: async () => {
+        console.log("Deleting the database");
+        await dbManager.resetDatabase();
+        console.log("Restoring config");
+        await dbManager.addData("system", SYSTEM);
+        config = await dbManager.getDataById("system", CONFIG_ID2);
+        await openMusicFolder(dbManager, config);
+      },
+      loadLibraryButton: async () => {
+        await loadLibraryIntoDB(config, dbManager);
+      }
+    };
+    for (const key of Object.keys(quickClickHandlers)) {
+      getDomElement((key.charAt(0) != "." ? "#" : "") + key).addEventListener("click", quickClickHandlers[key]);
+    }
+  });
+  async function runApplication(dbManager, config) {
+    await openMusicFolder(dbManager, config);
+    const modal = getDomElement("#permissionModal");
+    modal.classList.add("hidden");
+    getDomElement("#rescanButton").click();
+    let systemLowestGain = await getSystemLevel(dbManager);
+    let fadeRate = 3e3;
     const playerConfig = {
       ctx: null,
       systemLowestGain,
@@ -1002,35 +1555,40 @@
       player.updatePosition(-1);
     });
     eventBus.on("track-request-result", async (payload) => {
+      console.log("Request result", payload.requested?.fileHandle?.name, payload.previous?.fileHandle?.name);
       await player.loadNext({ track: payload.requested, silence: 0 });
     });
-    setTimeout(() => {
-      player.startNext();
-    }, 3e3);
-    const track = {
-      fileHandle: {},
-      metadata: {
-        start: 0,
-        end: 0,
-        meanVolume: -20,
-        maxVolume: 0,
-        tags: {
-          title: "unknown",
-          artist: "unknown"
-        }
+    const tracks = await dbManager.processEntriesInBatches("track", (record) => true);
+    const cortinas = await dbManager.processEntriesInBatches("cortina", (record) => true);
+    let t = 1;
+    let c = 1;
+    const allTandas = [];
+    while (t < tracks.length) {
+      if (c >= cortinas.length) {
+        c = 1;
       }
-    };
-    const tanda = {
-      name: "Dummy",
-      style: "Unknown",
-      cortina: null,
-      tracks: [track, track, track]
-    };
-    playlistService.setTandas([
-      tanda,
-      tanda
-    ]);
-  });
+      const tanda = {
+        name: "Dummy",
+        style: "Unknown",
+        cortina: await dbManager.getDataById("cortina", c++),
+        tracks: []
+      };
+      for (let i = 0; i < 4; i++) {
+        tanda.tracks.push(await dbManager.getDataById("track", t++));
+      }
+      tanda.tracks = tanda.tracks.map((t2) => {
+        t2.metadata.end = 20;
+        return t2;
+      });
+      allTandas.push(tanda);
+    }
+    console.log(allTandas);
+    playlistService.setTandas(allTandas);
+    eventBus.once("next-track-ready", async () => {
+      console.log("Starting playing tracks");
+      player.startNext();
+    });
+  }
 })();
 /*! howler.js v2.2.4 | (c) 2013-2020, James Simpson of GoldFire Studios | MIT License | howlerjs.com */
 /*! Spatial Plugin */

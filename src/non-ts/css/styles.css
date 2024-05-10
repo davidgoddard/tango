@@ -25,9 +25,11 @@ header {
   color: white;
   display: flex;
   justify-content: space-between;
+  padding: 0.5rem 1rem 0.5rem 1rem;
 }
 header > * {
   flex-grow: 1;
+  align-content: center;
 }
 
 main {
@@ -35,7 +37,10 @@ main {
   overflow: hidden;
 }
 main.all {
-  grid-template-columns: minmax(200px, 1fr) minmax(5px, 5px) minmax(100px, 1fr) minmax(5px,5px) minmax(200px, 1fr);
+  grid-template-columns: minmax(200px, 1fr) minmax(5px, 5px) minmax(100px, 1fr) minmax(
+      5px,
+      5px
+    ) minmax(200px, 1fr);
 }
 
 main.searchOnly {
@@ -53,7 +58,6 @@ main.playlistOnly {
   grid-template-rows: auto 1fr; /* Header size auto, rest is for body */
 }
 
-
 header > label {
   display: flex;
   align-items: center;
@@ -68,7 +72,7 @@ header button {
   cursor: pointer;
   justify-self: flex-start;
   display: none;
-  flex-grow:0;
+  flex-grow: 0;
 }
 
 header button.active {
@@ -90,38 +94,46 @@ header select {
   margin: 0.2rem;
 }
 
-.side-panel {
+.slideable-panel {
   height: 100%;
   width: 800px; /* Fixed width for the panel */
   position: fixed;
   z-index: 1;
   top: 0;
-  left: -800px; /* Start off-screen */
-  background-color: #111;
+  transform: translateX(0px);
+  left: 0px; /* Start off-screen */
+  background-color: #d3cec8;
   overflow-x: hidden;
   transition: transform 0.5s ease;
-  color: white;
+  color: #710404;
   padding: 20px;
 }
 
-.side-panel h2 {
-  padding-left: 25px;
+.playlist-settings-panel {
+  transform: translateX(calc(100vw - 800px));
+}
+.playlist-settings-panel.hiddenPanel {
+  transform: translateX(calc(100vw));
 }
 
-.side-panel #closeBtn {
-  position: absolute;
-  top: 10px;
-  right: 15px;
+#settingsPanel.hiddenPanel {
+  transform: translateX(-800px);
+}
+
+#settingsPanelButtonClose,
+#playlistSettingsPanelCloseButton {
+  justify-self: flex-end;
   font-size: 3rem;
   border: none;
   background: none;
   color: white;
   cursor: pointer;
+  line-height: 1rem;
+  align-items: center;
 }
 
-
 .hidden {
-  display: none;
+  display: none !important;
 }
 
 .column:last-child {
@@ -228,42 +240,14 @@ main.searchOnly > *:nth-child(5) {
   margin: 4px;
 }
 
-.playlist-settings-icon {
+.playlistSettingsPanelOpenButton {
   cursor: pointer;
   font-size: 24px;
 }
 
-.playlist-settings-panel {
-  position: fixed;
-  top: 20px;
-  right: -700px; /* Start hidden off-screen */
-  width: 700px;
-  height: 330px;
-  background: #696e7a;
-  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
-  transition: right 0.3s ease;
-  border: solid 5px #696e7a;
-  border-radius: 10px;
-  z-index: 99;
-}
-
-.playlist-settings-content {
+.playlist-settings-content,
+#settingsPanel {
   padding: 20px;
-}
-
-.playlist-settings-close-btn {
-  display: block;
-  /* padding: 10px 20px; */
-  margin-right: 10px;
-  border: none;
-  cursor: pointer;
-  color: white;
-  font-size: 3rem;
-}
-
-/* When panel is active, shift it into view */
-.playlist-settings-panel.active {
-  right: 0;
 }
 
 .field-container {
@@ -273,7 +257,6 @@ main.searchOnly > *:nth-child(5) {
   gap: 10px; /* Optional: Adds space between the label text and the input */
   width: 100%; /* Ensures the label fills the width of its container */
   margin: 0.2rem;
-  color: white;
 }
 
 .field-container input {
@@ -301,7 +284,7 @@ h2 {
 }
 
 #playlist {
-    overflow-y: auto;
+  overflow-y: auto;
 }
 
 .scrollable {
@@ -310,13 +293,8 @@ h2 {
 }
 
 .playlist-settings-panel header {
-  background:#353536;
+  background: #353536;
   color: white;
   display: flex;
   flex-direction: row;
 }
-.playlist-settings-panel h1 {
-  align-self: center;
-  padding-left:1rem;
-}
-

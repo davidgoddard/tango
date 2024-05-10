@@ -1,18 +1,30 @@
+# Ignore node_modules directory
+node_modules/
 
-# Cache files  
-.eslintcache
-.npm
-*.tsbuildinfo
-# Directories
-dist/           # This is the build process will output code.
-node_modules/   # The original reason we're here!
-# Env files      # A good safeguard against accidentally publishing
-.env.           #  private information, including security keys
-.env.test
-# Logs
+# Ignore development-specific files
+.DS_Store
+.vscode
+npm-debug.log
+yarn-error.log
+
+# Ignore build artifacts
+/dist
+/out
+/build
+
+# Ignore environment-specific files
+.env
+.env.local
+.env.*.local
+
+# Ignore dependency directories
+bower_components/
+jspm_packages/
+
+# Ignore cache and compiled files
 *.log
-logs
-npm-debug.log*
-# Misc files
-.DS_Store       # Macs often create this file
-notes.md        # Personal project notes, not my reference.
+*.gz
+*.map
+
+# Ignore OS-generated files
+Thumbs.db

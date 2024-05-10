@@ -1,4 +1,3 @@
-// event-bus.ts
 class EventBus {
     handlers = {};
     // Subscribe to an event
@@ -16,6 +15,17 @@ class EventBus {
         if (this.handlers[event].length === 0) {
             delete this.handlers[event];
         }
+    }
+    // Subscribe to an event, but only once
+    once(event, handler) {
+        const onceHandler = (payload) => {
+            // Call the original handler
+            handler(payload);
+            // Unsubscribe the once handler after the event is fired once
+            this.off(event, onceHandler);
+        };
+        // Subscribe to the event using the once handler
+        this.on(event, onceHandler);
     }
     // Emit an event with a payload
     emit(event, payload) {

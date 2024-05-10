@@ -10,7 +10,7 @@ export type ChangeDetails = {
 export type Tanda = {
     name: string,
     style: string,
-    cortina: string | null;
+    cortina: Track | null;
     tracks: Track[]
 }
 export class PlaylistService {
@@ -42,6 +42,7 @@ export class PlaylistService {
     }
 
     extractTracks() {
+        console.log('Extracted tracks', this.trackList)
         for (let tanda of this.tandaList) {
             for (let track of tanda.tracks) {
                 this.trackList.push(track)
