@@ -14,7 +14,6 @@ const addJsExtensionPlugin = {
 
       // Resolve the path to an absolute path
       const absolutePath = resolve(dirname(args.importer), resolvedPath);
-      console.log(args, absolutePath)
       return { path: absolutePath, namespace: 'file' };
     });
   },

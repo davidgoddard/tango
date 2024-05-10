@@ -5,7 +5,6 @@
   "main": "app.js",
   "type": "module",
   "dependencies": {
-    "tsc": "^2.0.4"
   },
   "devDependencies": {
     "esbuild": "^0.21.1",
@@ -13,9 +12,9 @@
     "typescript": "^5.4.5"
   },
   "scripts": {
-    "build": "/usr/local/bin/tsc && node esbuild.js && npm run build:cp-public",
+    "build": "tsc  && npm run build:cp-public && ls -ltr dist/lib && node esbuild.js",
     "build:cp-public": "cp -R ./src/non-ts/** ./dist",
-    "type": "/usr/local/bin/tsc --noEmit",
+    "type": "tsc --noEmit",
     "start": "npx http-server dist --cors"
   },
   "author": "David Goddard",

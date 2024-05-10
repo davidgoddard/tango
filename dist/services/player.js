@@ -1,26 +1,20 @@
 // @ts-ignore
-import Howl from "../non-ts/lib/howler.min.js";
-export function toTime(ms) {
-    if (isNaN(ms))
-        return "?";
-    let seconds = Math.round(ms / 1000);
-    let minutes = Math.floor(seconds / 60);
-    let hours = Math.floor(minutes / 60);
-    seconds %= 60;
-    minutes %= 60;
-    const parts = [];
-    const formattedSeconds = seconds < 10 ? "0" + seconds : seconds;
-    const formattedMinutes = minutes < 10 ? "0" + minutes : minutes;
-    if (hours > 0) {
-        parts.push(hours);
-        parts.push(formattedMinutes);
-    }
-    else {
-        parts.push(minutes);
-    }
-    parts.push(formattedSeconds);
-    return parts.join(":");
-}
+import Howl from "../lib/howler.min.js";
+import { formatTime } from "../services/utils";
+import { eventBus } from "../events/event-bus";
+/**
+ * Create a player.  This handles all songs on one output
+ * Emits `track-progress` every second with information on the current track
+ * Emits `track-request` when details of the next song in the sequence is needed
+ *
+ * Subscribes to `next-track` expecting { track, silence }
+ *
+ * @param {object} options -   ctx: any; // output context - i.e. headphones or speakers
+ *                             progress: (progress: ProgressData) => void; // method to call once per second for progress reporting
+ *                             nextUp: (N: number) => Promise<{ track: Track; silence: number }>;
+ *                             systemLowestGain: { meanVolume: number; maxVolume: number };
+ *                             fadeRate: number; // time over which to fade out.
+ */
 export class Player {
     options;
     current = null;
@@ -31,9 +25,10 @@ export class Player {
     constructor(options) {
         this.options = options;
         this.systemGain =
-            options.systemLowestGain.metadata.meanVolume -
-                options.systemLowestGain.metadata.maxVolume;
+            options.systemLowestGain.meanVolume -
+                options.systemLowestGain.maxVolume;
         console.log("Setting player system gain", this.systemGain, this.options);
+        eventBus.on("next-track", this.loadNext.bind(this));
         this.progressTimer = setInterval(this.checkProgress.bind(this), 100);
     }
     checkProgress() {
@@ -79,9 +74,9 @@ export class Player {
                     ? 0
                     : Math.min(player.seek() * 1000 - track.metadata?.start, 1000 * (track.metadata.end - track.metadata.start));
             const displayName = track.metadata?.end < 0
-                ? `${state}:  ${this.current.displayName} ( ${toTime(player.seek() * 1000)} / ? )`
-                : `${state}: ${this.current.displayName}  ( ${toTime(pos)} / ${toTime(1000 * (track.metadata.end - track.metadata.start))} )`;
-            this.options.progress({
+                ? `${state}:  ${this.current.displayName} ( ${formatTime(player.seek() * 1000)} / ? )`
+                : `${state}: ${this.current.displayName}  ( ${formatTime(pos)} / ${formatTime(1000 * (track.metadata.end - track.metadata.start))} )`;
+            eventBus.emit("track-progress", {
                 track,
                 pos,
                 display: displayName,
@@ -90,7 +85,7 @@ export class Player {
         }
         else {
             if (!this.next?.player) {
-                this.options.progress({
+                eventBus.emit("track-progress", {
                     track: null,
                     pos: null,
                     display: `Stopped`,
@@ -102,21 +97,26 @@ export class Player {
     static dBtoLinear(dB) {
         return Math.pow(10, dB / 20);
     }
-    async updatePosition(newPos) {
+    updatePosition(newPos) {
         console.log("Player - Updating position", newPos, "Was", this.playlistPos);
         if (newPos !== this.playlistPos) {
             this.playlistPos = newPos;
             if (typeof this.next?.unload == "function") {
                 this.next.unload();
             }
-            await this.loadNext();
+            this.requestNext(newPos + 1);
         }
     }
-    async loadNext() {
+    requestNext(N) {
+        console.log('Requesting track', N);
+        eventBus.emit("track-request", N);
+    }
+    // Called by event 'next-track'
+    async loadNext(payload) {
         try {
             const N = this.playlistPos + 1;
             console.log("Loading next", N);
-            const { track, silence } = await this.options.nextUp(N);
+            const { track, silence } = payload;
             console.log("Told by playlist to use this", track, "Silence: ", silence);
             if (track) {
                 const { player, url } = await this.createPlayer(track);
@@ -132,7 +132,7 @@ export class Player {
                             ? this.systemGain -
                                 (track.metadata.meanVolume - track.metadata.maxVolume)
                             : 1,
-                        displayName: `${track.metadata?.tags?.title || track.fileHandle.name} / ${track.metadata?.tags?.artist || "unknown"}`,
+                        displayName: `${track.metadata?.tags?.title || track.fileHandle?.name} / ${track.metadata?.tags?.artist || "unknown"}`,
                         state: "Waiting",
                         ending: false,
                     };
@@ -164,25 +164,34 @@ export class Player {
         return this.playlistPos;
     }
     async createPlayer(track) {
-        const url = URL.createObjectURL(await track.fileHandle.getFile());
-        const player = new Howl({
-            src: [url],
-            html5: true,
-            preload: true,
-            autoplay: false,
-        });
-        player.once("load", () => {
-            player.seek(track.metadata?.start || 0);
-            if (track.metadata?.meanVolume) {
-                const reduction = this.systemGain -
-                    (track.metadata.meanVolume - track.metadata.maxVolume);
-                console.log("Using reduction", reduction);
-                player.volume(Player.dBtoLinear(reduction));
-            }
-        });
-        if (track.metadata?.end < 0)
-            player.once("end", this.startNext.bind(this));
-        return { player, url };
+        try {
+            console.log('Trying to create a player', track);
+            const url = URL.createObjectURL(await track.fileHandle.getFile());
+            const player = new Howl({
+                src: [url],
+                html5: true,
+                preload: true,
+                autoplay: false,
+            });
+            player.once("load", () => {
+                player.seek(track.metadata?.start || 0);
+                if (track.metadata?.meanVolume) {
+                    const reduction = this.systemGain -
+                        (track.metadata.meanVolume - track.metadata.maxVolume);
+                    console.log("Using reduction", reduction);
+                    player.volume(Player.dBtoLinear(reduction));
+                }
+            });
+            if (track.metadata?.end < 0)
+                player.once("end", this.startNext.bind(this));
+            console.log('Returning', player, url);
+            return { player, url };
+        }
+        catch (error) {
+            console.error(error);
+            eventBus.emit('error', error);
+            throw error;
+        }
     }
     startNext() {
         if (!this.next)
@@ -205,7 +214,7 @@ export class Player {
             this.current.player.play();
             this.checkProgress();
         }
-        this.loadNext();
+        this.requestNext(this.playlistPos + 1);
     }
     stop() {
         if (this.isPlaying) {
