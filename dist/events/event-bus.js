@@ -29,7 +29,7 @@ class EventBus {
     }
     // Emit an event with a payload
     emit(event, payload) {
-        console.log('DEBUG: Emitting', event, payload == undefined ? 'no payload' : payload);
+        // console.log('DEBUG: Emitting', event, payload == undefined ? 'no payload' : payload)
         if (!this.handlers[event]) {
             console.log('DEBUG - no event listeners for', event, payload);
         }

@@ -1,10 +1,12 @@
 // Example usage in a component file
 import { eventBus } from "./events/event-bus";
-import "./components/tanda-element";
+import "./components/search.element";
+import "./components/tanda.element";
 import { Player } from "./services/player";
 import { PlaylistService } from "./services/playlist-service";
-import { DatabaseManager, } from "./services/database";
+import { DatabaseManager, convert, } from "./services/database";
 import { fetchLibraryFiles, getAllFiles, openMusicFolder, } from "./services/file-system";
+import { TabsContainer } from "./components/tabs.component";
 const SYSTEM = {
     defaultTandaStyleSequence: "4T 4T 3W 4T 3M",
 };
@@ -44,7 +46,7 @@ async function getSystemLevel(dbManager) {
         let systemLevel = systemLowestGain.meanVolume - systemLowestGain.maxVolume;
         if (trackLevel < systemLevel)
             systemLowestGain = record.metadata;
-        let extension = record.relativeFileName.split(".");
+        let extension = record.name.split(".");
         extension = extension[extension.length - 1];
         return true;
     });
@@ -59,9 +61,11 @@ async function scanFileSystem(config, dbManager, analyze) {
     // Store all changes
     let n = 0;
     for (const file of files) {
+        let indexFileName = convert(file.relativeFileName);
         scanFilePath.textContent = file.relativeFileName;
         scanProgress.textContent = ++n + "/" + files.length;
-        const original = (await dbManager.getDataByName("track", file.relativeFileName));
+        const table = indexFileName.split(/\/|\\/g)[1] == "music" ? "track" : "cortina";
+        let original = (await dbManager.getDataByName(table, indexFileName));
         if (!original) {
             const baseFile = await file.fileHandle.getFile();
             if (baseFile.size > 1000) {
@@ -72,54 +76,22 @@ async function scanFileSystem(config, dbManager, analyze) {
                     duration: undefined,
                     meanVolume: -20,
                     maxVolume: 0,
+                    tags: { title: indexFileName, artist: "unknown" },
                 };
                 // if (analyze) {
                 //     let { s, m } = await readMetadataFromFileHandle(file.fileHandle)
                 //     size = s
                 //     metadata = m
                 // }
-                if (size > 1000) {
-                    const table = file.relativeFileName.split(/\/|\\/g)[1] == "music"
-                        ? "track"
-                        : "cortina";
-                    await dbManager.addData(table, {
-                        type: "track",
-                        fileHandle: file.fileHandle,
-                        relativeFileName: file.relativeFileName,
-                        metadata,
-                        classifiers: {
-                            favourite: true,
-                        },
-                    });
-                }
-            }
-        }
-        else {
-            console.log("Already had details of ", file);
-            const baseFile = await file.fileHandle.getFile();
-            if (baseFile.size > 1000) {
-                let size = baseFile.size;
-                let metadata = original.metadata;
-                metadata.meanVolume = -20;
-                // if (analyze) {
-                //     let { s, m } = await readMetadataFromFileHandle(file.fileHandle)
-                //     size = s
-                //     metadata = { ...metadata, ...m }
-                // }
-                if (size > 1000) {
-                    const table = file.relativeFileName.split(/\/|\\/g)[1] == "music"
-                        ? "track"
-                        : "cortina";
-                    await dbManager.addData(table, {
-                        type: "track",
-                        fileHandle: file.fileHandle,
-                        relativeFileName: file.relativeFileName,
-                        metadata,
-                        classifiers: {
-                            favourite: true,
-                        },
-                    });
-                }
+                await dbManager.addData(table, {
+                    type: table,
+                    name: indexFileName,
+                    fileHandle: file.fileHandle,
+                    metadata,
+                    classifiers: {
+                        favourite: true,
+                    },
+                });
             }
         }
     }
@@ -129,43 +101,23 @@ async function loadLibraryIntoDB(config, dbManager) {
     const scanProgress = getDomElement("#scanProgress");
     const scanFilePath = getDomElement("#scanFilePath");
     const libraryFileHandles = await fetchLibraryFiles(config.musicFolder);
-    if (libraryFileHandles) {
-        let library;
-        let cortinas;
-        let tandas;
-        let playlists;
-        console.log(libraryFileHandles);
-        if (libraryFileHandles.library) {
-            let file = await libraryFileHandles.library.getFile();
-            library = JSON.parse(await file.text());
-            console.log(library);
-        }
-        if (libraryFileHandles.cortinas) {
-            let file = await libraryFileHandles.cortinas.getFile();
-            cortinas = JSON.parse(await file.text());
-            console.log("cortinas", cortinas);
-        }
-        if (libraryFileHandles.tandas) {
-            let file = await libraryFileHandles.tandas.getFile();
-            tandas = JSON.parse(await file.text());
-            console.log("tandas", tandas);
-        }
-        if (libraryFileHandles.playlists) {
-            let file = await libraryFileHandles.playlists.getFile();
-            playlists = JSON.parse(await file.text());
-            console.log("playlists", playlists);
-        }
+    async function getJSON(file) {
+        const text = await file.text();
+        const json = JSON.parse(text);
+        return json;
+    }
+    async function setTrackDetails(library, table) {
         let n = 0;
         let keys = Object.keys(library);
         for (const trackName of keys) {
             scanFilePath.textContent = trackName;
             scanProgress.textContent = ++n + "/" + keys.length;
-            const existing = (await dbManager.getDataByName("track", "/" + trackName));
+            let tn = convert("/" + trackName);
+            const existing = (await dbManager.getDataByName(table, tn));
             if (!existing) {
-                console.log("Missing file", trackName);
+                console.log("Missing file", tn, trackName);
             }
             else {
-                console.log(trackName, existing.id);
                 const libTrack = library[trackName];
                 const metadata = {
                     tags: {
@@ -180,12 +132,34 @@ async function loadLibraryIntoDB(config, dbManager) {
                     meanVolume: libTrack.analysis.meanGain || -20,
                     maxVolume: libTrack.analysis.gain || 0,
                 };
-                if (trackName == "music/01 Dance Monkey.m4a") {
-                    console.log(trackName, libTrack, metadata);
-                }
                 existing.metadata = metadata;
                 await dbManager.updateData("track", existing.id, existing);
             }
+        }
+    }
+    if (libraryFileHandles) {
+        let library;
+        let cortinas;
+        let tandas;
+        let playlists;
+        console.log(libraryFileHandles);
+        if (libraryFileHandles.library) {
+            library = await getJSON(await libraryFileHandles.library.getFile());
+            console.log(library);
+            await setTrackDetails(library, "track");
+        }
+        if (libraryFileHandles.cortinas) {
+            cortinas = await getJSON(await libraryFileHandles.cortinas.getFile());
+            console.log("cortinas", cortinas);
+            await setTrackDetails(cortinas, "cortina");
+        }
+        if (libraryFileHandles.tandas) {
+            tandas = await getJSON(await libraryFileHandles.tandas.getFile());
+            console.log("tandas", tandas);
+        }
+        if (libraryFileHandles.playlists) {
+            playlists = await getJSON(await libraryFileHandles.playlists.getFile());
+            console.log("playlists", playlists);
         }
         for (let tanda of tandas) {
             tanda.tracks = tanda.tracks.map((track) => "/" + track);
@@ -211,13 +185,61 @@ async function loadLibraryIntoDB(config, dbManager) {
         }
     }
 }
+async function deleteDatabase(dbManager) {
+    console.log("Deleting the database");
+    await dbManager.resetDatabase();
+    console.log("Restoring config");
+    await dbManager.addData("system", SYSTEM);
+    let config = (await dbManager.getDataById("system", CONFIG_ID));
+    await openMusicFolder(dbManager, config);
+    return config;
+}
+async function processQuery(dbManager, query, selectedStyle) {
+    return [];
+}
+// Request permission to access audio devices
+async function requestAudioPermission() {
+    try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Permission granted
+        console.log("Permission to access audio devices granted.");
+    }
+    catch (error) {
+        // Permission denied or error
+        console.error("Error accessing audio devices:", error);
+    }
+}
+// Function to enumerate available audio output devices
+async function enumerateOutputDevices() {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    console.log("Available audio devices", devices);
+    const outputDevices = devices.filter((device) => device.kind === "audiooutput");
+    return outputDevices;
+}
+// Function to populate the select element with output device options
+async function populateOutputDeviceOptions() {
+    const outputDevices = await enumerateOutputDevices();
+    function fillOptions(target) {
+        outputDevices.forEach((device) => {
+            const option = document.createElement("option");
+            option.value = device.deviceId;
+            option.text = device.label || "Unknown Device";
+            target.appendChild(option);
+        });
+    }
+    fillOptions(getDomElement("#speaker-output-devices"));
+    fillOptions(getDomElement("#headphones-output-devices"));
+}
 document.addEventListener("DOMContentLoaded", async () => {
+    try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+    }
+    catch (error) {
+        alert(`Without access to your computer's audio, Tanda Player cannot operate`);
+        throw error;
+    }
     eventBus.on("error", (error) => {
         console.error(error);
-    });
-    const headerField = getDomElement("body > header > h1");
-    eventBus.on("track-progress", async (progress) => {
-        headerField.textContent = progress.display;
     });
     const dbManager = await DatabaseManager();
     let config = await InitialiseConfig(dbManager);
@@ -245,12 +267,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             getDomElement(".playlist-settings-panel").classList.add("hiddenPanel");
         },
         deleteDBButton: async () => {
-            console.log("Deleting the database");
-            await dbManager.resetDatabase();
-            console.log("Restoring config");
-            await dbManager.addData("system", SYSTEM);
-            config = (await dbManager.getDataById("system", CONFIG_ID));
-            await openMusicFolder(dbManager, config);
+            config = await deleteDatabase(dbManager);
         },
         loadLibraryButton: async () => {
             await loadLibraryIntoDB(config, dbManager);
@@ -259,6 +276,38 @@ document.addEventListener("DOMContentLoaded", async () => {
     for (const key of Object.keys(quickClickHandlers)) {
         getDomElement((key.charAt(0) != "." ? "#" : "") + key).addEventListener("click", quickClickHandlers[key]);
     }
+    // Set up the search tabs
+    // Main application logic
+    const tabs = ["Search", "Favourites", "Recent"];
+    const tabsContainer = new TabsContainer(getDomElement("#tabsContainer"), tabs);
+    // Handle searches
+    eventBus.on("query", async (searchData) => {
+        // Process the query (e.g., fetch data from a server)
+        const results = await processQuery(dbManager, searchData.query, searchData.selectedStyle);
+        // Send the results back to the search component
+        eventBus.emit("queryResults", results);
+    });
+    // Support multiple sound-outputs
+    await requestAudioPermission();
+    populateOutputDeviceOptions();
+    // Event listener for output device selection changes
+    const outputDeviceSelector = getDomElement("#speaker-output-devices");
+    outputDeviceSelector.addEventListener("change", () => {
+        const selectedDeviceId = outputDeviceSelector.value;
+        config.mainOutput = selectedDeviceId;
+        dbManager.updateData("system", 1, config);
+        console.log("Audio Setting: ", config);
+        eventBus.emit("change-speaker", selectedDeviceId);
+    });
+    const headphoneDeviceSelector = getDomElement("#headphones-output-devices");
+    headphoneDeviceSelector.addEventListener("change", () => {
+        const selectedDeviceId = headphoneDeviceSelector
+            .value;
+        config.headphoneOutput = selectedDeviceId;
+        dbManager.updateData("system", 1, config);
+        console.log("Audio Setting: ", config);
+        eventBus.emit("change-headphones", selectedDeviceId);
+    });
 });
 async function runApplication(dbManager, config) {
     await openMusicFolder(dbManager, config);
@@ -266,35 +315,94 @@ async function runApplication(dbManager, config) {
     // Remove modal window and start application
     const modal = getDomElement("#permissionModal");
     modal.classList.add("hidden");
-    getDomElement("#rescanButton").click();
+    // (getDomElement("#rescanButton") as HTMLElement).click();
     // Scan all files in database to find system's lowest gain for normalisation purposes
     let systemLowestGain = await getSystemLevel(dbManager);
     let fadeRate = 3000;
-    // Prepare the new music player to play music adjusted to the given system gain
+    const playlistService = new PlaylistService(getDomElement("#playlistContainer"), async (type, name) => {
+        return (await dbManager.getDataByName(type, name));
+    });
+    // Prepare the new music speakerOutputPlayer to play music adjusted to the given system gain
     // and fade songs using the given fade rate.
-    const playerConfig = {
-        ctx: null,
+    const headerField = getDomElement("body > header > h1");
+    const speakerPlayerConfig = {
+        ctx: config.mainOutput,
         systemLowestGain,
         fadeRate,
+        fetchNext: async (N) => {
+            let silence = 0;
+            let nextTrack = playlistService.fetch(N);
+            if (N > 0) {
+                let previousTrack = playlistService.fetch(N - 1);
+                console.log("Next & previous", nextTrack, previousTrack);
+                silence = 2;
+                if (nextTrack.type == "track" && previousTrack.type == "cortina") {
+                    silence = 4;
+                }
+                if (nextTrack.type == "cortina" && previousTrack.type == "track") {
+                    silence = 4;
+                }
+            }
+            else {
+                silence = 0;
+            }
+            return { track: nextTrack, silence };
+        },
+        progress: (data) => {
+            headerField.textContent = data.display;
+        },
     };
-    const player = new Player(playerConfig);
-    const playlistService = new PlaylistService();
-    eventBus.on("new-playlist", () => {
-        // make the next track the first in the playlist
-        player.updatePosition(-1);
+    let headphonePlaylist = [];
+    const headphonesPlayerConfig = {
+        ctx: config.headphoneOutput,
+        systemLowestGain,
+        fadeRate: 500,
+        fetchNext: async (N) => {
+            console.log("Headphones next", {
+                track: headphonePlaylist[0],
+                silence: 0,
+            });
+            return { track: headphonePlaylist[0], silence: 0 };
+        },
+    };
+    const speakerOutputPlayer = new Player(speakerPlayerConfig);
+    const headphonesOutputPlayer = new Player(headphonesPlayerConfig);
+    eventBus.on("change-speaker", (context) => {
+        speakerPlayerConfig.ctx = context;
+        speakerOutputPlayer.updateOptions(speakerPlayerConfig);
     });
-    eventBus.on("track-request-result", async (payload) => {
-        // use payload.previous to decide on required silence
-        console.log("Request result", payload.requested?.fileHandle?.name, payload.previous?.fileHandle?.name);
-        await player.loadNext({ track: payload.requested, silence: 0 });
+    eventBus.on("change-headphones", (context) => {
+        headphonesPlayerConfig.ctx = context;
+        headphonesOutputPlayer.updateOptions(headphonesPlayerConfig);
+    });
+    document.addEventListener("playOnHeadphones", async (event) => {
+        const track = event.detail;
+        if (track.classList.contains("playingOnHeadphones")) {
+            headphonesOutputPlayer.stop();
+            Array.from(getDomElement("#playlistContainer").querySelectorAll(".playingOnHeadphones")).map((x) => x.classList.remove("playingOnHeadphones"));
+        }
+        else {
+            Array.from(getDomElement("#playlistContainer").querySelectorAll(".playingOnHeadphones")).map((x) => x.classList.remove("playingOnHeadphones"));
+            track.classList.add("playingOnHeadphones");
+            headphonePlaylist[0] = (await dbManager.getDataById("track", parseInt(track.getAttribute("trackid"))));
+            headphonesOutputPlayer.stop();
+            await headphonesOutputPlayer.updatePosition(-1);
+            console.log(headphonesOutputPlayer.next);
+            headphonesOutputPlayer.startNext();
+        }
+    });
+    eventBus.on("new-playlist", async () => {
+        // make the next track the first in the playlist
+        await speakerOutputPlayer.updatePosition(-1);
+        speakerOutputPlayer.startNext();
     });
     // Simulate user request to start playing
     // setTimeout(() => {
-    //   player.startNext();
+    //   speakerOutputPlayer.startNext();
     // }, 3000);
     // dummy code
-    const tracks = await dbManager.processEntriesInBatches("track", (record) => true);
-    const cortinas = await dbManager.processEntriesInBatches("cortina", (record) => true);
+    const tracks = (await dbManager.processEntriesInBatches("track", (record) => true));
+    const cortinas = (await dbManager.processEntriesInBatches("cortina", (record) => true));
     let t = 1;
     let c = 1;
     const allTandas = [];
@@ -303,24 +411,30 @@ async function runApplication(dbManager, config) {
             c = 1;
         }
         const tanda = {
+            type: "tanda",
             name: "Dummy",
             style: "Unknown",
-            cortina: (await dbManager.getDataById("cortina", c++)),
+            cortina: cortinas[c++].name,
             tracks: [],
         };
-        for (let i = 0; i < 4; i++) {
-            tanda.tracks.push((await dbManager.getDataById("track", t++)));
+        for (let i = 0; i < 4 && t < tracks.length; i++) {
+            tanda.tracks.push(tracks[t++].name);
         }
-        tanda.tracks = tanda.tracks.map((t) => {
-            t.metadata.end = 20;
-            return t;
-        });
         allTandas.push(tanda);
     }
     console.log(allTandas);
-    playlistService.setTandas(allTandas);
-    eventBus.once("next-track-ready", async () => {
-        console.log("Starting playing tracks");
-        player.startNext();
-    });
+    await playlistService.setTandas(allTandas);
+    // eventBus.once("next-track-ready", async () => {
+    //   console.log("Starting playing tracks");
+    //   speakerOutputPlayer.startNext();
+    // });
+    // await speakerOutputPlayer.updatePosition(1)
+    // speakerOutputPlayer.stop();
+    // setTimeout(async () => {
+    //   console.log("Testing headphones");
+    //   headphonePlaylist[0] = playlistService.fetch(4);
+    //   await headphonesOutputPlayer.updatePosition(-1);
+    //   console.log(headphonesOutputPlayer.next)
+    //   headphonesOutputPlayer.startNext();
+    // }, 5000);
 }

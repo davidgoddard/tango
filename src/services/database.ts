@@ -1,22 +1,15 @@
 // database.ts
 
-type TableNames = 'system' | 'track' | 'cortina' | 'tanda' | 'scratchpad' | 'playlist';
+import { Track, BaseRecord, Playlist, TableNames } from '../data-types'
 
-export interface BaseRecord {
-    id?: number;
-}
 
-interface Track extends BaseRecord {
-    type: 'track';
-    relativeFileName: string;
-    fileHandle: any;
-    metadata: any;
-    classifiers: any;
-}
-
-interface Playlist extends BaseRecord {
-    type: 'playlist';
-    name: string;
+export function convert(input: string): string {
+    return input.normalize("NFC");
+        // const encoder = new TextEncoder();
+    // const uint8Array = encoder.encode(input);
+    // let decoder = new TextDecoder('utf-16');
+    // let text = decoder.decode(uint8Array);
+    // return text;
 }
 
 export type IndexedDBRecord = BaseRecord | Track | Playlist ;
@@ -81,8 +74,8 @@ export class IndexedDBManager {
                     }
 
                     if (table === 'track' || table === 'cortina') {
-                        if (!objectStore.indexNames.contains('relativeFileName')) {
-                            objectStore.createIndex('name', 'relativeFileName', { unique: true });
+                        if (!objectStore.indexNames.contains('name')) {
+                            objectStore.createIndex('name', 'name', { unique: true });
                         }
                     }
 
@@ -148,6 +141,7 @@ export class IndexedDBManager {
             };
 
             request!.onerror = (event: Event) => {
+                console.error('Data causing error: ', table, data)
                 console.error('Error adding data: ', (event.target as IDBRequest).error);
                 reject((event.target as IDBRequest).error);
             };

@@ -1,5 +1,5 @@
 import { eventBus } from '../events/event-bus';
-import { Track } from './player'
+import { Track, Tanda } from '../data-types'
 
 export type ChangeDetails = {
     type: string,
@@ -7,27 +7,35 @@ export type ChangeDetails = {
     newPos: number
 }
 
-export type Tanda = {
-    name: string,
-    style: string,
-    cortina: Track | null;
-    tracks: Track[]
-}
 export class PlaylistService {
 
     private tandaList: Tanda[];
     private trackList: Track[];
 
-    constructor() {
+    constructor(private container: HTMLElement, private getDetail: (type: string, name: string) => Promise<Track>) {
         this.tandaList = [];
         this.trackList = [];
         eventBus.on('track-request', this.requestTrack.bind(this))
     }
 
-    setTandas(tandaList: Tanda[]) {
+    async setTandas(tandaList: Tanda[]) {
         this.tandaList = tandaList;
-        this.extractTracks();
+        await this.extractTracks();
         eventBus.emit('new-playlist')
+        this.container.innerHTML = '';
+        for ( let track of this.trackList ){
+            let te = document.createElement('track-element');
+            te.setAttribute('trackid', String(track.id));
+            te.setAttribute('style', track.metadata?.tags?.style!);
+            te.setAttribute('title', track.metadata?.tags?.title!);
+            te.setAttribute('artist', track.metadata?.tags?.artist!);
+            let year = track.metadata?.tags?.year!
+            if ( year ){
+                year = year.substring(0,4)
+            }
+            te.setAttribute('year', year);
+            this.container.appendChild(te)
+        }
     }
 
     getTracks() {
@@ -41,13 +49,20 @@ export class PlaylistService {
         });
     }
 
-    extractTracks() {
-        console.log('Extracted tracks', this.trackList)
+    async extractTracks() {
         for (let tanda of this.tandaList) {
+            if ( tanda.cortina){
+                this.trackList.push(await this.getDetail('cortina', tanda.cortina))
+            }
             for (let track of tanda.tracks) {
-                this.trackList.push(track)
+                this.trackList.push(await this.getDetail('track', track))
             }
         }
+        console.log('Extracted tracks', this.trackList)
+    }
+
+    fetch(N: number): Track {
+        return this.trackList[N]
     }
 
 }

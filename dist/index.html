@@ -2,175 +2,170 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Author: David Goddard
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Author: David Goddard
   A tanda based music player for Tango DJs">
-  <title>Tanda Player Lite</title>
+    <title>Tanda Player Lite</title>
 
-  <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
-  <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
+    <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
+    <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
 
-  <link rel="manifest" href="./manifest.json">
-  <link rel="stylesheet" href="./css/styles.css">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="stylesheet" href="./css/styles.css">
 
-  <script type="module" src="./components/file.element.js"></script>
-  <script type="module" src="./components/track.element.js"></script>
-  <script type="module" src="./components/tanda.element.js"></script>
-  <script type="module" src="./components/playlist.element.js"></script>
-  <script type="module" src="./components/scratch-pad.element.js"></script>
-  <script type="module" src="./components/search.element.js"></script>
+    <!-- <script type="module" src="./components/file.element.js"></script>
+    <script type="module" src="./components/tanda.element.js"></script>
+    <script type="module" src="./components/playlist.element.js"></script>
+    <script type="module" src="./components/scratch-pad.element.js"></script> -->
 
+    <script type="module" src="./components/track.element.js"></script>
+    <script type="module" src="./events/event-bus.js"></script>
+    <script type="module" src="./components/search.element.js"></script>
 </head>
 
 <body>
-  <header class="content">
-    <button class="active" id="settingsPanelButton" aria-label="Open menu">⚙️</button>
-    <h1>Tanda Player Lite</h1>
-    <label>View: <select id="modeSelector"></select></label>
-  </header>
+    <header class="content">
+        <button class="active" id="settingsPanelButton" aria-label="Open menu">⚙️</button>
+        <h1>Tanda Player Lite</h1>
+        <label>View: <select id="modeSelector"></select></label>
+    </header>
 
-  <div id="settingsPanel" class="slideable-panel content hiddenPanel">
-    <header>
-        <h2>Settings</h2>
-        <button class="active" id="settingsPanelButtonClose" aria-label="Close Settings">&times;</button>
-      </header>
-      
-    <ul>
-      <li>Links to classification page</li>
-      <li>Define playlist timings: between tracks, after tanda, before tanda</li>
-      <li>Reset column widths to defaults</li>
-      <li>Edit preferred text items</li>
-    </ul>
-
-    <form>
-      <legend>Defaults</legend>
-      <label>Tanda Style Sequence: <input type="text" placeholder="E.g. 4T 4T 3W 4T 3M" value="4T 4T 3W 4T 3M" id="defaultTandaStyleSequence"></label>
-    </form>
-
-    <p>To use another folder as the source of music files requires clearing the old database which is stored in the
-      browser. If you wish to save the current library of tandas etc. that goes with the current folder, then use the
-      "Export" feature first.</p>
-    <button class="active" id="exportDatabase">Export Database</button>
-    <button class="active" id="rescanButton">Re-scan for new files only</button>
-    <button class="active" id="rescanAnalyzeButton">Re-Analyze</button>
-    <button class="active" id="deleteDBButton">Reset Database</button>
-    <button class="active" id="loadLibraryButton">Open existing Tanda Player Library</button>
-
-    <section id="scannerProgress">
-      <h3>File Scanner Progress</h3>
-      <p id="scanProgress"></p>
-      <p id="scanFilePath"></p>
-      <p id="scanFileName"></p>
-    </section>
-  </div>
-
-  <main class="all">
-    <div id="searchColumn" class="column content">
-
-      <div class="tabs pre-defined-search-choice">
-        <div class="tab-headers">
-          <div class="tab-header active" data-tab="search-controls">Search</div>
-          <div class="tab-header" data-tab="favourites-results">Favourites<span id="favourites-count"></span></div>
-        </div>
-
-        <div class="tab-contents">
-          <div class="tab-content active" id="search-controls">
-            <search-element id="generalSearch"></search-element>
-          </div>
-          <div class="tab-content" id="favourites-results">
-            <search-element id="favouritesSearch"></search-element>
-          </div>
-        </div>
-      </div>
-
-      <ul>
-        <li>Basic search</li>
-        <li>Filter results by style and or other tags</li>
-        <li>Via config, show standard lists: favourites, recently added, recently played</li>
-        <li>Each item has click to move to clipboard</li>
-      </ul>
-
-    </div>
-    <div class="handle" id="handle1"></div>
-    <div id="scratchpadColumn" class="column content">
-      <header class="playlistHeading">
-        <h2>Scratch Pad</h2>
-      </header>
-      <ul>
-        <li>New items added to top</li>
-        <li>User can drag/drop and move items about</li>
-        <li>Allow user to tag tandas or songs and allow grouping by them</li>
-        <li>All tandas can be added to playlist: at current location, to end</li>
-        <li>Content can be filtered by style or other tags</li>
-      </ul>
-      <scratch-pad-element id="scratchPad" playlistSelector="#playlist"></scratch-pad-element>
-    </div>
-    <div class="handle" id="handle2"></div>
-    <div id="playlistColumn" class="column content">
-      <section class="fixedColumnContent">
-        <header class="playlistHeading">
-          <h2>Playlist</h2>
-          <section>
-            <button id="stopButton"><img src="./icons/stopNow.png" alt="stop now"></button>
-          </section>
-          <section>
-            <p>Show times:
-              <label>Relative: <input type="radio" name="timingBase" value="relative">
-                Real: <input type="radio" name="timingBase" value="realtime" checked="checked"></label>
-            </p>
-            <div class="playlistSettingsPanelOpenButton">⚙️</div>
-          </section>
+    <div id="settingsPanel" class="slideable-panel content hiddenPanel">
+        <header>
+            <h2>Settings</h2>
+            <button class="active" id="settingsPanelButtonClose" aria-label="Close Settings">&times;</button>
         </header>
-        <div class="playlist-settings-panel slideable-panel hiddenPanel">
-          <header>
-            <h2>Current Playlist Settings</h2>
-            <button id="playlistSettingsPanelCloseButton" class="active playlist-settings-close-btn" aria-label="Close Playlist Settings">&times;</button>
-          </header>
-          <div class="playlist-settings-content">
-            <form>
-              <label class="field-container">Name: <input type="text" id="playlistName"></label>
-              <label class="field-container">Cortina Set: <input type="text" id="cortinaSetName"></label>
-              <label class="field-container">Tanda Style Sequence: <input type="text" id="tandaStyleSequence"
-                  placeholder="E.g. 4T 4T 3W 4T 4T 3M"></label>
-              <p>Time between tracks causes songs to overlap if a negative value is given and adds silence if positive.
-                Note that songs are already trimmed of any leading and trailing silence.</p>
-              <label class="field-container">Time between tracks: <input type="number" id="playlistTrackSpacing"
-                  placeholder="Time in seconds between tracks"></label>
-              <label class="field-container">Time before cortina: <input type="number" id="playlistPreCortina"
-                  placeholder="Time in seconds before cortina (if used)"></label>
-              <label class="field-container">Time after cortina: <input type="number" id="playlistPostCortina"
-                  placeholder="Time in seconds after cortina (if used)"></label>
-              <button id="savePlaylist">Save Playlist</button>
-              <button id="loadPlaylist">Load Playlist</button>
-                </form>
-          </div>
-        </div>
+
+        <h3>Audio Output Selector</h3>
+  
+        <label for="speaker-output-devices"><img src="./icons/speaker.svg" alt="Select Speakers device">:</label>
+        <select id="speaker-output-devices"></select>
+        <label for="headphones-output-devices"><img src="./icons/headphones-icon.png" alt="Select Headphones device">:</label>
+        <select id="headphones-output-devices"></select>
+
+        <h3>Aspirations</h3>
         <ul>
-          <li>Filter by artist, song</li>
+            <li>Links to classification page</li>
+            <li>Define playlist timings: between tracks, after tanda, before tanda</li>
+            <li>Reset column widths to defaults</li>
+            <li>Edit preferred text items</li>
         </ul>
-      </section>
-      <playlist-element id="playlist" scratchpadSelector="#scratchPad">
-      </playlist-element>
+
+        <h3>Default Playlist options</h3>
+        <form>
+            <legend>Defaults</legend>
+            <label>Tanda Style Sequence: <input type="text" placeholder="E.g. 4T 4T 3W 4T 3M" value="4T 4T 3W 4T 3M"
+                    id="defaultTandaStyleSequence"></label>
+        </form>
+
+        <h3>File locations and databases</h3>
+        <p>To use another folder as the source of music files requires clearing the old database which is stored in the
+            browser. If you wish to save the current library of tandas etc. that goes with the current folder, then use
+            the
+            "Export" feature first.</p>
+        <button class="active" id="exportDatabase">Export Database</button>
+        <button class="active" id="rescanButton">Re-scan for new files only</button>
+        <button class="active" id="rescanAnalyzeButton">Re-Analyze</button>
+        <button class="active" id="deleteDBButton">Reset Database</button>
+        <button class="active" id="loadLibraryButton">Open existing Tanda Player Library</button>
+
+        <section id="scannerProgress">
+            <h3>File Scanner Progress</h3>
+            <p id="scanProgress"></p>
+            <p id="scanFilePath"></p>
+        </section>
     </div>
-  </main>
+
+    <main class="all">
+        <div id="searchColumn" class="column content">
+
+            <div id="tabsContainer"></div>
+        </div>
+        <div class="handle" id="handle1"></div>
+        <div id="scratchpadColumn" class="column content">
+            <header class="playlistHeading">
+                <h2>Scratch Pad</h2>
+            </header>
+            <ul>
+                <li>New items added to top</li>
+                <li>User can drag/drop and move items about</li>
+                <li>Allow user to tag tandas or songs and allow grouping by them</li>
+                <li>All tandas can be added to playlist: at current location, to end</li>
+                <li>Content can be filtered by style or other tags</li>
+            </ul>
+            <scratch-pad-element id="scratchPad" playlistSelector="#playlist"></scratch-pad-element>
+        </div>
+        <div class="handle" id="handle2"></div>
+        <div id="playlistColumn" class="column content">
+            <section class="fixedColumnContent">
+                <header class="playlistHeading">
+                    <h2>Playlist</h2>
+                    <section>
+                        <button id="stopButton"><img src="./icons/stopNow.png" alt="stop now"></button>
+                    </section>
+                    <section>
+                        <p>Show times:
+                            <label>Relative: <input type="radio" name="timingBase" value="relative">
+                                Real: <input type="radio" name="timingBase" value="realtime" checked="checked"></label>
+                        </p>
+                        <div class="playlistSettingsPanelOpenButton">⚙️</div>
+                    </section>
+                </header>
+                <div class="playlist-settings-panel slideable-panel hiddenPanel">
+                    <header>
+                        <h2>Current Playlist Settings</h2>
+                        <button id="playlistSettingsPanelCloseButton" class="active playlist-settings-close-btn"
+                            aria-label="Close Playlist Settings">&times;</button>
+                    </header>
+                    <div class="playlist-settings-content">
+                        <form>
+                            <label class="field-container">Name: <input type="text" id="playlistName"></label>
+                            <label class="field-container">Cortina Set: <input type="text" id="cortinaSetName"></label>
+                            <label class="field-container">Tanda Style Sequence: <input type="text"
+                                    id="tandaStyleSequence" placeholder="E.g. 4T 4T 3W 4T 4T 3M"></label>
+                            <p>Time between tracks causes songs to overlap if a negative value is given and adds silence
+                                if positive.
+                                Note that songs are already trimmed of any leading and trailing silence.</p>
+                            <label class="field-container">Time between tracks: <input type="number"
+                                    id="playlistTrackSpacing" placeholder="Time in seconds between tracks"></label>
+                            <label class="field-container">Time before cortina: <input type="number"
+                                    id="playlistPreCortina"
+                                    placeholder="Time in seconds before cortina (if used)"></label>
+                            <label class="field-container">Time after cortina: <input type="number"
+                                    id="playlistPostCortina"
+                                    placeholder="Time in seconds after cortina (if used)"></label>
+                            <button id="savePlaylist">Save Playlist</button>
+                            <button id="loadPlaylist">Load Playlist</button>
+                        </form>
+                    </div>
+                </div>
+                <ul>
+                    <li>Filter by artist, song</li>
+                </ul>
+            </section>
+            <div id="playlistContainer"></div>
+            </playlist-element>
+        </div>
+    </main>
 
 
-  <!-- <label>Tempo: <input id="tempo" type="range" min="0.8" max="1.3" step="0.01" value="0"><button id="tempoReset">Reset</button></label>
+    <!-- <label>Tempo: <input id="tempo" type="range" min="0.8" max="1.3" step="0.01" value="0"><button id="tempoReset">Reset</button></label>
   <label>Volume: <input id="volume" type="range" min="0" max="100" step="0.1" value="100"></label> -->
-  <div id="output"></div>
+    <div id="output"></div>
 
-  <div id="permissionModal" class="overlay">
-    <div class="modal">
-      <h2>Permission Request</h2>
-      <p>Tanda Player needs your permission to read your music files folder for all files. Please click 'Allow' to
-        continue.</p>
-      <button class="active" id="askUserPermission">Allow</button>
+    <div id="permissionModal" class="overlay">
+        <div class="modal">
+            <h2>Permission Request</h2>
+            <p>Tanda Player needs your permission to read your music files folder for all files. Please click 'Allow' to
+                continue.</p>
+            <button class="active" id="askUserPermission">Allow</button>
+        </div>
     </div>
-  </div>
 
-  <script type="module" src="./bundle.js"></script>
+    <script type="module" src="./bundle.js"></script>
     <script type="module" src="./lib/ffmpeg.min.js"></script>
     <script type="module" src="./lib/howler.min.js"></script>
 </body>
+
 </html>

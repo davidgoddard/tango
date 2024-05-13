@@ -120,6 +120,10 @@ header select {
   transform: translateX(-800px);
 }
 
+#settingsPanelButton {
+  margin-right: 1rem;
+}
+
 #settingsPanelButtonClose,
 #playlistSettingsPanelCloseButton {
   justify-self: flex-end;
@@ -297,4 +301,50 @@ h2 {
   color: white;
   display: flex;
   flex-direction: row;
+}
+
+
+/* Reset default list styles */
+.tab-list {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+  border-bottom: solid 2px orange;
+}
+
+/* Style for each tab item */
+.tab {
+  display: inline-block;
+  padding: 10px 20px;
+  cursor: pointer;
+  border: 1px solid #ccc;
+  border-bottom: none;
+  background-color: #f0f0f0;
+  transition: background-color 0.3s;
+}
+
+/* Style for the active tab */
+.tab.active {
+  background-color: #ffa600;
+  border-bottom-color: transparent;
+}
+
+/* Hover effect for tab */
+ul.tab-list li.tab:hover {
+  background-color: #fbcd78
+}
+
+/* Styling for tab panels */
+.tab-panel {
+  display: grid;
+  padding: 20px;
+  border: 1px solid #ccc;
+  border-top: none;
+  background-color: #fff;
+}
+
+label img {
+  height: 40px;
+  width: 40px;
+  vertical-align: middle;
 }

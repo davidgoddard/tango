@@ -711,7 +711,6 @@
     }
     // Emit an event with a payload
     emit(event, payload) {
-      console.log("DEBUG: Emitting", event, payload == void 0 ? "no payload" : payload);
       if (!this.handlers[event]) {
         console.log("DEBUG - no event listeners for", event, payload);
       } else {
@@ -723,20 +722,145 @@
   };
   var eventBus = new EventBus();
 
-  // dist/components/tanda-element.js
-  var TandaComponent = class extends HTMLElement {
-    connectedCallback() {
-      this.innerHTML = `<p>Tanda Component</p>`;
-      eventBus.on("songAdded", (song) => {
-        console.log("A new song was added elsewhere:", song);
-      });
-      eventBus.emit("songAdded", {
-        title: "Another from Tanda New Song",
-        artist: "Some Artist"
+  // dist/components/search.element.js
+  var SearchElement = class extends HTMLElement {
+    searchInput;
+    filterSelect;
+    tracksTab;
+    tandasTab;
+    tracksContent;
+    tandasContent;
+    tracksCount;
+    tandasCount;
+    constructor() {
+      super();
+      this.attachShadow({ mode: "open" });
+      this.shadowRoot.innerHTML = `
+        <style>
+          /* Add CSS styles here */
+          .tab-container {
+            display: flex;
+          }
+          .tab {
+            flex: 1;
+            text-align: center;
+            cursor: pointer;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-bottom: none;
+          }
+          .tab.active {
+            background-color: orange;
+          }
+          .content {
+            border: 1px solid #ccc;
+            padding: 16px;
+          }
+          .hidden {
+            display: none;
+          }
+          section {
+            display: grid;
+            grid-template-rows: auto auto 1fr;
+          }
+          .scrollable {
+            overflow-y: auto;
+          }
+        </style>
+        <section>
+          <div>
+            <label for="search-input">Search:</label>
+            <input type="text" id="search-input" placeholder="Enter search string">
+            <label for="filter-select">Style:</label>
+            <select id="filter-select">
+              <option value="all">All</option>
+              <option value="rock">Rock</option>
+              <option value="pop">Pop</option>
+              <option value="jazz">Jazz</option>
+              <!-- Add more options as needed -->
+            </select>
+          </div>
+          <div class="tab-container">
+            <div id="tracks-tab" class="tab active">Tracks (<span id="tracks-count">0</span>)</div>
+            <div id="tandas-tab" class="tab">Tandas (<span id="tandas-count">0</span>)</div>
+          </div>
+          <div class="scrollable">
+            <div id="tracks-content" class="content">
+              <!-- Content for tracks -->
+            </div>
+            <div id="tandas-content" class="content hidden">
+              <!-- Content for tandas -->
+            </div>
+          </div>
+        <section>`;
+      this.searchInput = this.shadowRoot.querySelector("#search-input");
+      this.filterSelect = this.shadowRoot.querySelector("#filter-select");
+      this.tracksTab = this.shadowRoot.querySelector("#tracks-tab");
+      this.tandasTab = this.shadowRoot.querySelector("#tandas-tab");
+      this.tracksContent = this.shadowRoot.querySelector("#tracks-content");
+      this.tandasContent = this.shadowRoot.querySelector("#tandas-content");
+      this.tracksCount = this.shadowRoot.querySelector("#tracks-count");
+      this.tandasCount = this.shadowRoot.querySelector("#tandas-count");
+      this.searchInput.addEventListener("input", this.handleSearch.bind(this));
+      this.filterSelect.addEventListener("change", this.handleFilter.bind(this));
+      this.tracksTab.addEventListener("click", () => this.showContent("tracks"));
+      this.tandasTab.addEventListener("click", () => this.showContent("tandas"));
+      this.tracksCount.textContent = "0";
+      this.tandasCount.textContent = "0";
+      eventBus.on("search-results", (results) => {
+        console.log(this, "received results", results);
       });
     }
+    focus() {
+      this.searchInput.focus();
+    }
+    // Method to handle search input
+    handleSearch() {
+      const searchData = this.searchInput.value.trim();
+      const selectedStyle = this.filterSelect.value;
+      eventBus.emit("query", { searchData, selectedStyle });
+    }
+    // Method to handle filter selection
+    handleFilter() {
+      this.handleSearch();
+    }
+    // Method to update search results
+    results(resultset) {
+      this.tracksCount.textContent = resultset.tracks.length.toString();
+      this.tandasCount.textContent = resultset.tandas.length.toString();
+      this.tracksContent.innerHTML = resultset.tracks.map((track) => `<track-element 
+            trackid="${track.id}"
+            title="${track.metadata?.tags?.title || track.name}"
+            artist="${track.metadata?.tags?.artist || "unknown"}"
+            year="${track.metadata?.tags?.year || "unknown"}"
+        ></track-element>`).join("");
+      this.tandasContent.innerHTML = JSON.stringify(resultset.tandas);
+      const tracks = this.tracksContent.querySelectorAll("track-element");
+      for (const track of tracks) {
+        const button = document.createElement("button");
+        button.innerHTML = '<img src="./icons/notepad.png" alt="copy to scratch pad">';
+        button.addEventListener("click", () => {
+          this.dispatchEvent(new CustomEvent("moveToScratchPad", { detail: track }));
+        });
+        track.shadowRoot.querySelector("article .actions").appendChild(button);
+      }
+    }
+    // Method to show content based on tab clicked
+    showContent(tab) {
+      if (tab === "tracks") {
+        this.tracksTab.classList.add("active");
+        this.tandasTab.classList.remove("active");
+        this.tracksContent.classList.remove("hidden");
+        this.tandasContent.classList.add("hidden");
+      } else {
+        this.tracksTab.classList.remove("active");
+        this.tandasTab.classList.add("active");
+        this.tracksContent.classList.add("hidden");
+        this.tandasContent.classList.remove("hidden");
+      }
+    }
   };
-  customElements.define("tanda-element", TandaComponent);
+  customElements.define("search-element", SearchElement);
 
   // dist/services/player.js
   var import_howler_min = __toESM(require_howler_min());
@@ -759,14 +883,16 @@
     current = null;
     next = null;
     playlistPos = null;
-    systemGain;
-    progressTimer;
+    systemGain = 0;
     constructor(options) {
       this.options = options;
-      this.systemGain = options.systemLowestGain.meanVolume - options.systemLowestGain.maxVolume;
-      console.log("Setting player system gain", this.systemGain, this.options);
-      eventBus.on("next-track", this.loadNext.bind(this));
-      this.progressTimer = setInterval(this.checkProgress.bind(this), 250);
+      this.updateOptions(options);
+      setInterval(this.checkProgress.bind(this), 250);
+    }
+    updateOptions(newOptions) {
+      this.options = newOptions;
+      this.systemGain = this.options.systemLowestGain.meanVolume - this.options.systemLowestGain.maxVolume;
+      console.log("New config", this.options, this.systemGain);
     }
     checkProgress() {
       if (this.current) {
@@ -775,7 +901,6 @@
           let timeNow = player.seek() * 1e3;
           if (track?.metadata?.end >= 0) {
             let timeEnd = 1e3 * track.metadata.end + Math.min(0, silence ?? 0);
-            console.log("Check timeEnd", timeEnd, "Time now", timeNow, "Ending?", ending, "Track:", track.fileHandle.name, "Gain", gainReduction);
             if (timeNow >= timeEnd - 500 && !ending) {
               this.current.ending = true;
               player.fade(_Player.dBtoLinear(gainReduction), 0, this.options.fadeRate);
@@ -807,51 +932,48 @@
       if (player) {
         const pos = !(track.metadata?.end >= 0) ? state == "Stopped" ? 0 : player.seek() * 1e3 : state == "Stopped" ? 0 : Math.min(player.seek() * 1e3 - track.metadata?.start, 1e3 * (track.metadata.end - track.metadata.start));
         const displayName = track.metadata?.end < 0 ? `${state}:  ${this.current.displayName} ( ${formatTime(player.seek() * 1e3)} / ? )` : `${state}: ${this.current.displayName}  ( ${formatTime(pos)} / ${formatTime(1e3 * (track.metadata.end - track.metadata.start))} )`;
-        eventBus.emit("track-progress", {
-          track,
-          pos,
-          display: displayName,
-          state: newState
-        });
+        if (this.options.progress) {
+          this.options.progress({
+            track,
+            pos,
+            display: displayName,
+            state: newState
+          });
+        }
       } else {
         if (!this.next?.player) {
-          eventBus.emit("track-progress", {
-            track: null,
-            pos: null,
-            display: `Stopped`,
-            state: `Stopped`
-          });
+          if (this.options.progress) {
+            this.options.progress({
+              track: null,
+              pos: null,
+              display: `Stopped`,
+              state: `Stopped`
+            });
+          }
         }
       }
     }
     static dBtoLinear(dB) {
       return Math.pow(10, dB / 20);
     }
-    updatePosition(newPos) {
-      console.log("Player - Updating position", newPos, "Was", this.playlistPos);
+    async updatePosition(newPos) {
       if (newPos !== this.playlistPos) {
         this.playlistPos = newPos;
         if (typeof this.next?.unload == "function") {
           this.next.unload();
         }
-        this.requestNext(newPos + 1);
+        await this.loadNext();
       }
     }
-    requestNext(N) {
-      console.log("Requesting track", N);
-      eventBus.emit("track-request", N);
-    }
     // Called by event 'next-track'
-    async loadNext(payload) {
+    async loadNext() {
       try {
         const N = this.playlistPos + 1;
-        console.log("Loading next", N);
-        const { track, silence } = payload;
-        console.log("Told by playlist to use this", track, "Silence: ", silence, "Gain => Mean", track.metadata?.meanVolume, "Max", track.metadata.maxVolume, "system", this.systemGain);
+        const { track, silence } = await this.options.fetchNext(N);
+        console.log("Result from fetch next", track, silence);
         if (track) {
           const { player, url } = await this.createPlayer(track);
           if (player) {
-            track.metadata.end = Math.min(25, track.metadata.end);
             const next = {
               position: N,
               silence,
@@ -864,7 +986,6 @@
               ending: false
             };
             next.unload = () => {
-              console.trace("Unloading", next.track);
               if (next.player) {
                 if (next.player.playing())
                   next.player.stop();
@@ -892,25 +1013,40 @@
     }
     async createPlayer(track) {
       try {
-        console.log("Trying to create a player", track);
         const url = URL.createObjectURL(await track.fileHandle.getFile());
-        const player = new import_howler_min.Howl({
+        console.log("Creating music player for context: ", this.options.ctx);
+        const howlerConfig = {
           src: [url],
           html5: true,
           preload: true,
-          autoplay: false
-        });
+          autoplay: false,
+          ctx: this.options.ctx,
+          onplay: () => {
+            const audioElement = player._sounds[0]._node;
+            if (typeof audioElement.setSinkId === "function") {
+              audioElement.setSinkId(this.options.ctx).then(() => {
+                console.log("Audio output successfully redirected.");
+              }).catch((error) => {
+                console.error("Failed to redirect audio output:", error);
+              });
+            }
+          }
+        };
+        console.log("New player config: ", howlerConfig);
+        const player = new import_howler_min.Howl(howlerConfig);
         player.once("load", () => {
           player.seek(track.metadata?.start || 0);
+          if (track.metadata?.end < 0) {
+            track.metadata.end = player.duration();
+            track.metadata.end = Math.min(20, track.metadata.end);
+          }
           if (track.metadata?.meanVolume !== null && track.metadata?.meanVolume !== void 0) {
             const reduction = this.systemGain - (track.metadata.meanVolume - track.metadata.maxVolume);
-            console.log("Using reduction", reduction);
             player.volume(_Player.dBtoLinear(reduction));
           }
         });
         if (track.metadata?.end < 0)
           player.once("end", this.startNext.bind(this));
-        console.log("Returning", player, url);
         return { player, url };
       } catch (error) {
         console.error(error);
@@ -919,12 +1055,17 @@
       }
     }
     startNext() {
-      console.log("Starting next", this.next);
       if (!this.next)
         return this.reportProgress("Stopped");
+      if (this.current?.track.type == "cortina") {
+        eventBus.emit("tanda");
+      }
       this.current = this.next;
       this.next = null;
       this.playlistPos = this.current.position;
+      if (this.current.track.type == "cortina") {
+        eventBus.emit("cortina");
+      }
       if (this.current.silence > 0) {
         this.reportProgress("Waiting");
         setTimeout(() => {
@@ -937,17 +1078,20 @@
         this.reportProgress("Playing");
         this.current.player.play();
       }
-      this.requestNext(this.playlistPos + 1);
+      this.loadNext();
     }
     stop() {
       if (this.isPlaying) {
         this.current.ending = true;
         this.current.player.fade(_Player.dBtoLinear(this.current.gainReduction), 0, this.options.fadeRate);
         this.reportProgress("Fading");
+        let obj = this.current.unload;
         setTimeout(() => {
-          this.reportProgress("Stopped");
-          if (this.current.unload) {
-            this.current.unload();
+          if (obj == this.current.unload) {
+            this.reportProgress("Stopped");
+            if (this.current.unload) {
+              this.current.unload();
+            }
           }
         }, this.options.fadeRate + 1e3);
       }
@@ -967,17 +1111,35 @@
 
   // dist/services/playlist-service.js
   var PlaylistService = class {
+    container;
+    getDetail;
     tandaList;
     trackList;
-    constructor() {
+    constructor(container, getDetail) {
+      this.container = container;
+      this.getDetail = getDetail;
       this.tandaList = [];
       this.trackList = [];
       eventBus.on("track-request", this.requestTrack.bind(this));
     }
-    setTandas(tandaList) {
+    async setTandas(tandaList) {
       this.tandaList = tandaList;
-      this.extractTracks();
+      await this.extractTracks();
       eventBus.emit("new-playlist");
+      this.container.innerHTML = "";
+      for (let track of this.trackList) {
+        let te = document.createElement("track-element");
+        te.setAttribute("trackid", String(track.id));
+        te.setAttribute("style", track.metadata?.tags?.style);
+        te.setAttribute("title", track.metadata?.tags?.title);
+        te.setAttribute("artist", track.metadata?.tags?.artist);
+        let year = track.metadata?.tags?.year;
+        if (year) {
+          year = year.substring(0, 4);
+        }
+        te.setAttribute("year", year);
+        this.container.appendChild(te);
+      }
     }
     getTracks() {
       return this.trackList;
@@ -988,17 +1150,26 @@
         previous: N > 0 ? this.trackList[N - 1] : null
       });
     }
-    extractTracks() {
-      console.log("Extracted tracks", this.trackList);
+    async extractTracks() {
       for (let tanda of this.tandaList) {
+        if (tanda.cortina) {
+          this.trackList.push(await this.getDetail("cortina", tanda.cortina));
+        }
         for (let track of tanda.tracks) {
-          this.trackList.push(track);
+          this.trackList.push(await this.getDetail("track", track));
         }
       }
+      console.log("Extracted tracks", this.trackList);
+    }
+    fetch(N) {
+      return this.trackList[N];
     }
   };
 
   // dist/services/database.js
+  function convert(input) {
+    return input.normalize("NFC");
+  }
   var IndexedDBManager = class {
     dbName = "Tanda Player Database";
     dbVersion = 1;
@@ -1046,8 +1217,8 @@
               objectStore = event.target.transaction?.objectStore(table);
             }
             if (table === "track" || table === "cortina") {
-              if (!objectStore.indexNames.contains("relativeFileName")) {
-                objectStore.createIndex("name", "relativeFileName", { unique: true });
+              if (!objectStore.indexNames.contains("name")) {
+                objectStore.createIndex("name", "name", { unique: true });
               }
             }
             if (table === "playlist") {
@@ -1100,6 +1271,7 @@
           resolve(request.result);
         };
         request.onerror = (event) => {
+          console.error("Data causing error: ", table, data);
           console.error("Error adding data: ", event.target.error);
           reject(event.target.error);
         };
@@ -1310,6 +1482,45 @@
     }
   }
 
+  // dist/components/tabs.component.js
+  var TabsContainer = class {
+    container;
+    tabs;
+    constructor(container, tabs) {
+      this.container = container;
+      this.tabs = tabs;
+      this.render();
+    }
+    render() {
+      this.container.innerHTML = `
+  <ul class="tab-list" role="tablist">
+    ${this.tabs.map((label, idx) => {
+        return `<li class="tab ${idx == 0 ? "active" : ""}" id="tab${idx + 1}" role="tab">${label}</li>`;
+      }).join("")}
+  </ul>
+  <div class="tab-panels">
+    ${this.tabs.map((label, idx) => {
+        return `<div class="tab-panel ${idx == 0 ? "" : "hidden"}" id="tab${idx + 1}-panel" role="tabpanel">
+      <!-- Content for Tab ${idx + 1} -->
+      <search-element></search-element>
+    </div>
+`;
+      }).join("")}
+  </div>
+`;
+      const tabs = Array.from(this.container.querySelectorAll(".tab"));
+      const panels = Array.from(this.container.querySelectorAll(".tab-panel"));
+      tabs.map((tab, idx) => tab.addEventListener("click", () => {
+        tabs.forEach((tab2) => tab2.classList.remove("active"));
+        tab.classList.add("active");
+        const childPanel = panels[idx];
+        panels.forEach((panel) => panel.classList.add("hidden"));
+        childPanel.classList.remove("hidden");
+        childPanel.querySelector("search-element").focus();
+      }));
+    }
+  };
+
   // dist/app.js
   var SYSTEM = {
     defaultTandaStyleSequence: "4T 4T 3W 4T 3M"
@@ -1343,7 +1554,7 @@
       let systemLevel = systemLowestGain.meanVolume - systemLowestGain.maxVolume;
       if (trackLevel < systemLevel)
         systemLowestGain = record.metadata;
-      let extension = record.relativeFileName.split(".");
+      let extension = record.name.split(".");
       extension = extension[extension.length - 1];
       return true;
     });
@@ -1356,9 +1567,11 @@
     let files = await getAllFiles(config.musicFolder);
     let n = 0;
     for (const file of files) {
+      let indexFileName = convert(file.relativeFileName);
       scanFilePath.textContent = file.relativeFileName;
       scanProgress.textContent = ++n + "/" + files.length;
-      const original = await dbManager.getDataByName("track", file.relativeFileName);
+      const table = indexFileName.split(/\/|\\/g)[1] == "music" ? "track" : "cortina";
+      let original = await dbManager.getDataByName(table, indexFileName);
       if (!original) {
         const baseFile = await file.fileHandle.getFile();
         if (baseFile.size > 1e3) {
@@ -1368,40 +1581,18 @@
             end: -1,
             duration: void 0,
             meanVolume: -20,
-            maxVolume: 0
+            maxVolume: 0,
+            tags: { title: indexFileName, artist: "unknown" }
           };
-          if (size > 1e3) {
-            const table = file.relativeFileName.split(/\/|\\/g)[1] == "music" ? "track" : "cortina";
-            await dbManager.addData(table, {
-              type: "track",
-              fileHandle: file.fileHandle,
-              relativeFileName: file.relativeFileName,
-              metadata,
-              classifiers: {
-                favourite: true
-              }
-            });
-          }
-        }
-      } else {
-        console.log("Already had details of ", file);
-        const baseFile = await file.fileHandle.getFile();
-        if (baseFile.size > 1e3) {
-          let size = baseFile.size;
-          let metadata = original.metadata;
-          metadata.meanVolume = -20;
-          if (size > 1e3) {
-            const table = file.relativeFileName.split(/\/|\\/g)[1] == "music" ? "track" : "cortina";
-            await dbManager.addData(table, {
-              type: "track",
-              fileHandle: file.fileHandle,
-              relativeFileName: file.relativeFileName,
-              metadata,
-              classifiers: {
-                favourite: true
-              }
-            });
-          }
+          await dbManager.addData(table, {
+            type: table,
+            name: indexFileName,
+            fileHandle: file.fileHandle,
+            metadata,
+            classifiers: {
+              favourite: true
+            }
+          });
         }
       }
     }
@@ -1411,42 +1602,22 @@
     const scanProgress = getDomElement("#scanProgress");
     const scanFilePath = getDomElement("#scanFilePath");
     const libraryFileHandles = await fetchLibraryFiles(config.musicFolder);
-    if (libraryFileHandles) {
-      let library;
-      let cortinas;
-      let tandas;
-      let playlists;
-      console.log(libraryFileHandles);
-      if (libraryFileHandles.library) {
-        let file = await libraryFileHandles.library.getFile();
-        library = JSON.parse(await file.text());
-        console.log(library);
-      }
-      if (libraryFileHandles.cortinas) {
-        let file = await libraryFileHandles.cortinas.getFile();
-        cortinas = JSON.parse(await file.text());
-        console.log("cortinas", cortinas);
-      }
-      if (libraryFileHandles.tandas) {
-        let file = await libraryFileHandles.tandas.getFile();
-        tandas = JSON.parse(await file.text());
-        console.log("tandas", tandas);
-      }
-      if (libraryFileHandles.playlists) {
-        let file = await libraryFileHandles.playlists.getFile();
-        playlists = JSON.parse(await file.text());
-        console.log("playlists", playlists);
-      }
+    async function getJSON(file) {
+      const text = await file.text();
+      const json = JSON.parse(text);
+      return json;
+    }
+    async function setTrackDetails(library, table) {
       let n = 0;
       let keys = Object.keys(library);
       for (const trackName of keys) {
         scanFilePath.textContent = trackName;
         scanProgress.textContent = ++n + "/" + keys.length;
-        const existing = await dbManager.getDataByName("track", "/" + trackName);
+        let tn = convert("/" + trackName);
+        const existing = await dbManager.getDataByName(table, tn);
         if (!existing) {
-          console.log("Missing file", trackName);
+          console.log("Missing file", tn, trackName);
         } else {
-          console.log(trackName, existing.id);
           const libTrack = library[trackName];
           const metadata = {
             tags: {
@@ -1461,12 +1632,34 @@
             meanVolume: libTrack.analysis.meanGain || -20,
             maxVolume: libTrack.analysis.gain || 0
           };
-          if (trackName == "music/01 Dance Monkey.m4a") {
-            console.log(trackName, libTrack, metadata);
-          }
           existing.metadata = metadata;
           await dbManager.updateData("track", existing.id, existing);
         }
+      }
+    }
+    if (libraryFileHandles) {
+      let library;
+      let cortinas;
+      let tandas;
+      let playlists;
+      console.log(libraryFileHandles);
+      if (libraryFileHandles.library) {
+        library = await getJSON(await libraryFileHandles.library.getFile());
+        console.log(library);
+        await setTrackDetails(library, "track");
+      }
+      if (libraryFileHandles.cortinas) {
+        cortinas = await getJSON(await libraryFileHandles.cortinas.getFile());
+        console.log("cortinas", cortinas);
+        await setTrackDetails(cortinas, "cortina");
+      }
+      if (libraryFileHandles.tandas) {
+        tandas = await getJSON(await libraryFileHandles.tandas.getFile());
+        console.log("tandas", tandas);
+      }
+      if (libraryFileHandles.playlists) {
+        playlists = await getJSON(await libraryFileHandles.playlists.getFile());
+        console.log("playlists", playlists);
       }
       for (let tanda of tandas) {
         tanda.tracks = tanda.tracks.map((track) => "/" + track);
@@ -1489,13 +1682,54 @@
       }
     }
   }
+  async function deleteDatabase(dbManager) {
+    console.log("Deleting the database");
+    await dbManager.resetDatabase();
+    console.log("Restoring config");
+    await dbManager.addData("system", SYSTEM);
+    let config = await dbManager.getDataById("system", CONFIG_ID2);
+    await openMusicFolder(dbManager, config);
+    return config;
+  }
+  async function processQuery(dbManager, query, selectedStyle) {
+    return [];
+  }
+  async function requestAudioPermission() {
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.log("Permission to access audio devices granted.");
+    } catch (error) {
+      console.error("Error accessing audio devices:", error);
+    }
+  }
+  async function enumerateOutputDevices() {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    console.log("Available audio devices", devices);
+    const outputDevices = devices.filter((device) => device.kind === "audiooutput");
+    return outputDevices;
+  }
+  async function populateOutputDeviceOptions() {
+    const outputDevices = await enumerateOutputDevices();
+    function fillOptions(target) {
+      outputDevices.forEach((device) => {
+        const option = document.createElement("option");
+        option.value = device.deviceId;
+        option.text = device.label || "Unknown Device";
+        target.appendChild(option);
+      });
+    }
+    fillOptions(getDomElement("#speaker-output-devices"));
+    fillOptions(getDomElement("#headphones-output-devices"));
+  }
   document.addEventListener("DOMContentLoaded", async () => {
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (error) {
+      alert(`Without access to your computer's audio, Tanda Player cannot operate`);
+      throw error;
+    }
     eventBus.on("error", (error) => {
       console.error(error);
-    });
-    const headerField = getDomElement("body > header > h1");
-    eventBus.on("track-progress", async (progress) => {
-      headerField.textContent = progress.display;
     });
     const dbManager = await DatabaseManager();
     let config = await InitialiseConfig(dbManager);
@@ -1522,12 +1756,7 @@
         getDomElement(".playlist-settings-panel").classList.add("hiddenPanel");
       },
       deleteDBButton: async () => {
-        console.log("Deleting the database");
-        await dbManager.resetDatabase();
-        console.log("Restoring config");
-        await dbManager.addData("system", SYSTEM);
-        config = await dbManager.getDataById("system", CONFIG_ID2);
-        await openMusicFolder(dbManager, config);
+        config = await deleteDatabase(dbManager);
       },
       loadLibraryButton: async () => {
         await loadLibraryIntoDB(config, dbManager);
@@ -1536,27 +1765,108 @@
     for (const key of Object.keys(quickClickHandlers)) {
       getDomElement((key.charAt(0) != "." ? "#" : "") + key).addEventListener("click", quickClickHandlers[key]);
     }
+    const tabs = ["Search", "Favourites", "Recent"];
+    const tabsContainer = new TabsContainer(getDomElement("#tabsContainer"), tabs);
+    eventBus.on("query", async (searchData) => {
+      const results = await processQuery(dbManager, searchData.query, searchData.selectedStyle);
+      eventBus.emit("queryResults", results);
+    });
+    await requestAudioPermission();
+    populateOutputDeviceOptions();
+    const outputDeviceSelector = getDomElement("#speaker-output-devices");
+    outputDeviceSelector.addEventListener("change", () => {
+      const selectedDeviceId = outputDeviceSelector.value;
+      config.mainOutput = selectedDeviceId;
+      dbManager.updateData("system", 1, config);
+      console.log("Audio Setting: ", config);
+      eventBus.emit("change-speaker", selectedDeviceId);
+    });
+    const headphoneDeviceSelector = getDomElement("#headphones-output-devices");
+    headphoneDeviceSelector.addEventListener("change", () => {
+      const selectedDeviceId = headphoneDeviceSelector.value;
+      config.headphoneOutput = selectedDeviceId;
+      dbManager.updateData("system", 1, config);
+      console.log("Audio Setting: ", config);
+      eventBus.emit("change-headphones", selectedDeviceId);
+    });
   });
   async function runApplication(dbManager, config) {
     await openMusicFolder(dbManager, config);
     const modal = getDomElement("#permissionModal");
     modal.classList.add("hidden");
-    getDomElement("#rescanButton").click();
     let systemLowestGain = await getSystemLevel(dbManager);
     let fadeRate = 3e3;
-    const playerConfig = {
-      ctx: null,
-      systemLowestGain,
-      fadeRate
-    };
-    const player = new Player(playerConfig);
-    const playlistService = new PlaylistService();
-    eventBus.on("new-playlist", () => {
-      player.updatePosition(-1);
+    const playlistService = new PlaylistService(getDomElement("#playlistContainer"), async (type, name) => {
+      return await dbManager.getDataByName(type, name);
     });
-    eventBus.on("track-request-result", async (payload) => {
-      console.log("Request result", payload.requested?.fileHandle?.name, payload.previous?.fileHandle?.name);
-      await player.loadNext({ track: payload.requested, silence: 0 });
+    const headerField = getDomElement("body > header > h1");
+    const speakerPlayerConfig = {
+      ctx: config.mainOutput,
+      systemLowestGain,
+      fadeRate,
+      fetchNext: async (N) => {
+        let silence = 0;
+        let nextTrack = playlistService.fetch(N);
+        if (N > 0) {
+          let previousTrack = playlistService.fetch(N - 1);
+          console.log("Next & previous", nextTrack, previousTrack);
+          silence = 2;
+          if (nextTrack.type == "track" && previousTrack.type == "cortina") {
+            silence = 4;
+          }
+          if (nextTrack.type == "cortina" && previousTrack.type == "track") {
+            silence = 4;
+          }
+        } else {
+          silence = 0;
+        }
+        return { track: nextTrack, silence };
+      },
+      progress: (data) => {
+        headerField.textContent = data.display;
+      }
+    };
+    let headphonePlaylist = [];
+    const headphonesPlayerConfig = {
+      ctx: config.headphoneOutput,
+      systemLowestGain,
+      fadeRate: 500,
+      fetchNext: async (N) => {
+        console.log("Headphones next", {
+          track: headphonePlaylist[0],
+          silence: 0
+        });
+        return { track: headphonePlaylist[0], silence: 0 };
+      }
+    };
+    const speakerOutputPlayer = new Player(speakerPlayerConfig);
+    const headphonesOutputPlayer = new Player(headphonesPlayerConfig);
+    eventBus.on("change-speaker", (context) => {
+      speakerPlayerConfig.ctx = context;
+      speakerOutputPlayer.updateOptions(speakerPlayerConfig);
+    });
+    eventBus.on("change-headphones", (context) => {
+      headphonesPlayerConfig.ctx = context;
+      headphonesOutputPlayer.updateOptions(headphonesPlayerConfig);
+    });
+    document.addEventListener("playOnHeadphones", async (event) => {
+      const track = event.detail;
+      if (track.classList.contains("playingOnHeadphones")) {
+        headphonesOutputPlayer.stop();
+        Array.from(getDomElement("#playlistContainer").querySelectorAll(".playingOnHeadphones")).map((x) => x.classList.remove("playingOnHeadphones"));
+      } else {
+        Array.from(getDomElement("#playlistContainer").querySelectorAll(".playingOnHeadphones")).map((x) => x.classList.remove("playingOnHeadphones"));
+        track.classList.add("playingOnHeadphones");
+        headphonePlaylist[0] = await dbManager.getDataById("track", parseInt(track.getAttribute("trackid")));
+        headphonesOutputPlayer.stop();
+        await headphonesOutputPlayer.updatePosition(-1);
+        console.log(headphonesOutputPlayer.next);
+        headphonesOutputPlayer.startNext();
+      }
+    });
+    eventBus.on("new-playlist", async () => {
+      await speakerOutputPlayer.updatePosition(-1);
+      speakerOutputPlayer.startNext();
     });
     const tracks = await dbManager.processEntriesInBatches("track", (record) => true);
     const cortinas = await dbManager.processEntriesInBatches("cortina", (record) => true);
@@ -1568,26 +1878,19 @@
         c = 1;
       }
       const tanda = {
+        type: "tanda",
         name: "Dummy",
         style: "Unknown",
-        cortina: await dbManager.getDataById("cortina", c++),
+        cortina: cortinas[c++].name,
         tracks: []
       };
-      for (let i = 0; i < 4; i++) {
-        tanda.tracks.push(await dbManager.getDataById("track", t++));
+      for (let i = 0; i < 4 && t < tracks.length; i++) {
+        tanda.tracks.push(tracks[t++].name);
       }
-      tanda.tracks = tanda.tracks.map((t2) => {
-        t2.metadata.end = 20;
-        return t2;
-      });
       allTandas.push(tanda);
     }
     console.log(allTandas);
-    playlistService.setTandas(allTandas);
-    eventBus.once("next-track-ready", async () => {
-      console.log("Starting playing tracks");
-      player.startNext();
-    });
+    await playlistService.setTandas(allTandas);
   }
 })();
 /*! howler.js v2.2.4 | (c) 2013-2020, James Simpson of GoldFire Studios | MIT License | howlerjs.com */

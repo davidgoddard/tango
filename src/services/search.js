@@ -15,14 +15,14 @@ document.addEventListener('DOMContentLoaded', async function () {
     async function generalSearch(filter) {
         const tracks = await dbManager.processEntriesInBatches('track', (track)=>{
             return ( 
-                track.relativeFileName.indexOf(filter.searchText) >0 ||
+                track.name.indexOf(filter.searchText) >0 ||
                 track.metadata?.tags?.title?.indexOf(filter.searchText) >= 0 ||
                 track.metadata?.tags?.artist?.indexOf(filter.searchText) >= 0 ||
                 track.metadata?.tags?.year?.indexOf(filter.searchText) >= 0
             )
         })
 
-        const files = new Set(tracks?.map(track => track.relativeFileName));
+        const files = new Set(tracks?.map(track => track.name));
 
         // See which tandas feature any of these tracks
 
