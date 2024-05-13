@@ -7,6 +7,7 @@ import { PlaylistService } from "./services/playlist-service";
 import { DatabaseManager, convert, } from "./services/database";
 import { fetchLibraryFiles, getAllFiles, openMusicFolder, } from "./services/file-system";
 import { TabsContainer } from "./components/tabs.component";
+import { decodeFFmpegOutput, initializeFFmpeg, runFFmpegCommand } from "./services/ffmpeg-interface";
 const SYSTEM = {
     defaultTandaStyleSequence: "4T 4T 3W 4T 3M",
 };
@@ -53,8 +54,26 @@ async function getSystemLevel(dbManager) {
     console.log("Fetched all files", files.length, "Lowest gain", systemLowestGain);
     return systemLowestGain;
 }
+async function readMetadataFromFileHandle(fileHandle) {
+    try {
+        const { convertedFile, outputLines } = (await runFFmpegCommand(fileHandle, '-map', '0:a', '-af', 'volumedetect,silencedetect=n=-60dB:d=1', '-f', 'null', '-'));
+        const metadata = decodeFFmpegOutput(outputLines);
+        return { size: convertedFile.byteLength, metadata };
+    }
+    catch (error) {
+        console.error('Failed to read metadata:', error);
+        return { size: 0, metadata: {} };
+    }
+}
 // Find all song files and add to the database any not yet known
 async function scanFileSystem(config, dbManager, analyze) {
+    try {
+        await initializeFFmpeg();
+    }
+    catch (error) {
+        alert('Unable to scan files - FFmpeg is not initialising correctly, ' + error);
+        throw error;
+    }
     const scanProgress = getDomElement("#scanProgress");
     const scanFilePath = getDomElement("#scanFilePath");
     let files = await getAllFiles(config.musicFolder);
@@ -66,7 +85,7 @@ async function scanFileSystem(config, dbManager, analyze) {
         scanProgress.textContent = ++n + "/" + files.length;
         const table = indexFileName.split(/\/|\\/g)[1] == "music" ? "track" : "cortina";
         let original = (await dbManager.getDataByName(table, indexFileName));
-        if (!original) {
+        if (!original || analyze) {
             const baseFile = await file.fileHandle.getFile();
             if (baseFile.size > 1000) {
                 let size = baseFile.size;
@@ -78,12 +97,12 @@ async function scanFileSystem(config, dbManager, analyze) {
                     maxVolume: 0,
                     tags: { title: indexFileName, artist: "unknown" },
                 };
-                // if (analyze) {
-                //     let { s, m } = await readMetadataFromFileHandle(file.fileHandle)
-                //     size = s
-                //     metadata = m
-                // }
-                await dbManager.addData(table, {
+                if (analyze) {
+                    let result = await readMetadataFromFileHandle(file.fileHandle);
+                    size = result.size;
+                    metadata = result.metadata;
+                }
+                const newData = {
                     type: table,
                     name: indexFileName,
                     fileHandle: file.fileHandle,
@@ -91,7 +110,13 @@ async function scanFileSystem(config, dbManager, analyze) {
                     classifiers: {
                         favourite: true,
                     },
-                });
+                };
+                if (!original) {
+                    await dbManager.addData(table, newData);
+                }
+                else {
+                    await dbManager.updateData(table, original.id, newData);
+                }
             }
         }
     }
@@ -217,18 +242,20 @@ async function enumerateOutputDevices() {
     return outputDevices;
 }
 // Function to populate the select element with output device options
-async function populateOutputDeviceOptions() {
+async function populateOutputDeviceOptions(config) {
     const outputDevices = await enumerateOutputDevices();
-    function fillOptions(target) {
+    function fillOptions(current, target) {
+        target.innerHTML = '';
         outputDevices.forEach((device) => {
             const option = document.createElement("option");
             option.value = device.deviceId;
             option.text = device.label || "Unknown Device";
+            option.selected = current == device.deviceId;
             target.appendChild(option);
         });
     }
-    fillOptions(getDomElement("#speaker-output-devices"));
-    fillOptions(getDomElement("#headphones-output-devices"));
+    fillOptions(config.mainOutput, getDomElement("#speaker-output-devices"));
+    fillOptions(config.headphoneOutput, getDomElement("#headphones-output-devices"));
 }
 document.addEventListener("DOMContentLoaded", async () => {
     try {
@@ -272,6 +299,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         loadLibraryButton: async () => {
             await loadLibraryIntoDB(config, dbManager);
         },
+        refreshAudioLists: () => {
+            populateOutputDeviceOptions(config);
+        },
     };
     for (const key of Object.keys(quickClickHandlers)) {
         getDomElement((key.charAt(0) != "." ? "#" : "") + key).addEventListener("click", quickClickHandlers[key]);
@@ -289,7 +319,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
     // Support multiple sound-outputs
     await requestAudioPermission();
-    populateOutputDeviceOptions();
+    populateOutputDeviceOptions(config);
     // Event listener for output device selection changes
     const outputDeviceSelector = getDomElement("#speaker-output-devices");
     outputDeviceSelector.addEventListener("change", () => {
@@ -318,7 +348,7 @@ async function runApplication(dbManager, config) {
     // (getDomElement("#rescanButton") as HTMLElement).click();
     // Scan all files in database to find system's lowest gain for normalisation purposes
     let systemLowestGain = await getSystemLevel(dbManager);
-    let fadeRate = 3000;
+    let fadeRate = 3;
     const playlistService = new PlaylistService(getDomElement("#playlistContainer"), async (type, name) => {
         return (await dbManager.getDataByName(type, name));
     });
@@ -356,13 +386,18 @@ async function runApplication(dbManager, config) {
     const headphonesPlayerConfig = {
         ctx: config.headphoneOutput,
         systemLowestGain,
-        fadeRate: 500,
+        fadeRate: 0.5,
         fetchNext: async (N) => {
-            console.log("Headphones next", {
-                track: headphonePlaylist[0],
-                silence: 0,
-            });
-            return { track: headphonePlaylist[0], silence: 0 };
+            if (N == 0) {
+                console.log("Headphones next", {
+                    track: headphonePlaylist[0],
+                    silence: 0,
+                });
+                return { track: headphonePlaylist[0], silence: 0 };
+            }
+            else {
+                return { track: undefined, silence: 0 };
+            }
         },
     };
     const speakerOutputPlayer = new Player(speakerPlayerConfig);
@@ -384,11 +419,13 @@ async function runApplication(dbManager, config) {
         else {
             Array.from(getDomElement("#playlistContainer").querySelectorAll(".playingOnHeadphones")).map((x) => x.classList.remove("playingOnHeadphones"));
             track.classList.add("playingOnHeadphones");
-            headphonePlaylist[0] = (await dbManager.getDataById("track", parseInt(track.getAttribute("trackid"))));
+            const table = track.getAttribute('title').split(/\/|\\/g)[1] == "music" ? "track" : "cortina";
+            headphonePlaylist[0] = (await dbManager.getDataById(table, parseInt(track.getAttribute("trackid"))));
             headphonesOutputPlayer.stop();
             await headphonesOutputPlayer.updatePosition(-1);
             console.log(headphonesOutputPlayer.next);
             headphonesOutputPlayer.startNext();
+            headphonePlaylist = [];
         }
     });
     eventBus.on("new-playlist", async () => {

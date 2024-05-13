@@ -1,68 +1,110 @@
-import { eventBus } from '../events/event-bus';
-import { Track, Tanda } from '../data-types'
+import { eventBus } from "../events/event-bus";
+import { Track, Tanda } from "../data-types";
 
-export type ChangeDetails = {
-    type: string,
-    oldPos: number,
-    newPos: number
+interface TandaTrack extends Track {
+  tandaOffset: number;
 }
 
+export type ChangeDetails = {
+  type: string;
+  oldPos: number;
+  newPos: number;
+};
+
 export class PlaylistService {
+  private tandaList: Tanda[];
+  private trackList: TandaTrack[];
 
-    private tandaList: Tanda[];
-    private trackList: Track[];
+  constructor(
+    private container: HTMLElement,
+    private getDetail: (type: string, name: string) => Promise<Track>
+  ) {
+    this.tandaList = [];
+    this.trackList = [];
+    eventBus.on("track-request", this.requestTrack.bind(this));
+  }
 
-    constructor(private container: HTMLElement, private getDetail: (type: string, name: string) => Promise<Track>) {
-        this.tandaList = [];
-        this.trackList = [];
-        eventBus.on('track-request', this.requestTrack.bind(this))
-    }
+  async setTandas(tandaList: Tanda[]) {
+    this.tandaList = tandaList;
+    await this.extractTracks();
+    eventBus.emit("new-playlist");
+    this.container.innerHTML = (
+      await Promise.all(
+        this.tandaList.map(async (tanda: Tanda, idx: number) => {
+          const cortinaElement = tanda.cortina
+            ? (async () => {
+                let track = await this.getDetail("cortina", tanda.cortina);
+                let year = track.metadata?.tags?.year!;
+                if (year) {
+                  year = year.substring(0, 4);
+                }
+                return `<cortina-element
+                                tandaid="${idx}"
+                                trackid="${String(track.id)}" 
+                                style="${track.metadata?.tags?.style!}" 
+                                title="${track.metadata?.tags?.title!}" 
+                                artist="${track.metadata?.tags?.artist!}"
+                                year="${year}"></cortina-element>`;
+              })()
+            : "";
 
-    async setTandas(tandaList: Tanda[]) {
-        this.tandaList = tandaList;
-        await this.extractTracks();
-        eventBus.emit('new-playlist')
-        this.container.innerHTML = '';
-        for ( let track of this.trackList ){
-            let te = document.createElement('track-element');
-            te.setAttribute('trackid', String(track.id));
-            te.setAttribute('style', track.metadata?.tags?.style!);
-            te.setAttribute('title', track.metadata?.tags?.title!);
-            te.setAttribute('artist', track.metadata?.tags?.artist!);
-            let year = track.metadata?.tags?.year!
-            if ( year ){
-                year = year.substring(0,4)
-            }
-            te.setAttribute('year', year);
-            this.container.appendChild(te)
-        }
-    }
+          const trackElements = await Promise.all(
+            tanda.tracks.map(async (trackName: string) => {
+              let track = await this.getDetail("track", trackName);
+              let year = track.metadata?.tags?.year!;
+              if (year) {
+                year = year.substring(0, 4);
+              }
+              return `<track-element 
+                            tandaid="${idx}"
+                            trackid="${String(track.id)}" 
+                            style="${track.metadata?.tags?.style!}" 
+                            title="${track.metadata?.tags?.title!}" 
+                            artist="${track.metadata?.tags?.artist!}"
+                            year="${year}"></track-element>`;
+            })
+          );
 
-    getTracks() {
-        return this.trackList;
-    }
+          return `<tanda-element style='unknown'>
+                        ${await cortinaElement}
+                        ${trackElements.join("")}
+                    </tanda-element>`;
+        })
+      )
+    ).join("");
+  }
 
-    requestTrack(N: number) {
-        eventBus.emit('track-request-result', {
-            requested: this.trackList[N],
-            previous: N > 0 ? this.trackList[N - 1] : null
+  getTracks() {
+    return this.trackList;
+  }
+
+  requestTrack(N: number) {
+    eventBus.emit("track-request-result", {
+      requested: this.trackList[N],
+      previous: N > 0 ? this.trackList[N - 1] : null,
+    });
+  }
+
+  async extractTracks() {
+    for (let idx = 0; idx < this.tandaList.length; idx++) {
+      let tanda = this.tandaList[idx];
+      if (tanda.cortina) {
+        this.trackList.push({
+          ...(await this.getDetail("cortina", tanda.cortina)),
+          tandaOffset: idx,
         });
+      }
+      for (let track of tanda.tracks) {
+        this.trackList.push({
+          ...(await this.getDetail("track", track)),
+          tandaOffset: idx,
+        });
+      }
     }
+    console.log("Extracted tracks", this.trackList);
+  }
 
-    async extractTracks() {
-        for (let tanda of this.tandaList) {
-            if ( tanda.cortina){
-                this.trackList.push(await this.getDetail('cortina', tanda.cortina))
-            }
-            for (let track of tanda.tracks) {
-                this.trackList.push(await this.getDetail('track', track))
-            }
-        }
-        console.log('Extracted tracks', this.trackList)
-    }
-
-    fetch(N: number): Track {
-        return this.trackList[N]
-    }
-
+  fetch(N: number): Track {
+    return this.trackList[N];
+  }
 }

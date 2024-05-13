@@ -862,6 +862,240 @@
   };
   customElements.define("search-element", SearchElement);
 
+  // dist/components/tanda.element.js
+  var TandaElement = class extends HTMLElement {
+    expanded = false;
+    constructor() {
+      super();
+      this.attachShadow({ mode: "open" });
+    }
+    connectedCallback() {
+      this.render();
+    }
+    timeStringToSeconds(timeString) {
+      if (timeString) {
+        const parts = timeString.split(":").map(Number);
+        let seconds = 0;
+        if (parts.length === 3) {
+          seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+        } else if (parts.length === 2) {
+          seconds = parts[0] * 60 + parts[1];
+        } else {
+          return "?";
+        }
+        return seconds;
+      } else {
+        return "";
+      }
+    }
+    toTime(seconds) {
+      if (isNaN(seconds))
+        return "?";
+      let minutes = Math.floor(seconds / 60);
+      let hours = Math.floor(minutes / 60);
+      seconds %= 60;
+      minutes %= 60;
+      const formattedSeconds = seconds < 10 ? "0" + seconds : seconds;
+      const formattedMinutes = minutes < 10 ? "0" + minutes : minutes;
+      const parts = [];
+      if (hours > 0) {
+        parts.push(hours);
+        parts.push(formattedMinutes);
+      } else {
+        parts.push(minutes);
+      }
+      parts.push(formattedSeconds);
+      return parts.join(":");
+    }
+    findMinMaxYears(years) {
+      const numericYears = years.map((year) => year ? Number(year) : NaN).filter((year) => !isNaN(year));
+      const hasUnknown = years.some((year) => !year);
+      if (numericYears.length > 0) {
+        const minYear = Math.min(...numericYears);
+        const maxYear = Math.max(...numericYears);
+        if (minYear !== maxYear) {
+          return `(${[
+            hasUnknown ? "Unknown" : "",
+            "Years " + minYear + " to " + maxYear
+          ].filter((x) => x).join(", ")})`;
+        } else {
+          return `(${[hasUnknown ? "Unknown" : "", "Year " + minYear].filter((x) => x).join(", ")})`;
+        }
+      } else {
+        return "";
+      }
+    }
+    render() {
+      const tracks = Array.from(this.querySelectorAll("track-element"));
+      const cortina = Array.from(this.querySelectorAll("cortina-element"));
+      const titles = tracks.map((track2) => track2.getAttribute("title")).filter((x) => x);
+      const titleSet = new Set(titles);
+      const artists = new Set(tracks.map((track2) => track2.getAttribute("artist")).filter((x) => x));
+      const years = tracks.map((track2) => track2.getAttribute("year")).filter((x) => x).map((year) => year.substring(0, 4));
+      const styles = new Set(tracks.map((track2) => track2.getAttribute("style"))?.filter((x) => x));
+      if (styles.size == 0) {
+        console.log("Getting tanda style from attribute", this.getAttribute("style"));
+        styles.add(this.getAttribute("style"));
+      }
+      let duration = 0;
+      tracks.forEach((track2) => duration += this.timeStringToSeconds(track2.getAttribute("duration")));
+      const summary = `(${titles.length} Tracks; Duration: ${this.toTime(duration)}):  ${[...titleSet][0] == "place holder" ? "Place Holder" : ""} ${this.findMinMaxYears(years)} ${[...artists].join(", ")}`;
+      const track = cortina[0];
+      let cortinaArtist;
+      let cortinaTitle;
+      if (track) {
+        cortinaTitle = track.getAttribute("title");
+        cortinaArtist = track.getAttribute("artist");
+        if (cortinaTitle.length > 15)
+          cortinaTitle = cortinaTitle.substring(0, 15) + "...";
+        if (cortinaArtist.length > 15)
+          cortinaArtist = cortinaArtist.substring(0, 15) + "...";
+      } else {
+        cortinaTitle = "Unknown";
+        cortinaArtist = "";
+      }
+      const cortinaSummary = cortinaTitle.length > 0 ? `<button>${cortinaTitle}${cortinaArtist ? "<br/>" + cortinaArtist : ""}</button>` : "";
+      this.shadowRoot.innerHTML = `
+            <style>
+                .summary { cursor: pointer; display: grid; grid-template-columns: 40px auto;}
+                .summary header { display: flex; justify-content: center }
+                .summary header span {
+                    font-size: 1.5rem;
+                    font-weight: bold;
+                }
+                .details { display: none; }
+                #container article {
+                    border: solid 2px #ccc;
+                    border-radius: 7px;
+                    margin-top: 0rem;
+                    margin-bottom: 0rem;
+                    padding: 0.2rem;
+                }
+                #actions {
+                    display: flex;
+                    flex-direction: row;
+                    justify-content: flex-end;
+                }
+                #actions button {
+                    display: flex;
+                    align-self: center;
+                    padding: 0px;
+                    margin-left: 10px;
+                    border: none;
+                    background: transparent;
+                    height: 20px;
+                    width: 20px;
+                }
+                .details.expanded {
+                    display: block;
+                }
+                #container.moving article {
+                    border: dashed 2px red;
+                    margin: 1rem;
+                }
+                #container.empty article {
+                    border: dashed 2px green;
+                    margin: 1rem;
+                }
+                :host-context(tanda-element.target) #actions button {
+                    display: block;
+                }
+                #actions button.target {
+                    display: none;
+                }
+                button img {
+                    height: 20px;
+                    width: 20px;
+                }
+                :host-context(.playing) #container article {
+                    border: dashed 2px #cf8805;
+                    display: block;
+                    border-radius: 10px;
+                    margin: 1rem!important;
+                }
+                :host-context(.played) {
+                    display: block;
+                    background-color: #777;
+                    border-radius: 10px;
+                }
+                .cortinaControls {
+                    display: none;
+                }
+                .cortinaControls button {
+                    border: none;
+                    background-color:transparent;
+                }
+                .cortinaControls img {
+                    height: 40px;
+                    width: 40px;
+                }
+                .cortinaControls.active {
+                    display: block;
+                }
+
+                main > section {
+                    float: right;
+                    text-align: right;
+                    min-width: 8rem;
+                }
+                main > section > button {
+                    width: 100%;
+                    margin-bottom: 0.3rem;
+                }
+            </style>
+            <div id="container">
+                <article>
+                    <div id="toggle" class="summary">
+                        <header>
+                            <span>${styles.size == 1 ? [...styles]?.[0]?.charAt(0)?.toUpperCase() : "?"}</span>
+                        </header>
+                        <main>
+                                                     
+                            <section>
+                                <div class="cortinaControls">
+                                    <button class="playAll"><img src="./icons/player_play 2.png" alt="Play whole cortina"></button>
+                                    <button class="stopPlayAll"><img src="./icons/player_stop 2.png" alt="Play whole cortina"></button>
+                                </div>
+                                ${cortinaSummary}
+                                <section id="actions"></section>
+                            </section>
+
+                            <span></span>${summary}   
+                        </main>
+                    </div>
+                    <div class="details">   
+                        <slot></slot>                 
+                    </div>
+                </article>
+            </div>
+        `;
+      this.shadowRoot.querySelector("#toggle main").addEventListener("click", () => this.toggleExpand());
+      this.shadowRoot.querySelector(".playAll").addEventListener("click", this.notifyPlayAll.bind(this));
+      this.shadowRoot.querySelector(".stopPlayAll").addEventListener("click", this.notifyStopPlayAll.bind(this));
+    }
+    toggleExpand() {
+      this.expanded = !this.expanded;
+      let details = this.shadowRoot.querySelector(".details");
+      let span = this.shadowRoot.querySelector("main span");
+      if (this.expanded) {
+        details.classList.add("expanded");
+        span.textContent = "\u25BA";
+      } else {
+        details.classList.remove("expanded");
+        span.textContent = "";
+      }
+    }
+    notifyPlayAll() {
+      const event = new CustomEvent("playFullCortina", { bubbles: true });
+      this.dispatchEvent(event);
+    }
+    notifyStopPlayAll() {
+      const event = new CustomEvent("stopPlayFullCortina", { bubbles: true });
+      this.dispatchEvent(event);
+    }
+  };
+  customElements.define("tanda-element", TandaElement);
+
   // dist/services/player.js
   var import_howler_min = __toESM(require_howler_min());
 
@@ -903,17 +1137,15 @@
             let timeEnd = 1e3 * track.metadata.end + Math.min(0, silence ?? 0);
             if (timeNow >= timeEnd - 500 && !ending) {
               this.current.ending = true;
-              player.fade(_Player.dBtoLinear(gainReduction), 0, this.options.fadeRate);
+              player.fade(_Player.dBtoLinear(gainReduction), 0, this.options.fadeRate * 1e3);
               this.reportProgress("Fading");
               let obj = this.current;
               setTimeout(() => {
-                if (obj === this.current) {
-                  player.off("end", this.startNext.bind(this));
-                  if (this.current?.unload) {
-                    this.current.unload();
-                  }
+                player.off("end", this.startNext.bind(this));
+                if (obj.unload) {
+                  obj.unload();
                 }
-              }, this.options.fadeRate + 1e3);
+              }, this.options.fadeRate * 1e3 + 1e3);
               this.startNext();
             } else {
               this.reportProgress(state);
@@ -986,6 +1218,7 @@
               ending: false
             };
             next.unload = () => {
+              console.log("Unloading player", JSON.stringify(track));
               if (next.player) {
                 if (next.player.playing())
                   next.player.stop();
@@ -1022,19 +1255,24 @@
           autoplay: false,
           ctx: this.options.ctx,
           onplay: () => {
-            const audioElement = player._sounds[0]._node;
-            if (typeof audioElement.setSinkId === "function") {
-              audioElement.setSinkId(this.options.ctx).then(() => {
-                console.log("Audio output successfully redirected.");
-              }).catch((error) => {
-                console.error("Failed to redirect audio output:", error);
-              });
-            }
+            console.log("starting howler playing");
           }
         };
         console.log("New player config: ", howlerConfig);
         const player = new import_howler_min.Howl(howlerConfig);
-        player.once("load", () => {
+        player.once("load", async () => {
+          console.log("track loaded into howler", this.options.ctx);
+          if (this.options.ctx) {
+            try {
+              const audioElement = player._sounds[0]._node;
+              if (typeof audioElement.setSinkId === "function") {
+                await audioElement.setSinkId(this.options.ctx);
+                console.log("Selected output device successfully");
+              }
+            } catch (error) {
+              console.error(error, this.options.ctx);
+            }
+          }
           player.seek(track.metadata?.start || 0);
           if (track.metadata?.end < 0) {
             track.metadata.end = player.duration();
@@ -1083,7 +1321,7 @@
     stop() {
       if (this.isPlaying) {
         this.current.ending = true;
-        this.current.player.fade(_Player.dBtoLinear(this.current.gainReduction), 0, this.options.fadeRate);
+        this.current.player.fade(_Player.dBtoLinear(this.current.gainReduction), 0, this.options.fadeRate * 1e3);
         this.reportProgress("Fading");
         let obj = this.current.unload;
         setTimeout(() => {
@@ -1092,8 +1330,10 @@
             if (this.current.unload) {
               this.current.unload();
             }
+          } else {
+            console.error("Timeout to unload failed to unload due to changed obj", obj, this.current);
           }
-        }, this.options.fadeRate + 1e3);
+        }, this.options.fadeRate * 1e3 + 1e3);
       }
     }
     start() {
@@ -1126,20 +1366,40 @@
       this.tandaList = tandaList;
       await this.extractTracks();
       eventBus.emit("new-playlist");
-      this.container.innerHTML = "";
-      for (let track of this.trackList) {
-        let te = document.createElement("track-element");
-        te.setAttribute("trackid", String(track.id));
-        te.setAttribute("style", track.metadata?.tags?.style);
-        te.setAttribute("title", track.metadata?.tags?.title);
-        te.setAttribute("artist", track.metadata?.tags?.artist);
-        let year = track.metadata?.tags?.year;
-        if (year) {
-          year = year.substring(0, 4);
-        }
-        te.setAttribute("year", year);
-        this.container.appendChild(te);
-      }
+      this.container.innerHTML = (await Promise.all(this.tandaList.map(async (tanda, idx) => {
+        const cortinaElement = tanda.cortina ? (async () => {
+          let track = await this.getDetail("cortina", tanda.cortina);
+          let year = track.metadata?.tags?.year;
+          if (year) {
+            year = year.substring(0, 4);
+          }
+          return `<cortina-element
+                                tandaid="${idx}"
+                                trackid="${String(track.id)}" 
+                                style="${track.metadata?.tags?.style}" 
+                                title="${track.metadata?.tags?.title}" 
+                                artist="${track.metadata?.tags?.artist}"
+                                year="${year}"></cortina-element>`;
+        })() : "";
+        const trackElements = await Promise.all(tanda.tracks.map(async (trackName) => {
+          let track = await this.getDetail("track", trackName);
+          let year = track.metadata?.tags?.year;
+          if (year) {
+            year = year.substring(0, 4);
+          }
+          return `<track-element 
+                            tandaid="${idx}"
+                            trackid="${String(track.id)}" 
+                            style="${track.metadata?.tags?.style}" 
+                            title="${track.metadata?.tags?.title}" 
+                            artist="${track.metadata?.tags?.artist}"
+                            year="${year}"></track-element>`;
+        }));
+        return `<tanda-element style='unknown'>
+                        ${await cortinaElement}
+                        ${trackElements.join("")}
+                    </tanda-element>`;
+      }))).join("");
     }
     getTracks() {
       return this.trackList;
@@ -1151,12 +1411,19 @@
       });
     }
     async extractTracks() {
-      for (let tanda of this.tandaList) {
+      for (let idx = 0; idx < this.tandaList.length; idx++) {
+        let tanda = this.tandaList[idx];
         if (tanda.cortina) {
-          this.trackList.push(await this.getDetail("cortina", tanda.cortina));
+          this.trackList.push({
+            ...await this.getDetail("cortina", tanda.cortina),
+            tandaOffset: idx
+          });
         }
         for (let track of tanda.tracks) {
-          this.trackList.push(await this.getDetail("track", track));
+          this.trackList.push({
+            ...await this.getDetail("track", track),
+            tandaOffset: idx
+          });
         }
       }
       console.log("Extracted tracks", this.trackList);
@@ -1521,6 +1788,162 @@
     }
   };
 
+  // dist/services/ffmpeg-interface.js
+  var FFmpeg = window.FFmpeg;
+  var { createFFmpeg } = FFmpeg;
+  var ffmpeg;
+  var initializeFFmpeg = async () => {
+    ffmpeg = createFFmpeg({ log: true });
+    await ffmpeg.load();
+    console.log("FFmpeg initialized");
+  };
+  async function readFile(fileHandle) {
+    try {
+      const file = await fileHandle.getFile();
+      const contents = await file.arrayBuffer();
+      return contents;
+    } catch (error) {
+      console.error("Error reading file:", error);
+      return void 0;
+    }
+  }
+  async function readFileContents(fileHandle) {
+    let contents;
+    try {
+      contents = await readFile(fileHandle);
+      if (!contents) {
+        console.log("Failed to read file");
+      } else {
+        console.log("File read successfully", contents);
+        const uint8Array = new Uint8Array(contents);
+        console.log("Got unit8 array", uint8Array.byteLength);
+        contents = uint8Array;
+      }
+    } catch (error) {
+      console.error("Error reading file contents:", error);
+    }
+    console.log("Read file size: ", contents?.byteLength);
+    return contents;
+  }
+  var totalCalls = 0;
+  var runFFmpegCommand = async (fileHandle, ...args) => {
+    console.log("FFMPEG call ", totalCalls);
+    totalCalls++;
+    if (totalCalls % 50 === 0) {
+      console.log("RE-INITIALISING FFMPEG");
+      await ffmpeg.terminate();
+      await initializeFFmpeg();
+    }
+    try {
+      const fileData = await readFileContents(fileHandle);
+      if (!fileData || fileData.byteLength < 1e3) {
+        console.log("Too small");
+        return;
+      }
+      await ffmpeg.FS("writeFile", fileHandle.name, fileData);
+      const originalConsoleLog = console.log;
+      const outputLines = [];
+      console.log = function(message) {
+        if (message && message.startsWith("[fferr]")) {
+          originalConsoleLog.apply(console, arguments);
+          outputLines.push(message);
+        } else {
+          originalConsoleLog.apply(console, arguments);
+        }
+      };
+      const ffmpegArgs = args.length > 0 ? ["-i", fileHandle.name, ...args, "output.wav"] : ["-i", fileHandle.name, "output.wav"];
+      await ffmpeg.run(...ffmpegArgs);
+      console.log = originalConsoleLog;
+      const convertedFile = await ffmpeg.FS("readFile", "output.wav");
+      await ffmpeg.FS("unlink", fileHandle.name);
+      await ffmpeg.FS("unlink", "output.wav");
+      return { convertedFile, outputLines };
+    } catch (error) {
+      console.error("Error running FFmpeg command:", error);
+    }
+  };
+  function timeStringToSeconds(timeString) {
+    const [hours, minutes, secondsWithMillis] = timeString.split(":");
+    const [seconds, milliseconds] = secondsWithMillis.split(".");
+    const hoursInSeconds = parseInt(hours) * 3600;
+    const minutesInSeconds = parseInt(minutes) * 60;
+    const secondsTotal = parseInt(seconds);
+    const millisecondsTotal = parseInt(milliseconds) / 100;
+    const totalTimeInSeconds = hoursInSeconds + minutesInSeconds + secondsTotal + millisecondsTotal;
+    return totalTimeInSeconds;
+  }
+  var decodeFFmpegOutput = (outputLines) => {
+    let silenceStartFinishes = 0;
+    let silenceEndCommences = 0;
+    let duration = 0;
+    let meanVolume = 0;
+    let maxVolume = 0;
+    let tags = {};
+    let tagsContext = "";
+    for (const line of outputLines) {
+      console.log(line);
+      if (tagsContext === "" && line.match(/Output.*to 'pipe:'/)) {
+        tagsContext = "output";
+      }
+      if (tagsContext === "output" && line.match(/\[fferr\]     /)) {
+        const tagName = line.substring("fferr]     ".length).split(":")[0].trim();
+        const tagValue = line.split(":")[1].trim();
+        tags[tagName] = tagValue;
+      }
+      if (line.match(/Parsed_volumedetect_0.*_volume/)) {
+        console.log("GAIN ", line);
+        const tokens = line.split(" ");
+        console.log(tokens);
+        if (tokens[4] === "mean_volume:") {
+          meanVolume = parseFloat(tokens[5]);
+        }
+        if (tokens[4] === "max_volume:") {
+          maxVolume = parseFloat(tokens[5]);
+        }
+      }
+      if (line.match(/\[fferr\]   Duration: /i)) {
+        console.log("DURATION", line);
+        const tokens = line.split(" ");
+        console.log(tokens);
+        duration = timeStringToSeconds(tokens[4]);
+      }
+      if (line.match(/silencedetect @.* silence_start/)) {
+        console.log("SILENCE START", line);
+        const tokens = line.split(" ");
+        console.log(tokens);
+        silenceEndCommences = parseFloat(tokens[5]);
+      }
+      if (line.match(/silencedetect @.* silence_end: .* | silence_duration: .*/)) {
+        console.log("SILENCE END", line);
+        const tokens = line.split(" ");
+        console.log(tokens);
+        let duration2 = parseFloat(tokens[8]);
+        let time = parseFloat(tokens[5]);
+        if (time < 10) {
+          silenceStartFinishes = time;
+        }
+      }
+    }
+    if (silenceEndCommences === 0) {
+      silenceEndCommences = duration;
+    }
+    if (silenceEndCommences < duration - 20) {
+      silenceEndCommences = duration;
+    }
+    console.log("Derived duration", duration);
+    console.log("Derived silence at start finishes @", silenceStartFinishes);
+    console.log("Derived silence at end starts @", silenceEndCommences);
+    const metadata = {
+      duration,
+      start: silenceStartFinishes,
+      end: silenceEndCommences,
+      meanVolume,
+      maxVolume,
+      tags
+    };
+    return metadata;
+  };
+
   // dist/app.js
   var SYSTEM = {
     defaultTandaStyleSequence: "4T 4T 3W 4T 3M"
@@ -1561,7 +1984,23 @@
     console.log("Fetched all files", files.length, "Lowest gain", systemLowestGain);
     return systemLowestGain;
   }
+  async function readMetadataFromFileHandle(fileHandle) {
+    try {
+      const { convertedFile, outputLines } = await runFFmpegCommand(fileHandle, "-map", "0:a", "-af", "volumedetect,silencedetect=n=-60dB:d=1", "-f", "null", "-");
+      const metadata = decodeFFmpegOutput(outputLines);
+      return { size: convertedFile.byteLength, metadata };
+    } catch (error) {
+      console.error("Failed to read metadata:", error);
+      return { size: 0, metadata: {} };
+    }
+  }
   async function scanFileSystem(config, dbManager, analyze) {
+    try {
+      await initializeFFmpeg();
+    } catch (error) {
+      alert("Unable to scan files - FFmpeg is not initialising correctly, " + error);
+      throw error;
+    }
     const scanProgress = getDomElement("#scanProgress");
     const scanFilePath = getDomElement("#scanFilePath");
     let files = await getAllFiles(config.musicFolder);
@@ -1572,7 +2011,7 @@
       scanProgress.textContent = ++n + "/" + files.length;
       const table = indexFileName.split(/\/|\\/g)[1] == "music" ? "track" : "cortina";
       let original = await dbManager.getDataByName(table, indexFileName);
-      if (!original) {
+      if (!original || analyze) {
         const baseFile = await file.fileHandle.getFile();
         if (baseFile.size > 1e3) {
           let size = baseFile.size;
@@ -1584,7 +2023,12 @@
             maxVolume: 0,
             tags: { title: indexFileName, artist: "unknown" }
           };
-          await dbManager.addData(table, {
+          if (analyze) {
+            let result = await readMetadataFromFileHandle(file.fileHandle);
+            size = result.size;
+            metadata = result.metadata;
+          }
+          const newData = {
             type: table,
             name: indexFileName,
             fileHandle: file.fileHandle,
@@ -1592,7 +2036,12 @@
             classifiers: {
               favourite: true
             }
-          });
+          };
+          if (!original) {
+            await dbManager.addData(table, newData);
+          } else {
+            await dbManager.updateData(table, original.id, newData);
+          }
         }
       }
     }
@@ -1708,18 +2157,20 @@
     const outputDevices = devices.filter((device) => device.kind === "audiooutput");
     return outputDevices;
   }
-  async function populateOutputDeviceOptions() {
+  async function populateOutputDeviceOptions(config) {
     const outputDevices = await enumerateOutputDevices();
-    function fillOptions(target) {
+    function fillOptions(current, target) {
+      target.innerHTML = "";
       outputDevices.forEach((device) => {
         const option = document.createElement("option");
         option.value = device.deviceId;
         option.text = device.label || "Unknown Device";
+        option.selected = current == device.deviceId;
         target.appendChild(option);
       });
     }
-    fillOptions(getDomElement("#speaker-output-devices"));
-    fillOptions(getDomElement("#headphones-output-devices"));
+    fillOptions(config.mainOutput, getDomElement("#speaker-output-devices"));
+    fillOptions(config.headphoneOutput, getDomElement("#headphones-output-devices"));
   }
   document.addEventListener("DOMContentLoaded", async () => {
     try {
@@ -1760,6 +2211,9 @@
       },
       loadLibraryButton: async () => {
         await loadLibraryIntoDB(config, dbManager);
+      },
+      refreshAudioLists: () => {
+        populateOutputDeviceOptions(config);
       }
     };
     for (const key of Object.keys(quickClickHandlers)) {
@@ -1772,7 +2226,7 @@
       eventBus.emit("queryResults", results);
     });
     await requestAudioPermission();
-    populateOutputDeviceOptions();
+    populateOutputDeviceOptions(config);
     const outputDeviceSelector = getDomElement("#speaker-output-devices");
     outputDeviceSelector.addEventListener("change", () => {
       const selectedDeviceId = outputDeviceSelector.value;
@@ -1795,7 +2249,7 @@
     const modal = getDomElement("#permissionModal");
     modal.classList.add("hidden");
     let systemLowestGain = await getSystemLevel(dbManager);
-    let fadeRate = 3e3;
+    let fadeRate = 3;
     const playlistService = new PlaylistService(getDomElement("#playlistContainer"), async (type, name) => {
       return await dbManager.getDataByName(type, name);
     });
@@ -1830,13 +2284,17 @@
     const headphonesPlayerConfig = {
       ctx: config.headphoneOutput,
       systemLowestGain,
-      fadeRate: 500,
+      fadeRate: 0.5,
       fetchNext: async (N) => {
-        console.log("Headphones next", {
-          track: headphonePlaylist[0],
-          silence: 0
-        });
-        return { track: headphonePlaylist[0], silence: 0 };
+        if (N == 0) {
+          console.log("Headphones next", {
+            track: headphonePlaylist[0],
+            silence: 0
+          });
+          return { track: headphonePlaylist[0], silence: 0 };
+        } else {
+          return { track: void 0, silence: 0 };
+        }
       }
     };
     const speakerOutputPlayer = new Player(speakerPlayerConfig);
@@ -1857,11 +2315,13 @@
       } else {
         Array.from(getDomElement("#playlistContainer").querySelectorAll(".playingOnHeadphones")).map((x) => x.classList.remove("playingOnHeadphones"));
         track.classList.add("playingOnHeadphones");
-        headphonePlaylist[0] = await dbManager.getDataById("track", parseInt(track.getAttribute("trackid")));
+        const table = track.getAttribute("title").split(/\/|\\/g)[1] == "music" ? "track" : "cortina";
+        headphonePlaylist[0] = await dbManager.getDataById(table, parseInt(track.getAttribute("trackid")));
         headphonesOutputPlayer.stop();
         await headphonesOutputPlayer.updatePosition(-1);
         console.log(headphonesOutputPlayer.next);
         headphonesOutputPlayer.startNext();
+        headphonePlaylist = [];
       }
     });
     eventBus.on("new-playlist", async () => {

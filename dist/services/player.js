@@ -40,17 +40,15 @@ export class Player {
                     let timeEnd = 1000 * track.metadata.end + Math.min(0, silence ?? 0);
                     if (timeNow >= timeEnd - 500 && !ending) {
                         this.current.ending = true;
-                        player.fade(Player.dBtoLinear(gainReduction), 0, this.options.fadeRate);
+                        player.fade(Player.dBtoLinear(gainReduction), 0, this.options.fadeRate * 1000);
                         this.reportProgress("Fading");
                         let obj = this.current;
                         setTimeout(() => {
-                            if (obj === this.current) {
-                                player.off("end", this.startNext.bind(this));
-                                if (this.current?.unload) {
-                                    this.current.unload();
-                                }
+                            player.off("end", this.startNext.bind(this));
+                            if (obj.unload) {
+                                obj.unload();
                             }
-                        }, this.options.fadeRate + 1000);
+                        }, this.options.fadeRate * 1000 + 1000);
                         this.startNext();
                     }
                     else {
@@ -138,6 +136,7 @@ export class Player {
                         ending: false,
                     };
                     next.unload = () => {
+                        console.log('Unloading player', JSON.stringify(track));
                         if (next.player) {
                             if (next.player.playing())
                                 next.player.stop();
@@ -176,22 +175,26 @@ export class Player {
                 autoplay: false,
                 ctx: this.options.ctx,
                 onplay: () => {
-                    const audioElement = player._sounds[0]._node; // Access the underlying HTMLAudioElement
-                    if (typeof audioElement.setSinkId === "function") {
-                        audioElement
-                            .setSinkId(this.options.ctx)
-                            .then(() => {
-                            console.log("Audio output successfully redirected.");
-                        })
-                            .catch((error) => {
-                            console.error("Failed to redirect audio output:", error);
-                        });
-                    }
+                    console.log("starting howler playing");
                 },
             };
             console.log("New player config: ", howlerConfig);
             const player = new Howl(howlerConfig);
-            player.once("load", () => {
+            player.once("load", async () => {
+                console.log("track loaded into howler", this.options.ctx);
+                // Try to route the audio where required
+                if (this.options.ctx) {
+                    try {
+                        const audioElement = player._sounds[0]._node; // Access the underlying HTMLAudioElement
+                        if (typeof audioElement.setSinkId === "function") {
+                            await audioElement.setSinkId(this.options.ctx);
+                            console.log('Selected output device successfully');
+                        }
+                    }
+                    catch (error) {
+                        console.error(error, this.options.ctx);
+                    }
+                }
                 player.seek(track.metadata?.start || 0);
                 if (track.metadata?.end < 0) {
                     track.metadata.end = player.duration();
@@ -246,7 +249,7 @@ export class Player {
     stop() {
         if (this.isPlaying) {
             this.current.ending = true;
-            this.current.player.fade(Player.dBtoLinear(this.current.gainReduction), 0, this.options.fadeRate);
+            this.current.player.fade(Player.dBtoLinear(this.current.gainReduction), 0, this.options.fadeRate * 1000);
             this.reportProgress("Fading");
             let obj = this.current.unload;
             setTimeout(() => {
@@ -256,7 +259,10 @@ export class Player {
                         this.current.unload();
                     }
                 }
-            }, this.options.fadeRate + 1000);
+                else {
+                    console.error('Timeout to unload failed to unload due to changed obj', obj, this.current);
+                }
+            }, this.options.fadeRate * 1000 + 1000);
         }
     }
     start() {
