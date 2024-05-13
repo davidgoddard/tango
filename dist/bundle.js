@@ -1795,7 +1795,7 @@
   var initializeFFmpeg = async () => {
     ffmpeg = createFFmpeg({ log: true });
     await ffmpeg.load();
-    console.log("FFmpeg initialized");
+    console.log("FFmpeg initialized - terminate?", ffmpeg.terminate);
   };
   async function readFile(fileHandle) {
     try {
@@ -1831,8 +1831,10 @@
     totalCalls++;
     if (totalCalls % 50 === 0) {
       console.log("RE-INITIALISING FFMPEG");
-      await ffmpeg.terminate();
-      await initializeFFmpeg();
+      ffmpeg.terminate();
+      setTimeout(async () => {
+        await initializeFFmpeg();
+      }, 1e3);
     }
     try {
       const fileData = await readFileContents(fileHandle);

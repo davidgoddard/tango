@@ -8,7 +8,7 @@ let ffmpeg: any; // Define ffmpeg variable
 export const initializeFFmpeg = async () => {
     ffmpeg = createFFmpeg({ log: true });
     await ffmpeg.load();
-    console.log('FFmpeg initialized');
+    console.log('FFmpeg initialized - terminate?', ffmpeg.terminate);
 };
 
 async function readFile(fileHandle: FileSystemFileHandle) {
@@ -49,8 +49,11 @@ export const runFFmpegCommand = async (fileHandle: FileSystemFileHandle, ...args
     totalCalls++;
     if (totalCalls % 50 === 0) {
         console.log('RE-INITIALISING FFMPEG');
-        await ffmpeg.terminate();
-        await initializeFFmpeg();
+        ffmpeg.terminate();
+        setTimeout(async ()=>{
+            await initializeFFmpeg()
+        },1000)
+        ;
     }
 
     try {
