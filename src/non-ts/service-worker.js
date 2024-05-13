@@ -30,7 +30,6 @@ const urlsToCache = [
   './icons/goBackToStart.png',
   './icons/stopNext.png',
   './icons/stopNow.png',
-  './icons/speaker.svg',
   './icons/pause.png',
   './icons/stopNextTanda.png',
   './icons/playNext.png',
