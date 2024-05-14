@@ -86,7 +86,7 @@ export class PlaylistService {
           const cortinaElement = tanda.cortina
             ? (async () => {
                 let track = await this.getDetail("cortina", tanda.cortina);
-                let year = track.metadata?.tags?.year!;
+                let year = track.metadata?.tags?.date || track.metadata?.tags?.year || track.metadata?.tags?.creation_time;
                 if (year) {
                   year = year.substring(0, 4);
                 }
@@ -103,7 +103,7 @@ export class PlaylistService {
           const trackElements = await Promise.all(
             tanda.tracks.map(async (trackName: string) => {
               let track = await this.getDetail("track", trackName);
-              let year = track.metadata?.tags?.year!;
+              let year = track.metadata?.tags?.date || track.metadata?.tags?.year || track.metadata?.tags?.creation_time;
               if (year) {
                 year = year.substring(0, 4);
               }
