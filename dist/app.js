@@ -129,7 +129,7 @@ async function scanFileSystem(config, dbManager, analyze) {
                 let { id } = (await dbManager.getDataByName(table, indexFileName));
                 // Create new version of the record
                 let metadata = analysis
-                    ? analysis
+                    ? analysis[batchIdx]
                     : {
                         start: 0,
                         end: -1,

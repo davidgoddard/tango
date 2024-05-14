@@ -1895,7 +1895,7 @@
           scanProgress.textContent = ++n + "/" + files.length;
           const table = indexFileName.split(/\/|\\/g)[1] == "music" ? "track" : "cortina";
           let { id } = await dbManager.getDataByName(table, indexFileName);
-          let metadata = analysis ? analysis : {
+          let metadata = analysis ? analysis[batchIdx] : {
             start: 0,
             end: -1,
             duration: void 0,

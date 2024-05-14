@@ -192,7 +192,7 @@ async function scanFileSystem(
         // Create new version of the record
 
         let metadata: any = analysis
-          ? analysis
+          ? analysis[batchIdx]
           : {
               start: 0,
               end: -1,
