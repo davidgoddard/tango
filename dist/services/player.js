@@ -136,7 +136,7 @@ export class Player {
                         ending: false,
                     };
                     next.unload = () => {
-                        console.log('Unloading player', JSON.stringify(track));
+                        console.log("Unloading player", JSON.stringify(track));
                         if (next.player) {
                             if (next.player.playing())
                                 next.player.stop();
@@ -188,7 +188,7 @@ export class Player {
                         const audioElement = player._sounds[0]._node; // Access the underlying HTMLAudioElement
                         if (typeof audioElement.setSinkId === "function") {
                             await audioElement.setSinkId(this.options.ctx);
-                            console.log('Selected output device successfully');
+                            console.log("Selected output device successfully");
                         }
                     }
                     catch (error) {
@@ -251,16 +251,11 @@ export class Player {
             this.current.ending = true;
             this.current.player.fade(Player.dBtoLinear(this.current.gainReduction), 0, this.options.fadeRate * 1000);
             this.reportProgress("Fading");
-            let obj = this.current.unload;
+            let obj = this.current;
             setTimeout(() => {
-                if (obj == this.current.unload) {
-                    this.reportProgress("Stopped");
-                    if (this.current.unload) {
-                        this.current.unload();
-                    }
-                }
-                else {
-                    console.error('Timeout to unload failed to unload due to changed obj', obj, this.current);
+                this.reportProgress("Stopped");
+                if (obj.unload) {
+                    obj.unload();
                 }
             }, this.options.fadeRate * 1000 + 1000);
         }

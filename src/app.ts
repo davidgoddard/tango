@@ -3,6 +3,9 @@
 import { eventBus } from "./events/event-bus";
 import "./components/search.element";
 import "./components/tanda.element";
+import { TabsContainer } from "./components/tabs.component";
+import { TrackElement } from "./components/track.element";
+import "./components/cortina.element";
 
 import { Track, Tanda, Playlist, BaseRecord, TableNames } from "./data-types";
 import { Player, PlayerOptions, ProgressData } from "./services/player";
@@ -17,7 +20,6 @@ import {
   getAllFiles,
   openMusicFolder,
 } from "./services/file-system";
-import { TabsContainer } from "./components/tabs.component";
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
@@ -122,7 +124,7 @@ async function scanFileSystem(
 
       let iframe: HTMLIFrameElement; // Track reference to iframe
       iframe = document.createElement("iframe");
-      iframe.src = "child.html";
+      iframe.src = "ffmpeg-frame.html";
       document.getElementById("iframeContainer")!.appendChild(iframe);
 
       // Wait for the FFmpeg module to be initialised
@@ -134,7 +136,9 @@ async function scanFileSystem(
       });
 
       //@ts-ignore
-      let results = await iframe.contentWindow!.readMetadataFromFileHandle(fileHandles)
+      let results = await iframe.contentWindow!.readMetadataFromFileHandle(
+        fileHandles
+      );
 
       // Tear down the FFmpeg module to free resources
 
@@ -148,6 +152,10 @@ async function scanFileSystem(
     }
     const scanProgress = getDomElement("#scanProgress");
     const scanFilePath = getDomElement("#scanFilePath");
+    scanFilePath.textContent = analyze
+      ? "Please wait - progress is reported in batches ..."
+      : "";
+    scanProgress.textContent = "";
 
     let files = await getAllFiles(
       config.musicFolder as FileSystemDirectoryHandle
@@ -591,21 +599,23 @@ async function runApplication(
   });
 
   document.addEventListener("playOnHeadphones", async (event: any) => {
-    const track = event.detail;
-    if (track.classList.contains("playingOnHeadphones")) {
+    console.log('Play on headphones in app', event.detail)
+    const track = event.detail.element;
+    // Clear all other tracks from playing
+
+    (
+      Array.from(
+        getDomElement("#playlistContainer").querySelectorAll(
+          "track-element,cortina-element"
+        )
+      ) as TrackElement[]
+    ).forEach((x: TrackElement) => {
+      if (x !== track) x.stopPlayingOnHeadphones();
+    });
+
+    if (!event.detail.playing) {
       headphonesOutputPlayer.stop();
-      Array.from(
-        getDomElement("#playlistContainer").querySelectorAll(
-          ".playingOnHeadphones"
-        )
-      ).map((x) => x.classList.remove("playingOnHeadphones"));
     } else {
-      Array.from(
-        getDomElement("#playlistContainer").querySelectorAll(
-          ".playingOnHeadphones"
-        )
-      ).map((x) => x.classList.remove("playingOnHeadphones"));
-      track.classList.add("playingOnHeadphones");
       const table =
         track.getAttribute("title").split(/\/|\\/g)[1] == "music"
           ? "track"
@@ -644,13 +654,13 @@ async function runApplication(
     (record) => true
   )) as Track[];
 
-  let t = 1;
-  let c = 1;
+  let t = 0;
+  let c = 0;
 
   const allTandas: Tanda[] = [];
   while (t < tracks.length) {
     if (c >= cortinas.length) {
-      c = 1;
+      c = 0;
     }
     const tanda: Tanda = {
       type: "tanda",

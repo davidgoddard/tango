@@ -20,9 +20,9 @@ class VirtualScrollList extends HTMLElement {
       this.container.style.position = 'relative';
   
       this.content = document.createElement('div');
-      this.content.style.position = 'absolute';
-      this.content.style.top = '0';
-      this.content.style.left = '0';
+    //   this.content.style.position = 'absolute';
+    //   this.content.style.top = '0';
+    //   this.content.style.left = '0';
       this.content.style.width = '100%';
   
       this.container.appendChild(this.content);
@@ -77,8 +77,8 @@ class VirtualScrollList extends HTMLElement {
       for (let i = startIndex; i < endIndex; i++) {
         const item = this.buffer[i];
         const itemElement = await this.renderFunction!(item, i);
-        itemElement.style.position = 'absolute';
-        itemElement.style.top = `${i * this.itemHeight}px`;
+        // itemElement.style.position = 'absolute';
+        // itemElement.style.top = `${i * this.itemHeight}px`;
         this.content.appendChild(itemElement);
       }
     }

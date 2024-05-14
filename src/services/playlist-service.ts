@@ -28,58 +28,58 @@ export class PlaylistService {
     this.tandaList = tandaList;
     await this.extractTracks();
 
-    const virtualList = document.createElement(
-      "virtual-scroll-list"
-    ) as VirtualScrollList;
-    virtualList.setAttribute("item-height", "50");
-    virtualList.setAttribute("total-items", String(this.tandaList.length)); // Number of items
+    // const virtualList = document.createElement(
+    //   "virtual-scroll-list"
+    // ) as VirtualScrollList;
+    // virtualList.setAttribute("item-height", "50");
+    // virtualList.setAttribute("total-items", String(this.tandaList.length)); // Number of items
 
-    virtualList.setRenderFunction(async (tanda: Tanda, idx: number) => {
-        const tandaElement = document.createElement('tanda-element')
-        tandaElement.setAttribute('style', tanda.style)
+    // virtualList.setRenderFunction(async (tanda: Tanda, idx: number) => {
+    //     const tandaElement = document.createElement('tanda-element')
+    //     tandaElement.setAttribute('style', tanda.style)
 
-        if ( tanda.cortina ){
-            let track = await this.getDetail("cortina", tanda.cortina);
-            let year = track.metadata?.tags?.year!;
-            if (year) {
-              year = year.substring(0, 4);
-            }
-            const cortinaElement = document.createElement('cortina-element');
-            cortinaElement.setAttribute('tandaid', String(idx))
-            cortinaElement.setAttribute('trackid', String(track.id))
-            cortinaElement.setAttribute('style', track.metadata?.tags?.style!)
-            cortinaElement.setAttribute('title', track.metadata?.tags?.title!)
-            cortinaElement.setAttribute('artist', track.metadata?.tags?.artist!)
-            cortinaElement.setAttribute('year', year)
-            tandaElement.appendChild(cortinaElement)
+    //     if ( tanda.cortina ){
+    //         let track = await this.getDetail("cortina", tanda.cortina);
+    //         let year = track.metadata?.tags?.year!;
+    //         if (year) {
+    //           year = year.substring(0, 4);
+    //         }
+    //         const cortinaElement = document.createElement('cortina-element');
+    //         cortinaElement.setAttribute('tandaid', String(idx))
+    //         cortinaElement.setAttribute('trackid', String(track.id))
+    //         cortinaElement.setAttribute('style', track.metadata?.tags?.style!)
+    //         cortinaElement.setAttribute('title', track.metadata?.tags?.title!)
+    //         cortinaElement.setAttribute('artist', track.metadata?.tags?.artist!)
+    //         cortinaElement.setAttribute('year', year)
+    //         tandaElement.appendChild(cortinaElement)
 
-        }
+    //     }
 
-        tanda.tracks.map(async (trackName: string) => {
-          let track = await this.getDetail("track", trackName);
-          let year = track.metadata?.tags?.year!;
-          if (year) {
-            year = year.substring(0, 4);
-          }
-          const trackElement = document.createElement('track-element')
-          trackElement.setAttribute('tandaid', String(idx))
-          trackElement.setAttribute('trackid', String(track.id))
-          trackElement.setAttribute('style', track.metadata?.tags?.style!)
-          trackElement.setAttribute('title', track.metadata?.tags?.title!)
-          trackElement.setAttribute('artist', track.metadata?.tags?.artist!)
-          trackElement.setAttribute('year', year)
-          tandaElement.appendChild(trackElement)
-      })
+    //     tanda.tracks.map(async (trackName: string) => {
+    //       let track = await this.getDetail("track", trackName);
+    //       let year = track.metadata?.tags?.year!;
+    //       if (year) {
+    //         year = year.substring(0, 4);
+    //       }
+    //       const trackElement = document.createElement('track-element')
+    //       trackElement.setAttribute('tandaid', String(idx))
+    //       trackElement.setAttribute('trackid', String(track.id))
+    //       trackElement.setAttribute('style', track.metadata?.tags?.style!)
+    //       trackElement.setAttribute('title', track.metadata?.tags?.title!)
+    //       trackElement.setAttribute('artist', track.metadata?.tags?.artist!)
+    //       trackElement.setAttribute('year', year)
+    //       tandaElement.appendChild(trackElement)
+    //   })
 
-        return tandaElement;
-    });
+    //     return tandaElement;
+    // });
 
-    virtualList.setItems(this.tandaList);
+    // virtualList.setItems(this.tandaList);
 
-    this.container.innerHTML = "";
-    this.container.appendChild(virtualList);
+    // this.container.innerHTML = "";
+    // this.container.appendChild(virtualList);
 
-    /*    eventBus.emit("new-playlist");
+    eventBus.emit("new-playlist");
     this.container.innerHTML = (
       await Promise.all(
         this.tandaList.map(async (tanda: Tanda, idx: number) => {
@@ -124,7 +124,7 @@ export class PlaylistService {
         })
       )
     ).join("");
-    */
+    
   }
 
   getTracks() {

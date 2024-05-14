@@ -1,51 +1,111 @@
+export type Action = {
+    id: string;
+  image: string;
+  alt: string;
+  sortOrder: number;
+};
+
+interface State {
+    isPlaying: boolean,
+    isPlayingOnHeadphones: boolean,
+    actions: Set<Action>
+}
+
 class TrackElement extends HTMLElement {
-    constructor() {
-        super();
-        this.attachShadow({ mode: 'open' });
+  private isPlaying = false;
+  private isPlayingOnHeadphones = false;
+  private actions = new Set();
+
+  constructor() {
+    super();
+    this.attachShadow({ mode: "open" });
+  }
+
+  connectedCallback() {
+    this.render();
+
+    this.shadowRoot!.querySelector("#headphones")!.addEventListener(
+      "click",
+      this.playOnHeadphones.bind(this)
+    );
+
+    this.shadowRoot!.querySelector(".actions")!.addEventListener(
+      "click",
+      this.handleTargetButtonClick.bind(this)
+    );
+
+    this.shadowRoot!.querySelector("main")!.addEventListener(
+      "click",
+      this.handleTrackClick.bind(this)
+    );
+  }
+
+  addAction(action: Action) {
+    this.actions.add(action);
+  }
+
+  stopPlayingOnHeadphones() {
+    this.isPlayingOnHeadphones = false;
+    this.shadowRoot!.querySelector("#headphones")!.classList.remove("playing");
+  }
+
+  playOnHeadphones(event: Event) {
+    event.stopPropagation();
+    event.preventDefault();
+    console.log("Play on headphones", this);
+    if (!this.isPlayingOnHeadphones) {
+        this.isPlayingOnHeadphones = true;
+        this.shadowRoot!.querySelector("#headphones")!.classList.add("playing");
+    } else {
+        this.isPlayingOnHeadphones = false;
+        this.shadowRoot!.querySelector("#headphones")!.classList.remove("playing");
     }
+    const emitEvent = new CustomEvent("playOnHeadphones", {
+      detail: { element: this, playing: this.isPlayingOnHeadphones },
+      bubbles: true,
+    });
+    this.dispatchEvent(emitEvent);
+  }
 
-    connectedCallback() {
-        this.render();
-
-        this.shadowRoot!.querySelector('#headphones')!.addEventListener('click', this.playOnHeadphones.bind(this)); 
-        this.shadowRoot!.querySelector('.actions')!.addEventListener('click', this.handleTargetButtonClick.bind(this));
-        this.shadowRoot!.querySelector('main')!.addEventListener('click', this.handleTrackClick.bind(this));
+  handleTargetButtonClick(event: Event) {
+    const targetButton = (event.target as HTMLElement)?.closest(
+      "button.target"
+    );
+    if (targetButton) {
+      event.stopPropagation();
+      event.preventDefault();
+      const emitEvent = new CustomEvent("clickedTargetTrack", {
+        detail: { actionId: targetButton.id, element: this },
+        bubbles: true,
+      });
+      this.dispatchEvent(emitEvent);
     }
+  }
 
-    playOnHeadphones(event:Event){
-        event.stopPropagation();
-        event.preventDefault();
-        console.log('Play on headphones', this)
-        const emitEvent = new CustomEvent("playOnHeadphones", { detail: this, bubbles: true });
-        this.dispatchEvent(emitEvent);
+  handleTrackClick() {
+    const trackId = this.getAttribute("trackid");
+    if (trackId) {
+      const event = new CustomEvent("clickedTrack", {
+        detail: this,
+        bubbles: true,
+      });
+      this.dispatchEvent(event);
     }
+  }
 
-    handleTargetButtonClick(event: Event) {
-        const targetButton = (event.target as HTMLElement)?.closest('button.target');
-        if (targetButton) {
-            event.stopPropagation();
-            event.preventDefault();
-            const emitEvent = new CustomEvent("clickedTargetTrack", { detail: this, bubbles: true });
-            this.dispatchEvent(emitEvent);
-        }
-    }
-
-    handleTrackClick() {
-        const trackId = this.getAttribute('trackid');
-        if (trackId) {
-            const event = new CustomEvent("clickedTrack", { detail: this, bubbles: true });
-            this.dispatchEvent(event);
-        }
-    }
-
-    render() {
-        this.shadowRoot!.innerHTML = `
+  render() {
+    this.shadowRoot!.innerHTML = `
         <style>
         * {
             background-color:transparent;
         }
         .track {
             padding: 0.4rem;
+        }
+        header {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
         }
         h2 {
             margin: 0px;
@@ -84,6 +144,7 @@ class TrackElement extends HTMLElement {
         button {
             background-color: transparent;
             border: none;
+            padding: 0px 10px 0px 0px;
         }
         img {
             height: 20px;
@@ -95,28 +156,44 @@ class TrackElement extends HTMLElement {
         #headphones {
             border: solid 2px transparent;
         }
-        :host-context(track-element.playingOnHeadphones) #headphones {
+        #headphones.playing {
             background-color: #00800040;
             border: solid 2px red;
             border-radius: 100%;
         }
     </style>
     <article class="track">
-        <section class="actions"><button class="target"><img src="./icons/target.png" alt="Swap track with this"></button></section>
+        <section class="actions">
+        ${([...this.actions] as Action[])
+          .sort((a: Action, b: Action) => {
+            return a.sortOrder - b.sortOrder;
+          })
+          .map((action) => {
+            return `<button id="${action.id}"><img src="${action.image}" alt="${action.alt}"></button>`;
+          })}
+        </section>
+        <header>
+            <button id="headphones" class="${
+                this.isPlayingOnHeadphones ? "playing" : ""
+            }">
+                <img src="./icons/headphones-icon.png" alt="Listen on headphones">
+            </button><h2>${this.getAttribute("title")}</h2>
+        </header>
         <main>
-        <h2>${this.getAttribute('title')}</h2>
-        <p><button id="headphones"><img src="./icons/headphones-icon.png" alt="Listen on headphones"></button>
-            <span class='style'>${this.getAttribute('style')}</span>
-            By <span class='artist'>${this.getAttribute('artist')}</span>
-            Year <span class='year'>${this.getAttribute('year')}</span>
-            Duration: <span class='duration'>${this.getAttribute('duration')}</span>
-        </p>
-        <main>
+            <p>                
+                <span class='style'>${this.getAttribute("style")}</span>
+                By <span class='artist'>${this.getAttribute("artist")}</span>
+                Year <span class='year'>${this.getAttribute("year")}</span>
+                Duration: <span class='duration'>${this.getAttribute(
+                  "duration"
+                )}</span>
+            </p>
+        </main>
     </article>
         `;
-    }
+  }
 }
 
-customElements.define('track-element', TrackElement);
+customElements.define("track-element", TrackElement);
 
 export { TrackElement };

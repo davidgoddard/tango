@@ -2,11 +2,12 @@
 import { eventBus } from "./events/event-bus";
 import "./components/search.element";
 import "./components/tanda.element";
+import { TabsContainer } from "./components/tabs.component";
+import "./components/cortina.element";
 import { Player } from "./services/player";
 import { PlaylistService } from "./services/playlist-service";
 import { DatabaseManager, convert, } from "./services/database";
 import { fetchLibraryFiles, getAllFiles, openMusicFolder, } from "./services/file-system";
-import { TabsContainer } from "./components/tabs.component";
 if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
         navigator.serviceWorker
@@ -81,7 +82,7 @@ async function scanFileSystem(config, dbManager, analyze) {
             // Create an iframe containing the ffmpeg code
             let iframe; // Track reference to iframe
             iframe = document.createElement("iframe");
-            iframe.src = "child.html";
+            iframe.src = "ffmpeg-frame.html";
             document.getElementById("iframeContainer").appendChild(iframe);
             // Wait for the FFmpeg module to be initialised
             await new Promise((resolve) => {
@@ -101,6 +102,10 @@ async function scanFileSystem(config, dbManager, analyze) {
         }
         const scanProgress = getDomElement("#scanProgress");
         const scanFilePath = getDomElement("#scanFilePath");
+        scanFilePath.textContent = analyze
+            ? "Please wait - progress is reported in batches ..."
+            : "";
+        scanProgress.textContent = "";
         let files = await getAllFiles(config.musicFolder);
         function splitArrayIntoBatches(array, batchSize) {
             const batches = [];
@@ -445,14 +450,17 @@ async function runApplication(dbManager, config) {
         headphonesOutputPlayer.updateOptions(headphonesPlayerConfig);
     });
     document.addEventListener("playOnHeadphones", async (event) => {
-        const track = event.detail;
-        if (track.classList.contains("playingOnHeadphones")) {
+        console.log('Play on headphones in app', event.detail);
+        const track = event.detail.element;
+        // Clear all other tracks from playing
+        Array.from(getDomElement("#playlistContainer").querySelectorAll("track-element,cortina-element")).forEach((x) => {
+            if (x !== track)
+                x.stopPlayingOnHeadphones();
+        });
+        if (!event.detail.playing) {
             headphonesOutputPlayer.stop();
-            Array.from(getDomElement("#playlistContainer").querySelectorAll(".playingOnHeadphones")).map((x) => x.classList.remove("playingOnHeadphones"));
         }
         else {
-            Array.from(getDomElement("#playlistContainer").querySelectorAll(".playingOnHeadphones")).map((x) => x.classList.remove("playingOnHeadphones"));
-            track.classList.add("playingOnHeadphones");
             const table = track.getAttribute("title").split(/\/|\\/g)[1] == "music"
                 ? "track"
                 : "cortina";
@@ -476,12 +484,12 @@ async function runApplication(dbManager, config) {
     // dummy code
     const tracks = (await dbManager.processEntriesInBatches("track", (record) => true));
     const cortinas = (await dbManager.processEntriesInBatches("cortina", (record) => true));
-    let t = 1;
-    let c = 1;
+    let t = 0;
+    let c = 0;
     const allTandas = [];
     while (t < tracks.length) {
         if (c >= cortinas.length) {
-            c = 1;
+            c = 0;
         }
         const tanda = {
             type: "tanda",

@@ -963,7 +963,14 @@
                     font-size: 1.5rem;
                     font-weight: bold;
                 }
-                .details { display: none; }
+                .details { 
+                  height: 0px; 
+                  overflow-y: hidden;
+                  transition: height 1s ease-in-out;
+                }
+                #container {
+                  width: 100%;
+                }
                 #container article {
                     border: solid 2px #ccc;
                     border-radius: 7px;
@@ -987,7 +994,7 @@
                     width: 20px;
                 }
                 .details.expanded {
-                    display: block;
+                    height: auto;
                 }
                 #container.moving article {
                     border: dashed 2px red;
@@ -1063,7 +1070,7 @@
                             <span></span>${summary}   
                         </main>
                     </div>
-                    <div class="details">   
+                    <div class="details ${this.expanded ? "expanded" : ""}">   
                         <slot></slot>                 
                     </div>
                 </article>
@@ -1095,6 +1102,134 @@
     }
   };
   customElements.define("tanda-element", TandaElement);
+
+  // dist/components/tabs.component.js
+  var TabsContainer = class {
+    container;
+    tabs;
+    constructor(container, tabs) {
+      this.container = container;
+      this.tabs = tabs;
+      this.render();
+    }
+    render() {
+      this.container.innerHTML = `
+  <ul class="tab-list" role="tablist">
+    ${this.tabs.map((label, idx) => {
+        return `<li class="tab ${idx == 0 ? "active" : ""}" id="tab${idx + 1}" role="tab">${label}</li>`;
+      }).join("")}
+  </ul>
+  <div class="tab-panels">
+    ${this.tabs.map((label, idx) => {
+        return `<div class="tab-panel ${idx == 0 ? "" : "hidden"}" id="tab${idx + 1}-panel" role="tabpanel">
+      <!-- Content for Tab ${idx + 1} -->
+      <search-element></search-element>
+    </div>
+`;
+      }).join("")}
+  </div>
+`;
+      const tabs = Array.from(this.container.querySelectorAll(".tab"));
+      const panels = Array.from(this.container.querySelectorAll(".tab-panel"));
+      tabs.map((tab, idx) => tab.addEventListener("click", () => {
+        tabs.forEach((tab2) => tab2.classList.remove("active"));
+        tab.classList.add("active");
+        const childPanel = panels[idx];
+        panels.forEach((panel) => panel.classList.add("hidden"));
+        childPanel.classList.remove("hidden");
+        childPanel.querySelector("search-element").focus();
+      }));
+    }
+  };
+
+  // dist/components/cortina.element.js
+  var CortinaElement = class extends HTMLElement {
+    isPlayingOnHeadphones = false;
+    constructor() {
+      super();
+      this.attachShadow({ mode: "open" });
+    }
+    connectedCallback() {
+      this.render();
+      this.shadowRoot.querySelector("#headphones").addEventListener("click", this.playOnHeadphones.bind(this));
+    }
+    render() {
+      this.shadowRoot.innerHTML = `
+        <style>
+        * {
+            background-color:transparent;
+        }
+        .cortina {
+            padding: 0.4rem;
+        }
+        h2 {
+            margin: 0px;
+            padding: 0px;
+            font-size: medium;
+        }
+        p {
+            padding: 0px;
+            margin: 0.2rem 0;
+        }
+        
+        button {
+            background-color: transparent;
+            border: none;
+            padding: 0px 10px 0px 0px;
+        }
+        img {
+            height: 20px;
+            width: 20px;
+        }
+        
+        #headphones {
+            border: solid 2px transparent;
+        }
+        #headphones.playing {
+            background-color: #00800040;
+            border: solid 2px red;
+            border-radius: 100%;
+        }
+        header {
+            display: flex;
+            flex-direction:row;
+            align-items:center;
+        }
+        </style>
+        <article class="cortina">
+          <header>
+            <button id="headphones" class="${this.isPlayingOnHeadphones ? "playing" : ""}"><img src="./icons/headphones-icon.png" alt="Listen on headphones"></button>
+            <h2>${this.getAttribute("title")}</h2>
+          </header>
+          <main>          
+            <p>${this.getAttribute("style")} By ${this.getAttribute("artist")} Year ${this.getAttribute("year")} Duration: ${this.getAttribute("duration")}</p>
+            </main>
+        </article>
+        `;
+    }
+    stopPlayingOnHeadphones() {
+      this.isPlayingOnHeadphones = false;
+      this.shadowRoot.querySelector("#headphones").classList.remove("playing");
+    }
+    playOnHeadphones(event) {
+      event.stopPropagation();
+      event.preventDefault();
+      console.log("Play on headphones", this);
+      if (!this.isPlayingOnHeadphones) {
+        this.isPlayingOnHeadphones = true;
+        this.shadowRoot.querySelector("#headphones").classList.add("playing");
+      } else {
+        this.isPlayingOnHeadphones = false;
+        this.shadowRoot.querySelector("#headphones").classList.remove("playing");
+      }
+      const emitEvent = new CustomEvent("playOnHeadphones", {
+        detail: { element: this, playing: this.isPlayingOnHeadphones },
+        bubbles: true
+      });
+      this.dispatchEvent(emitEvent);
+    }
+  };
+  customElements.define("cortina-element", CortinaElement);
 
   // dist/services/player.js
   var import_howler_min = __toESM(require_howler_min());
@@ -1323,15 +1458,11 @@
         this.current.ending = true;
         this.current.player.fade(_Player.dBtoLinear(this.current.gainReduction), 0, this.options.fadeRate * 1e3);
         this.reportProgress("Fading");
-        let obj = this.current.unload;
+        let obj = this.current;
         setTimeout(() => {
-          if (obj == this.current.unload) {
-            this.reportProgress("Stopped");
-            if (this.current.unload) {
-              this.current.unload();
-            }
-          } else {
-            console.error("Timeout to unload failed to unload due to changed obj", obj, this.current);
+          this.reportProgress("Stopped");
+          if (obj.unload) {
+            obj.unload();
           }
         }, this.options.fadeRate * 1e3 + 1e3);
       }
@@ -1365,47 +1496,41 @@
     async setTandas(tandaList) {
       this.tandaList = tandaList;
       await this.extractTracks();
-      const virtualList = document.createElement("virtual-scroll-list");
-      virtualList.setAttribute("item-height", "50");
-      virtualList.setAttribute("total-items", String(this.tandaList.length));
-      virtualList.setRenderFunction(async (tanda, idx) => {
-        const tandaElement = document.createElement("tanda-element");
-        tandaElement.setAttribute("style", tanda.style);
-        if (tanda.cortina) {
+      eventBus.emit("new-playlist");
+      this.container.innerHTML = (await Promise.all(this.tandaList.map(async (tanda, idx) => {
+        const cortinaElement = tanda.cortina ? (async () => {
           let track = await this.getDetail("cortina", tanda.cortina);
           let year = track.metadata?.tags?.year;
           if (year) {
             year = year.substring(0, 4);
           }
-          const cortinaElement = document.createElement("cortina-element");
-          cortinaElement.setAttribute("tandaid", String(idx));
-          cortinaElement.setAttribute("trackid", String(track.id));
-          cortinaElement.setAttribute("style", track.metadata?.tags?.style);
-          cortinaElement.setAttribute("title", track.metadata?.tags?.title);
-          cortinaElement.setAttribute("artist", track.metadata?.tags?.artist);
-          cortinaElement.setAttribute("year", year);
-          tandaElement.appendChild(cortinaElement);
-        }
-        tanda.tracks.map(async (trackName) => {
+          return `<cortina-element
+                                tandaid="${idx}"
+                                trackid="${String(track.id)}" 
+                                style="${track.metadata?.tags?.style}" 
+                                title="${track.metadata?.tags?.title}" 
+                                artist="${track.metadata?.tags?.artist}"
+                                year="${year}"></cortina-element>`;
+        })() : "";
+        const trackElements = await Promise.all(tanda.tracks.map(async (trackName) => {
           let track = await this.getDetail("track", trackName);
           let year = track.metadata?.tags?.year;
           if (year) {
             year = year.substring(0, 4);
           }
-          const trackElement = document.createElement("track-element");
-          trackElement.setAttribute("tandaid", String(idx));
-          trackElement.setAttribute("trackid", String(track.id));
-          trackElement.setAttribute("style", track.metadata?.tags?.style);
-          trackElement.setAttribute("title", track.metadata?.tags?.title);
-          trackElement.setAttribute("artist", track.metadata?.tags?.artist);
-          trackElement.setAttribute("year", year);
-          tandaElement.appendChild(trackElement);
-        });
-        return tandaElement;
-      });
-      virtualList.setItems(this.tandaList);
-      this.container.innerHTML = "";
-      this.container.appendChild(virtualList);
+          return `<track-element 
+                            tandaid="${idx}"
+                            trackid="${String(track.id)}" 
+                            style="${track.metadata?.tags?.style}" 
+                            title="${track.metadata?.tags?.title}" 
+                            artist="${track.metadata?.tags?.artist}"
+                            year="${year}"></track-element>`;
+        }));
+        return `<tanda-element style='unknown'>
+                        ${await cortinaElement}
+                        ${trackElements.join("")}
+                    </tanda-element>`;
+      }))).join("");
     }
     getTracks() {
       return this.trackList;
@@ -1755,45 +1880,6 @@
     }
   }
 
-  // dist/components/tabs.component.js
-  var TabsContainer = class {
-    container;
-    tabs;
-    constructor(container, tabs) {
-      this.container = container;
-      this.tabs = tabs;
-      this.render();
-    }
-    render() {
-      this.container.innerHTML = `
-  <ul class="tab-list" role="tablist">
-    ${this.tabs.map((label, idx) => {
-        return `<li class="tab ${idx == 0 ? "active" : ""}" id="tab${idx + 1}" role="tab">${label}</li>`;
-      }).join("")}
-  </ul>
-  <div class="tab-panels">
-    ${this.tabs.map((label, idx) => {
-        return `<div class="tab-panel ${idx == 0 ? "" : "hidden"}" id="tab${idx + 1}-panel" role="tabpanel">
-      <!-- Content for Tab ${idx + 1} -->
-      <search-element></search-element>
-    </div>
-`;
-      }).join("")}
-  </div>
-`;
-      const tabs = Array.from(this.container.querySelectorAll(".tab"));
-      const panels = Array.from(this.container.querySelectorAll(".tab-panel"));
-      tabs.map((tab, idx) => tab.addEventListener("click", () => {
-        tabs.forEach((tab2) => tab2.classList.remove("active"));
-        tab.classList.add("active");
-        const childPanel = panels[idx];
-        panels.forEach((panel) => panel.classList.add("hidden"));
-        childPanel.classList.remove("hidden");
-        childPanel.querySelector("search-element").focus();
-      }));
-    }
-  };
-
   // dist/app.js
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
@@ -1863,7 +1949,7 @@
       async function analyzeBatch(fileHandles) {
         let iframe;
         iframe = document.createElement("iframe");
-        iframe.src = "child.html";
+        iframe.src = "ffmpeg-frame.html";
         document.getElementById("iframeContainer").appendChild(iframe);
         await new Promise((resolve) => {
           iframe.addEventListener("load", () => {
@@ -1879,6 +1965,8 @@
       }
       const scanProgress = getDomElement("#scanProgress");
       const scanFilePath = getDomElement("#scanFilePath");
+      scanFilePath.textContent = analyze ? "Please wait - progress is reported in batches ..." : "";
+      scanProgress.textContent = "";
       let files = await getAllFiles(config.musicFolder);
       let batchSize = 20;
       const batches = splitArrayIntoBatches(files, batchSize);
@@ -2181,13 +2269,15 @@
       headphonesOutputPlayer.updateOptions(headphonesPlayerConfig);
     });
     document.addEventListener("playOnHeadphones", async (event) => {
-      const track = event.detail;
-      if (track.classList.contains("playingOnHeadphones")) {
+      console.log("Play on headphones in app", event.detail);
+      const track = event.detail.element;
+      Array.from(getDomElement("#playlistContainer").querySelectorAll("track-element,cortina-element")).forEach((x) => {
+        if (x !== track)
+          x.stopPlayingOnHeadphones();
+      });
+      if (!event.detail.playing) {
         headphonesOutputPlayer.stop();
-        Array.from(getDomElement("#playlistContainer").querySelectorAll(".playingOnHeadphones")).map((x) => x.classList.remove("playingOnHeadphones"));
       } else {
-        Array.from(getDomElement("#playlistContainer").querySelectorAll(".playingOnHeadphones")).map((x) => x.classList.remove("playingOnHeadphones"));
-        track.classList.add("playingOnHeadphones");
         const table = track.getAttribute("title").split(/\/|\\/g)[1] == "music" ? "track" : "cortina";
         headphonePlaylist[0] = await dbManager.getDataById(table, parseInt(track.getAttribute("trackid")));
         headphonesOutputPlayer.stop();
@@ -2203,12 +2293,12 @@
     });
     const tracks = await dbManager.processEntriesInBatches("track", (record) => true);
     const cortinas = await dbManager.processEntriesInBatches("cortina", (record) => true);
-    let t = 1;
-    let c = 1;
+    let t = 0;
+    let c = 0;
     const allTandas = [];
     while (t < tracks.length) {
       if (c >= cortinas.length) {
-        c = 1;
+        c = 0;
       }
       const tanda = {
         type: "tanda",

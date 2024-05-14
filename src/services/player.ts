@@ -86,10 +86,10 @@ export class Player {
             this.reportProgress("Fading");
             let obj = this.current;
             setTimeout(() => {
-                player.off("end", this.startNext.bind(this));
-                if (obj.unload) {
-                  obj.unload();
-                }
+              player.off("end", this.startNext.bind(this));
+              if (obj.unload) {
+                obj.unload();
+              }
             }, this.options.fadeRate * 1000 + 1000);
             this.startNext();
           } else {
@@ -192,7 +192,7 @@ export class Player {
             ending: false,
           };
           next.unload = () => {
-            console.log('Unloading player', JSON.stringify(track))
+            console.log("Unloading player", JSON.stringify(track));
             if (next.player) {
               if (next.player!.playing()) next.player!.stop();
               next.player!.unload();
@@ -243,12 +243,12 @@ export class Player {
         console.log("track loaded into howler", this.options.ctx);
 
         // Try to route the audio where required
-        if ( this.options.ctx ){
+        if (this.options.ctx) {
           try {
             const audioElement = player._sounds[0]._node; // Access the underlying HTMLAudioElement
             if (typeof audioElement.setSinkId === "function") {
               await audioElement.setSinkId(this.options.ctx);
-              console.log('Selected output device successfully')
+              console.log("Selected output device successfully");
             }
           } catch (error) {
             console.error(error, this.options.ctx);
@@ -319,15 +319,11 @@ export class Player {
         this.options.fadeRate * 1000
       );
       this.reportProgress("Fading");
-      let obj = this.current!.unload;
+      let obj = this.current!;
       setTimeout(() => {
-        if (obj == this.current!.unload) {
-          this.reportProgress("Stopped");
-          if (this.current!.unload) {
-            this.current!.unload();
-          }
-        } else {
-          console.error('Timeout to unload failed to unload due to changed obj', obj, this.current)
+        this.reportProgress("Stopped");
+        if (obj.unload) {
+          obj.unload();
         }
       }, this.options.fadeRate * 1000 + 1000);
     }

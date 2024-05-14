@@ -1,3 +1,16 @@
+export type Action = {
+  id: string;
+image: string;
+alt: string;
+sortOrder: number;
+};
+
+interface State {
+  isPlaying: boolean,
+  isPlayingOnHeadphones: boolean,
+  actions: Set<Action>
+}
+
 class TandaElement extends HTMLElement {
   private expanded: boolean = false;
 
@@ -145,7 +158,14 @@ class TandaElement extends HTMLElement {
                     font-size: 1.5rem;
                     font-weight: bold;
                 }
-                .details { display: none; }
+                .details { 
+                  height: 0px; 
+                  overflow-y: hidden;
+                  transition: height 1s ease-in-out;
+                }
+                #container {
+                  width: 100%;
+                }
                 #container article {
                     border: solid 2px #ccc;
                     border-radius: 7px;
@@ -169,7 +189,7 @@ class TandaElement extends HTMLElement {
                     width: 20px;
                 }
                 .details.expanded {
-                    display: block;
+                    height: auto;
                 }
                 #container.moving article {
                     border: dashed 2px red;
@@ -249,7 +269,7 @@ class TandaElement extends HTMLElement {
                             <span></span>${summary}   
                         </main>
                     </div>
-                    <div class="details">   
+                    <div class="details ${this.expanded ? "expanded" : ""}">   
                         <slot></slot>                 
                     </div>
                 </article>
