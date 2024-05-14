@@ -144,7 +144,7 @@ class TrackElement extends HTMLElement {
         button {
             background-color: transparent;
             border: none;
-            padding: 0px 10px 0px 0px;
+            margin-right: 10px;
         }
         img {
             height: 20px;
