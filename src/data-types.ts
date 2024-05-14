@@ -23,6 +23,7 @@ export interface Track extends BaseRecord {
           artist?: string;
           style?: string;
           year?: string;
+          date?: string;
         }
       },
       classifiers: Classifiers;

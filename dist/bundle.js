@@ -1175,7 +1175,7 @@
         button {
             background-color: transparent;
             border: none;
-            padding: 0px 10px 0px 0px;
+            margin-right: 10px;
         }
         img {
             height: 20px;
@@ -1199,7 +1199,7 @@
         <article class="cortina">
           <header>
             <button id="headphones" class="${this.isPlayingOnHeadphones ? "playing" : ""}"><img src="./icons/headphones-icon.png" alt="Listen on headphones"></button>
-            <h2>${this.getAttribute("title")}</h2>
+            <h2>(Cortina) ${this.getAttribute("title")}</h2>
           </header>
           <main>          
             <p>${this.getAttribute("style")} By ${this.getAttribute("artist")} Year ${this.getAttribute("year")} Duration: ${this.getAttribute("duration")}</p>
