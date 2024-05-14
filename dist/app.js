@@ -7,15 +7,15 @@ import { PlaylistService } from "./services/playlist-service";
 import { DatabaseManager, convert, } from "./services/database";
 import { fetchLibraryFiles, getAllFiles, openMusicFolder, } from "./services/file-system";
 import { TabsContainer } from "./components/tabs.component";
-import { decodeFFmpegOutput, initializeFFmpeg, runFFmpegCommand } from "./services/ffmpeg-interface";
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/service-worker.js')
-            .then(registration => {
-            console.log('Service Worker registered:', registration);
+if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+        navigator.serviceWorker
+            .register("/service-worker.js")
+            .then((registration) => {
+            console.log("Service Worker registered:", registration);
         })
-            .catch(error => {
-            console.error('Service Worker registration failed:', error);
+            .catch((error) => {
+            console.error("Service Worker registration failed:", error);
         });
     });
 }
@@ -65,73 +65,101 @@ async function getSystemLevel(dbManager) {
     console.log("Fetched all files", files.length, "Lowest gain", systemLowestGain);
     return systemLowestGain;
 }
-async function readMetadataFromFileHandle(fileHandle) {
-    try {
-        const { convertedFile, outputLines } = (await runFFmpegCommand(fileHandle, '-map', '0:a', '-af', 'volumedetect,silencedetect=n=-60dB:d=1', '-f', 'null', '-'));
-        const metadata = decodeFFmpegOutput(outputLines);
-        return { size: convertedFile.byteLength, metadata };
+// Event listener to receive messages from the child frame
+window.addEventListener("message", (event) => {
+    if (event.origin !== window.origin)
+        return; // Security check
+    const data = event.data;
+    if (data.type === "ffmpeg_output") {
+        console.log("Received FFmpeg output from child:", data);
     }
-    catch (error) {
-        console.error('Failed to read metadata:', error);
-        return { size: 0, metadata: {} };
-    }
-}
+});
 // Find all song files and add to the database any not yet known
 async function scanFileSystem(config, dbManager, analyze) {
     try {
-        await initializeFFmpeg();
-    }
-    catch (error) {
-        alert('Unable to scan files - FFmpeg is not initialising correctly, ' + error);
-        throw error;
-    }
-    const scanProgress = getDomElement("#scanProgress");
-    const scanFilePath = getDomElement("#scanFilePath");
-    let files = await getAllFiles(config.musicFolder);
-    // Store all changes
-    let n = 0;
-    for (const file of files) {
-        let indexFileName = convert(file.relativeFileName);
-        scanFilePath.textContent = file.relativeFileName;
-        scanProgress.textContent = ++n + "/" + files.length;
-        const table = indexFileName.split(/\/|\\/g)[1] == "music" ? "track" : "cortina";
-        let original = (await dbManager.getDataByName(table, indexFileName));
-        if (!original || analyze) {
-            const baseFile = await file.fileHandle.getFile();
-            if (baseFile.size > 1000) {
-                let size = baseFile.size;
-                let metadata = {
-                    start: 0,
-                    end: -1,
-                    duration: undefined,
-                    meanVolume: -20,
-                    maxVolume: 0,
-                    tags: { title: indexFileName, artist: "unknown" },
-                };
-                if (analyze) {
-                    let result = await readMetadataFromFileHandle(file.fileHandle);
-                    size = result.size;
-                    metadata = result.metadata;
-                }
+        async function analyzeBatch(fileHandles) {
+            // Create an iframe containing the ffmpeg code
+            let iframe; // Track reference to iframe
+            iframe = document.createElement("iframe");
+            iframe.src = "child.html";
+            document.getElementById("iframeContainer").appendChild(iframe);
+            // Wait for the FFmpeg module to be initialised
+            await new Promise((resolve) => {
+                iframe.addEventListener("load", () => {
+                    resolve(null);
+                });
+            });
+            //@ts-ignore
+            let results = await iframe.contentWindow.readMetadataFromFileHandle(fileHandles);
+            // Tear down the FFmpeg module to free resources
+            if (iframe) {
+                console.log("Cleaning up FFmpeg resources...");
+                // Remove iframe from DOM
+                iframe.remove();
+            }
+            return results;
+        }
+        const scanProgress = getDomElement("#scanProgress");
+        const scanFilePath = getDomElement("#scanFilePath");
+        let files = await getAllFiles(config.musicFolder);
+        function splitArrayIntoBatches(array, batchSize) {
+            const batches = [];
+            for (let i = 0; i < array.length; i += batchSize) {
+                batches.push(array.slice(i, i + batchSize));
+            }
+            return batches;
+        }
+        let batchSize = 20;
+        const batches = splitArrayIntoBatches(files, batchSize);
+        let n = 0;
+        for (const batch of batches) {
+            let analysis;
+            if (analyze) {
+                // Get results on a one-to-one match to the batch
+                analysis = await analyzeBatch(batch.map((item) => item.fileHandle));
+            }
+            for (let batchIdx = 0; batchIdx < batch.length; batchIdx++) {
+                const item = batch[batchIdx];
+                let indexFileName = convert(item.relativeFileName);
+                // Keep user informed as this will take a long time
+                scanFilePath.textContent = item.relativeFileName;
+                scanProgress.textContent = ++n + "/" + files.length;
+                const table = indexFileName.split(/\/|\\/g)[1] == "music" ? "track" : "cortina";
+                // Look up filename to see if we already have a trackid for it
+                let { id } = (await dbManager.getDataByName(table, indexFileName));
+                // Create new version of the record
+                let metadata = analysis
+                    ? analysis
+                    : {
+                        start: 0,
+                        end: -1,
+                        duration: undefined,
+                        meanVolume: -20,
+                        maxVolume: 0,
+                        tags: { title: indexFileName, artist: "unknown" },
+                    };
                 const newData = {
                     type: table,
                     name: indexFileName,
-                    fileHandle: file.fileHandle,
+                    fileHandle: item.fileHandle,
                     metadata,
                     classifiers: {
                         favourite: true,
                     },
                 };
-                if (!original) {
+                if (!id) {
                     await dbManager.addData(table, newData);
                 }
                 else {
-                    await dbManager.updateData(table, original.id, newData);
+                    await dbManager.updateData(table, id, newData);
                 }
             }
         }
+        console.log("Have now updated the database with all tracks");
     }
-    console.log("Have now updated the database with all tracks");
+    catch (error) {
+        console.error(error);
+    }
 }
 async function loadLibraryIntoDB(config, dbManager) {
     const scanProgress = getDomElement("#scanProgress");
@@ -256,7 +284,7 @@ async function enumerateOutputDevices() {
 async function populateOutputDeviceOptions(config) {
     const outputDevices = await enumerateOutputDevices();
     function fillOptions(current, target) {
-        target.innerHTML = '';
+        target.innerHTML = "";
         outputDevices.forEach((device) => {
             const option = document.createElement("option");
             option.value = device.deviceId;
@@ -283,9 +311,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     let config = await InitialiseConfig(dbManager);
     // Setup the quick key click to function mappings
     let quickClickHandlers = {
-        askUserPermission: async () => {
-            runApplication(dbManager, config);
-        },
         rescanButton: () => {
             scanFileSystem(config, dbManager, false);
         },
@@ -349,14 +374,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         console.log("Audio Setting: ", config);
         eventBus.emit("change-headphones", selectedDeviceId);
     });
+    // Everything is now setup so run the app.
+    await runApplication(dbManager, config);
 });
 async function runApplication(dbManager, config) {
     await openMusicFolder(dbManager, config);
     // await verifyPermission(config.musicFolder, 'readonly')
-    // Remove modal window and start application
-    const modal = getDomElement("#permissionModal");
-    modal.classList.add("hidden");
-    // (getDomElement("#rescanButton") as HTMLElement).click();
     // Scan all files in database to find system's lowest gain for normalisation purposes
     let systemLowestGain = await getSystemLevel(dbManager);
     let fadeRate = 3;
@@ -430,7 +453,9 @@ async function runApplication(dbManager, config) {
         else {
             Array.from(getDomElement("#playlistContainer").querySelectorAll(".playingOnHeadphones")).map((x) => x.classList.remove("playingOnHeadphones"));
             track.classList.add("playingOnHeadphones");
-            const table = track.getAttribute('title').split(/\/|\\/g)[1] == "music" ? "track" : "cortina";
+            const table = track.getAttribute("title").split(/\/|\\/g)[1] == "music"
+                ? "track"
+                : "cortina";
             headphonePlaylist[0] = (await dbManager.getDataById(table, parseInt(track.getAttribute("trackid"))));
             headphonesOutputPlayer.stop();
             await headphonesOutputPlayer.updatePosition(-1);

@@ -14,43 +14,93 @@ export class PlaylistService {
     async setTandas(tandaList) {
         this.tandaList = tandaList;
         await this.extractTracks();
-        eventBus.emit("new-playlist");
-        this.container.innerHTML = (await Promise.all(this.tandaList.map(async (tanda, idx) => {
-            const cortinaElement = tanda.cortina
-                ? (async () => {
-                    let track = await this.getDetail("cortina", tanda.cortina);
-                    let year = track.metadata?.tags?.year;
-                    if (year) {
-                        year = year.substring(0, 4);
-                    }
-                    return `<cortina-element
-                                tandaid="${idx}"
-                                trackid="${String(track.id)}" 
-                                style="${track.metadata?.tags?.style}" 
-                                title="${track.metadata?.tags?.title}" 
-                                artist="${track.metadata?.tags?.artist}"
-                                year="${year}"></cortina-element>`;
-                })()
-                : "";
-            const trackElements = await Promise.all(tanda.tracks.map(async (trackName) => {
+        const virtualList = document.createElement("virtual-scroll-list");
+        virtualList.setAttribute("item-height", "50");
+        virtualList.setAttribute("total-items", String(this.tandaList.length)); // Number of items
+        virtualList.setRenderFunction(async (tanda, idx) => {
+            const tandaElement = document.createElement('tanda-element');
+            tandaElement.setAttribute('style', tanda.style);
+            if (tanda.cortina) {
+                let track = await this.getDetail("cortina", tanda.cortina);
+                let year = track.metadata?.tags?.year;
+                if (year) {
+                    year = year.substring(0, 4);
+                }
+                const cortinaElement = document.createElement('cortina-element');
+                cortinaElement.setAttribute('tandaid', String(idx));
+                cortinaElement.setAttribute('trackid', String(track.id));
+                cortinaElement.setAttribute('style', track.metadata?.tags?.style);
+                cortinaElement.setAttribute('title', track.metadata?.tags?.title);
+                cortinaElement.setAttribute('artist', track.metadata?.tags?.artist);
+                cortinaElement.setAttribute('year', year);
+                tandaElement.appendChild(cortinaElement);
+            }
+            tanda.tracks.map(async (trackName) => {
                 let track = await this.getDetail("track", trackName);
                 let year = track.metadata?.tags?.year;
                 if (year) {
                     year = year.substring(0, 4);
                 }
-                return `<track-element 
-                            tandaid="${idx}"
-                            trackid="${String(track.id)}" 
-                            style="${track.metadata?.tags?.style}" 
-                            title="${track.metadata?.tags?.title}" 
-                            artist="${track.metadata?.tags?.artist}"
-                            year="${year}"></track-element>`;
-            }));
-            return `<tanda-element style='unknown'>
-                        ${await cortinaElement}
-                        ${trackElements.join("")}
-                    </tanda-element>`;
-        }))).join("");
+                const trackElement = document.createElement('track-element');
+                trackElement.setAttribute('tandaid', String(idx));
+                trackElement.setAttribute('trackid', String(track.id));
+                trackElement.setAttribute('style', track.metadata?.tags?.style);
+                trackElement.setAttribute('title', track.metadata?.tags?.title);
+                trackElement.setAttribute('artist', track.metadata?.tags?.artist);
+                trackElement.setAttribute('year', year);
+                tandaElement.appendChild(trackElement);
+            });
+            return tandaElement;
+        });
+        virtualList.setItems(this.tandaList);
+        this.container.innerHTML = "";
+        this.container.appendChild(virtualList);
+        /*    eventBus.emit("new-playlist");
+        this.container.innerHTML = (
+          await Promise.all(
+            this.tandaList.map(async (tanda: Tanda, idx: number) => {
+              const cortinaElement = tanda.cortina
+                ? (async () => {
+                    let track = await this.getDetail("cortina", tanda.cortina);
+                    let year = track.metadata?.tags?.year!;
+                    if (year) {
+                      year = year.substring(0, 4);
+                    }
+                    return `<cortina-element
+                                    tandaid="${idx}"
+                                    trackid="${String(track.id)}"
+                                    style="${track.metadata?.tags?.style!}"
+                                    title="${track.metadata?.tags?.title!}"
+                                    artist="${track.metadata?.tags?.artist!}"
+                                    year="${year}"></cortina-element>`;
+                  })()
+                : "";
+    
+              const trackElements = await Promise.all(
+                tanda.tracks.map(async (trackName: string) => {
+                  let track = await this.getDetail("track", trackName);
+                  let year = track.metadata?.tags?.year!;
+                  if (year) {
+                    year = year.substring(0, 4);
+                  }
+                  return `<track-element
+                                tandaid="${idx}"
+                                trackid="${String(track.id)}"
+                                style="${track.metadata?.tags?.style!}"
+                                title="${track.metadata?.tags?.title!}"
+                                artist="${track.metadata?.tags?.artist!}"
+                                year="${year}"></track-element>`;
+                })
+              );
+    
+              return `<tanda-element style='unknown'>
+                            ${await cortinaElement}
+                            ${trackElements.join("")}
+                        </tanda-element>`;
+            })
+          )
+        ).join("");
+        */
     }
     getTracks() {
         return this.trackList;

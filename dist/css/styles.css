@@ -348,3 +348,10 @@ label img {
   width: 40px;
   vertical-align: middle;
 }
+
+#iframeContainer {
+  position: absolute;
+  top: 0px;
+  bottom: 0px;
+  height: 0px;
+}

@@ -18,16 +18,16 @@ import {
   openMusicFolder,
 } from "./services/file-system";
 import { TabsContainer } from "./components/tabs.component";
-import { decodeFFmpegOutput, initializeFFmpeg, runFFmpegCommand } from "./services/ffmpeg-interface";
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js')
-      .then(registration => {
-        console.log('Service Worker registered:', registration);
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("/service-worker.js")
+      .then((registration) => {
+        console.log("Service Worker registered:", registration);
       })
-      .catch(error => {
-        console.error('Service Worker registration failed:', error);
+      .catch((error) => {
+        console.error("Service Worker registration failed:", error);
       });
   });
 }
@@ -97,17 +97,15 @@ async function getSystemLevel(
   return systemLowestGain;
 }
 
-async function readMetadataFromFileHandle(fileHandle: FileSystemFileHandle) {
-  try {
-      const { convertedFile, outputLines } = (await runFFmpegCommand(fileHandle, '-map', '0:a', '-af', 'volumedetect,silencedetect=n=-60dB:d=1', '-f', 'null', '-'))!
-      const metadata = decodeFFmpegOutput(outputLines);
-      return { size: convertedFile.byteLength, metadata };
-  } catch (error) {
-      console.error('Failed to read metadata:', error);
-      return { size: 0, metadata: {} }
-  }
-}
+// Event listener to receive messages from the child frame
+window.addEventListener("message", (event) => {
+  if (event.origin !== window.origin) return; // Security check
 
+  const data = event.data;
+  if (data.type === "ffmpeg_output") {
+    console.log("Received FFmpeg output from child:", data);
+  }
+});
 
 // Find all song files and add to the database any not yet known
 
@@ -116,70 +114,116 @@ async function scanFileSystem(
   dbManager: IndexedDBManager,
   analyze: boolean
 ) {
+  try {
+    async function analyzeBatch(
+      fileHandles: FileSystemFileHandle[]
+    ): Promise<any> {
+      // Create an iframe containing the ffmpeg code
 
-  try{
-    await initializeFFmpeg();
-  }
-  catch(error){
-    alert('Unable to scan files - FFmpeg is not initialising correctly, ' + error)
-    throw error
-  }
+      let iframe: HTMLIFrameElement; // Track reference to iframe
+      iframe = document.createElement("iframe");
+      iframe.src = "child.html";
+      document.getElementById("iframeContainer")!.appendChild(iframe);
 
-  const scanProgress = getDomElement("#scanProgress");
-  const scanFilePath = getDomElement("#scanFilePath");
+      // Wait for the FFmpeg module to be initialised
 
-  let files = await getAllFiles(
-    config.musicFolder as FileSystemDirectoryHandle
-  );
+      await new Promise((resolve) => {
+        iframe.addEventListener("load", () => {
+          resolve(null);
+        });
+      });
 
-  // Store all changes
+      //@ts-ignore
+      let results = await iframe.contentWindow!.readMetadataFromFileHandle(fileHandles)
 
-  let n = 0;
-  for (const file of files) {
-    let indexFileName = convert(file.relativeFileName);
-    scanFilePath.textContent = file.relativeFileName;
-    scanProgress.textContent = ++n + "/" + files.length;
-    const table =
-      indexFileName.split(/\/|\\/g)[1] == "music" ? "track" : "cortina";
-    let original: Track = (await dbManager.getDataByName(
-      table,
-      indexFileName
-    )) as Track;
-    if (!original || analyze) {
-      const baseFile = await file.fileHandle.getFile();
-      if (baseFile.size > 1000) {
-        let size = baseFile.size;
-        let metadata: any = {
-          start: 0,
-          end: -1,
-          duration: undefined,
-          meanVolume: -20,
-          maxVolume: 0,
-          tags: { title: indexFileName, artist: "unknown" },
-        };
-        if (analyze) {
-            let result = await readMetadataFromFileHandle(file.fileHandle)
-            size = result.size
-            metadata = result.metadata
-        }
+      // Tear down the FFmpeg module to free resources
+
+      if (iframe) {
+        console.log("Cleaning up FFmpeg resources...");
+        // Remove iframe from DOM
+        iframe.remove();
+      }
+
+      return results;
+    }
+    const scanProgress = getDomElement("#scanProgress");
+    const scanFilePath = getDomElement("#scanFilePath");
+
+    let files = await getAllFiles(
+      config.musicFolder as FileSystemDirectoryHandle
+    );
+
+    function splitArrayIntoBatches<T>(array: T[], batchSize: number): T[][] {
+      const batches: T[][] = [];
+      for (let i = 0; i < array.length; i += batchSize) {
+        batches.push(array.slice(i, i + batchSize));
+      }
+      return batches;
+    }
+
+    let batchSize = 20;
+    const batches = splitArrayIntoBatches(files, batchSize);
+
+    let n = 0;
+    for (const batch of batches) {
+      let analysis;
+      if (analyze) {
+        // Get results on a one-to-one match to the batch
+        analysis = await analyzeBatch(batch.map((item) => item.fileHandle));
+      }
+      for (let batchIdx = 0; batchIdx < batch.length; batchIdx++) {
+        const item = batch[batchIdx];
+        let indexFileName = convert(item.relativeFileName);
+
+        // Keep user informed as this will take a long time
+        scanFilePath.textContent = item.relativeFileName;
+        scanProgress.textContent = ++n + "/" + files.length;
+
+        const table =
+          indexFileName.split(/\/|\\/g)[1] == "music" ? "track" : "cortina";
+
+        // Look up filename to see if we already have a trackid for it
+
+        let { id }: Track = (await dbManager.getDataByName(
+          table,
+          indexFileName
+        )) as Track;
+
+        // Create new version of the record
+
+        let metadata: any = analysis
+          ? analysis
+          : {
+              start: 0,
+              end: -1,
+              duration: undefined,
+              meanVolume: -20,
+              maxVolume: 0,
+              tags: { title: indexFileName, artist: "unknown" },
+            };
+
         const newData: Track = {
           type: table,
           name: indexFileName,
-          fileHandle: file.fileHandle,
+          fileHandle: item.fileHandle,
           metadata,
           classifiers: {
             favourite: true,
           },
+        };
+
+        if (!id) {
+          await dbManager.addData(table, newData);
+        } else {
+          await dbManager.updateData(table, id!, newData);
         }
-        if ( !original ){
-        await dbManager.addData(table, newData);
-      } else {
-        await dbManager.updateData(table, original.id!, newData)
-      }
       }
     }
+
+    console.log("Have now updated the database with all tracks");
+  } catch (error) {
+    console.error(error);
   }
-  console.log("Have now updated the database with all tracks");
 }
 
 async function loadLibraryIntoDB(
@@ -337,7 +381,7 @@ async function populateOutputDeviceOptions(config: ConfigOptions) {
   const outputDevices = await enumerateOutputDevices();
 
   function fillOptions(current: string, target: HTMLElement) {
-    target.innerHTML = '';
+    target.innerHTML = "";
     outputDevices.forEach((device) => {
       const option = document.createElement("option");
       option.value = device.deviceId;
@@ -348,7 +392,10 @@ async function populateOutputDeviceOptions(config: ConfigOptions) {
   }
 
   fillOptions(config.mainOutput!, getDomElement("#speaker-output-devices"));
-  fillOptions(config.headphoneOutput!, getDomElement("#headphones-output-devices"));
+  fillOptions(
+    config.headphoneOutput!,
+    getDomElement("#headphones-output-devices")
+  );
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -371,9 +418,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Setup the quick key click to function mappings
 
   let quickClickHandlers: { [key: string]: EventListener } = {
-    askUserPermission: async () => {
-      runApplication(dbManager, config);
-    },
     rescanButton: () => {
       scanFileSystem(config, dbManager, false);
     },
@@ -399,7 +443,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       await loadLibraryIntoDB(config, dbManager);
     },
     refreshAudioLists: () => {
-      populateOutputDeviceOptions(config)
+      populateOutputDeviceOptions(config);
     },
   };
 
@@ -461,6 +505,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     console.log("Audio Setting: ", config);
     eventBus.emit("change-headphones", selectedDeviceId);
   });
+
+  // Everything is now setup so run the app.
+  await runApplication(dbManager, config);
 });
 
 async function runApplication(
@@ -469,13 +516,6 @@ async function runApplication(
 ) {
   await openMusicFolder(dbManager, config);
   // await verifyPermission(config.musicFolder, 'readonly')
-
-  // Remove modal window and start application
-
-  const modal = getDomElement("#permissionModal");
-  modal.classList.add("hidden");
-
-  // (getDomElement("#rescanButton") as HTMLElement).click();
 
   // Scan all files in database to find system's lowest gain for normalisation purposes
 
@@ -526,15 +566,15 @@ async function runApplication(
     systemLowestGain,
     fadeRate: 0.5,
     fetchNext: async (N: number) => {
-      if ( N == 0 ){
-      console.log("Headphones next", {
-        track: headphonePlaylist[0],
-        silence: 0,
-      });
-      return { track: headphonePlaylist[0], silence: 0 };
-    } else {
-      return { track: undefined, silence: 0}
-    }
+      if (N == 0) {
+        console.log("Headphones next", {
+          track: headphonePlaylist[0],
+          silence: 0,
+        });
+        return { track: headphonePlaylist[0], silence: 0 };
+      } else {
+        return { track: undefined, silence: 0 };
+      }
     },
   };
 
@@ -566,7 +606,10 @@ async function runApplication(
         )
       ).map((x) => x.classList.remove("playingOnHeadphones"));
       track.classList.add("playingOnHeadphones");
-      const table = track.getAttribute('title').split(/\/|\\/g)[1] == "music" ? "track" : "cortina";
+      const table =
+        track.getAttribute("title").split(/\/|\\/g)[1] == "music"
+          ? "track"
+          : "cortina";
       headphonePlaylist[0] = (await dbManager.getDataById(
         table,
         parseInt(track.getAttribute("trackid"))
@@ -575,7 +618,7 @@ async function runApplication(
       await headphonesOutputPlayer.updatePosition(-1);
       console.log(headphonesOutputPlayer.next);
       headphonesOutputPlayer.startNext();
-      headphonePlaylist = []
+      headphonePlaylist = [];
     }
   });
 

@@ -1365,41 +1365,47 @@
     async setTandas(tandaList) {
       this.tandaList = tandaList;
       await this.extractTracks();
-      eventBus.emit("new-playlist");
-      this.container.innerHTML = (await Promise.all(this.tandaList.map(async (tanda, idx) => {
-        const cortinaElement = tanda.cortina ? (async () => {
+      const virtualList = document.createElement("virtual-scroll-list");
+      virtualList.setAttribute("item-height", "50");
+      virtualList.setAttribute("total-items", String(this.tandaList.length));
+      virtualList.setRenderFunction(async (tanda, idx) => {
+        const tandaElement = document.createElement("tanda-element");
+        tandaElement.setAttribute("style", tanda.style);
+        if (tanda.cortina) {
           let track = await this.getDetail("cortina", tanda.cortina);
           let year = track.metadata?.tags?.year;
           if (year) {
             year = year.substring(0, 4);
           }
-          return `<cortina-element
-                                tandaid="${idx}"
-                                trackid="${String(track.id)}" 
-                                style="${track.metadata?.tags?.style}" 
-                                title="${track.metadata?.tags?.title}" 
-                                artist="${track.metadata?.tags?.artist}"
-                                year="${year}"></cortina-element>`;
-        })() : "";
-        const trackElements = await Promise.all(tanda.tracks.map(async (trackName) => {
+          const cortinaElement = document.createElement("cortina-element");
+          cortinaElement.setAttribute("tandaid", String(idx));
+          cortinaElement.setAttribute("trackid", String(track.id));
+          cortinaElement.setAttribute("style", track.metadata?.tags?.style);
+          cortinaElement.setAttribute("title", track.metadata?.tags?.title);
+          cortinaElement.setAttribute("artist", track.metadata?.tags?.artist);
+          cortinaElement.setAttribute("year", year);
+          tandaElement.appendChild(cortinaElement);
+        }
+        tanda.tracks.map(async (trackName) => {
           let track = await this.getDetail("track", trackName);
           let year = track.metadata?.tags?.year;
           if (year) {
             year = year.substring(0, 4);
           }
-          return `<track-element 
-                            tandaid="${idx}"
-                            trackid="${String(track.id)}" 
-                            style="${track.metadata?.tags?.style}" 
-                            title="${track.metadata?.tags?.title}" 
-                            artist="${track.metadata?.tags?.artist}"
-                            year="${year}"></track-element>`;
-        }));
-        return `<tanda-element style='unknown'>
-                        ${await cortinaElement}
-                        ${trackElements.join("")}
-                    </tanda-element>`;
-      }))).join("");
+          const trackElement = document.createElement("track-element");
+          trackElement.setAttribute("tandaid", String(idx));
+          trackElement.setAttribute("trackid", String(track.id));
+          trackElement.setAttribute("style", track.metadata?.tags?.style);
+          trackElement.setAttribute("title", track.metadata?.tags?.title);
+          trackElement.setAttribute("artist", track.metadata?.tags?.artist);
+          trackElement.setAttribute("year", year);
+          tandaElement.appendChild(trackElement);
+        });
+        return tandaElement;
+      });
+      virtualList.setItems(this.tandaList);
+      this.container.innerHTML = "";
+      this.container.appendChild(virtualList);
     }
     getTracks() {
       return this.trackList;
@@ -1788,164 +1794,6 @@
     }
   };
 
-  // dist/services/ffmpeg-interface.js
-  var FFmpeg = window.FFmpeg;
-  var { createFFmpeg } = FFmpeg;
-  var ffmpeg;
-  var initializeFFmpeg = async () => {
-    ffmpeg = createFFmpeg({ log: true });
-    await ffmpeg.load();
-    console.log("FFmpeg initialized - terminate?", ffmpeg.terminate);
-  };
-  async function readFile(fileHandle) {
-    try {
-      const file = await fileHandle.getFile();
-      const contents = await file.arrayBuffer();
-      return contents;
-    } catch (error) {
-      console.error("Error reading file:", error);
-      return void 0;
-    }
-  }
-  async function readFileContents(fileHandle) {
-    let contents;
-    try {
-      contents = await readFile(fileHandle);
-      if (!contents) {
-        console.log("Failed to read file");
-      } else {
-        console.log("File read successfully", contents);
-        const uint8Array = new Uint8Array(contents);
-        console.log("Got unit8 array", uint8Array.byteLength);
-        contents = uint8Array;
-      }
-    } catch (error) {
-      console.error("Error reading file contents:", error);
-    }
-    console.log("Read file size: ", contents?.byteLength);
-    return contents;
-  }
-  var totalCalls = 0;
-  var runFFmpegCommand = async (fileHandle, ...args) => {
-    console.log("FFMPEG call ", totalCalls);
-    totalCalls++;
-    if (totalCalls % 50 === 0) {
-      console.log("RE-INITIALISING FFMPEG");
-      ffmpeg.terminate();
-      setTimeout(async () => {
-        await initializeFFmpeg();
-      }, 1e3);
-    }
-    try {
-      const fileData = await readFileContents(fileHandle);
-      if (!fileData || fileData.byteLength < 1e3) {
-        console.log("Too small");
-        return;
-      }
-      await ffmpeg.FS("writeFile", fileHandle.name, fileData);
-      const originalConsoleLog = console.log;
-      const outputLines = [];
-      console.log = function(message) {
-        if (message && message.startsWith("[fferr]")) {
-          originalConsoleLog.apply(console, arguments);
-          outputLines.push(message);
-        } else {
-          originalConsoleLog.apply(console, arguments);
-        }
-      };
-      const ffmpegArgs = args.length > 0 ? ["-i", fileHandle.name, ...args, "output.wav"] : ["-i", fileHandle.name, "output.wav"];
-      await ffmpeg.run(...ffmpegArgs);
-      console.log = originalConsoleLog;
-      const convertedFile = await ffmpeg.FS("readFile", "output.wav");
-      await ffmpeg.FS("unlink", fileHandle.name);
-      await ffmpeg.FS("unlink", "output.wav");
-      return { convertedFile, outputLines };
-    } catch (error) {
-      console.error("Error running FFmpeg command:", error);
-    }
-  };
-  function timeStringToSeconds(timeString) {
-    const [hours, minutes, secondsWithMillis] = timeString.split(":");
-    const [seconds, milliseconds] = secondsWithMillis.split(".");
-    const hoursInSeconds = parseInt(hours) * 3600;
-    const minutesInSeconds = parseInt(minutes) * 60;
-    const secondsTotal = parseInt(seconds);
-    const millisecondsTotal = parseInt(milliseconds) / 100;
-    const totalTimeInSeconds = hoursInSeconds + minutesInSeconds + secondsTotal + millisecondsTotal;
-    return totalTimeInSeconds;
-  }
-  var decodeFFmpegOutput = (outputLines) => {
-    let silenceStartFinishes = 0;
-    let silenceEndCommences = 0;
-    let duration = 0;
-    let meanVolume = 0;
-    let maxVolume = 0;
-    let tags = {};
-    let tagsContext = "";
-    for (const line of outputLines) {
-      console.log(line);
-      if (tagsContext === "" && line.match(/Output.*to 'pipe:'/)) {
-        tagsContext = "output";
-      }
-      if (tagsContext === "output" && line.match(/\[fferr\]     /)) {
-        const tagName = line.substring("fferr]     ".length).split(":")[0].trim();
-        const tagValue = line.split(":")[1].trim();
-        tags[tagName] = tagValue;
-      }
-      if (line.match(/Parsed_volumedetect_0.*_volume/)) {
-        console.log("GAIN ", line);
-        const tokens = line.split(" ");
-        console.log(tokens);
-        if (tokens[4] === "mean_volume:") {
-          meanVolume = parseFloat(tokens[5]);
-        }
-        if (tokens[4] === "max_volume:") {
-          maxVolume = parseFloat(tokens[5]);
-        }
-      }
-      if (line.match(/\[fferr\]   Duration: /i)) {
-        console.log("DURATION", line);
-        const tokens = line.split(" ");
-        console.log(tokens);
-        duration = timeStringToSeconds(tokens[4]);
-      }
-      if (line.match(/silencedetect @.* silence_start/)) {
-        console.log("SILENCE START", line);
-        const tokens = line.split(" ");
-        console.log(tokens);
-        silenceEndCommences = parseFloat(tokens[5]);
-      }
-      if (line.match(/silencedetect @.* silence_end: .* | silence_duration: .*/)) {
-        console.log("SILENCE END", line);
-        const tokens = line.split(" ");
-        console.log(tokens);
-        let duration2 = parseFloat(tokens[8]);
-        let time = parseFloat(tokens[5]);
-        if (time < 10) {
-          silenceStartFinishes = time;
-        }
-      }
-    }
-    if (silenceEndCommences === 0) {
-      silenceEndCommences = duration;
-    }
-    if (silenceEndCommences < duration - 20) {
-      silenceEndCommences = duration;
-    }
-    console.log("Derived duration", duration);
-    console.log("Derived silence at start finishes @", silenceStartFinishes);
-    console.log("Derived silence at end starts @", silenceEndCommences);
-    const metadata = {
-      duration,
-      start: silenceStartFinishes,
-      end: silenceEndCommences,
-      meanVolume,
-      maxVolume,
-      tags
-    };
-    return metadata;
-  };
-
   // dist/app.js
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
@@ -1995,38 +1843,59 @@
     console.log("Fetched all files", files.length, "Lowest gain", systemLowestGain);
     return systemLowestGain;
   }
-  async function readMetadataFromFileHandle(fileHandle) {
-    try {
-      const { convertedFile, outputLines } = await runFFmpegCommand(fileHandle, "-map", "0:a", "-af", "volumedetect,silencedetect=n=-60dB:d=1", "-f", "null", "-");
-      const metadata = decodeFFmpegOutput(outputLines);
-      return { size: convertedFile.byteLength, metadata };
-    } catch (error) {
-      console.error("Failed to read metadata:", error);
-      return { size: 0, metadata: {} };
+  window.addEventListener("message", (event) => {
+    if (event.origin !== window.origin)
+      return;
+    const data = event.data;
+    if (data.type === "ffmpeg_output") {
+      console.log("Received FFmpeg output from child:", data);
     }
-  }
+  });
   async function scanFileSystem(config, dbManager, analyze) {
     try {
-      await initializeFFmpeg();
-    } catch (error) {
-      alert("Unable to scan files - FFmpeg is not initialising correctly, " + error);
-      throw error;
-    }
-    const scanProgress = getDomElement("#scanProgress");
-    const scanFilePath = getDomElement("#scanFilePath");
-    let files = await getAllFiles(config.musicFolder);
-    let n = 0;
-    for (const file of files) {
-      let indexFileName = convert(file.relativeFileName);
-      scanFilePath.textContent = file.relativeFileName;
-      scanProgress.textContent = ++n + "/" + files.length;
-      const table = indexFileName.split(/\/|\\/g)[1] == "music" ? "track" : "cortina";
-      let original = await dbManager.getDataByName(table, indexFileName);
-      if (!original || analyze) {
-        const baseFile = await file.fileHandle.getFile();
-        if (baseFile.size > 1e3) {
-          let size = baseFile.size;
-          let metadata = {
+      let splitArrayIntoBatches = function(array, batchSize2) {
+        const batches2 = [];
+        for (let i = 0; i < array.length; i += batchSize2) {
+          batches2.push(array.slice(i, i + batchSize2));
+        }
+        return batches2;
+      };
+      async function analyzeBatch(fileHandles) {
+        let iframe;
+        iframe = document.createElement("iframe");
+        iframe.src = "child.html";
+        document.getElementById("iframeContainer").appendChild(iframe);
+        await new Promise((resolve) => {
+          iframe.addEventListener("load", () => {
+            resolve(null);
+          });
+        });
+        let results = await iframe.contentWindow.readMetadataFromFileHandle(fileHandles);
+        if (iframe) {
+          console.log("Cleaning up FFmpeg resources...");
+          iframe.remove();
+        }
+        return results;
+      }
+      const scanProgress = getDomElement("#scanProgress");
+      const scanFilePath = getDomElement("#scanFilePath");
+      let files = await getAllFiles(config.musicFolder);
+      let batchSize = 20;
+      const batches = splitArrayIntoBatches(files, batchSize);
+      let n = 0;
+      for (const batch of batches) {
+        let analysis;
+        if (analyze) {
+          analysis = await analyzeBatch(batch.map((item) => item.fileHandle));
+        }
+        for (let batchIdx = 0; batchIdx < batch.length; batchIdx++) {
+          const item = batch[batchIdx];
+          let indexFileName = convert(item.relativeFileName);
+          scanFilePath.textContent = item.relativeFileName;
+          scanProgress.textContent = ++n + "/" + files.length;
+          const table = indexFileName.split(/\/|\\/g)[1] == "music" ? "track" : "cortina";
+          let { id } = await dbManager.getDataByName(table, indexFileName);
+          let metadata = analysis ? analysis : {
             start: 0,
             end: -1,
             duration: void 0,
@@ -2034,29 +1903,26 @@
             maxVolume: 0,
             tags: { title: indexFileName, artist: "unknown" }
           };
-          if (analyze) {
-            let result = await readMetadataFromFileHandle(file.fileHandle);
-            size = result.size;
-            metadata = result.metadata;
-          }
           const newData = {
             type: table,
             name: indexFileName,
-            fileHandle: file.fileHandle,
+            fileHandle: item.fileHandle,
             metadata,
             classifiers: {
               favourite: true
             }
           };
-          if (!original) {
+          if (!id) {
             await dbManager.addData(table, newData);
           } else {
-            await dbManager.updateData(table, original.id, newData);
+            await dbManager.updateData(table, id, newData);
           }
         }
       }
+      console.log("Have now updated the database with all tracks");
+    } catch (error) {
+      console.error(error);
     }
-    console.log("Have now updated the database with all tracks");
   }
   async function loadLibraryIntoDB(config, dbManager) {
     const scanProgress = getDomElement("#scanProgress");
@@ -2196,9 +2062,6 @@
     const dbManager = await DatabaseManager();
     let config = await InitialiseConfig(dbManager);
     let quickClickHandlers = {
-      askUserPermission: async () => {
-        runApplication(dbManager, config);
-      },
       rescanButton: () => {
         scanFileSystem(config, dbManager, false);
       },
@@ -2254,11 +2117,10 @@
       console.log("Audio Setting: ", config);
       eventBus.emit("change-headphones", selectedDeviceId);
     });
+    await runApplication(dbManager, config);
   });
   async function runApplication(dbManager, config) {
     await openMusicFolder(dbManager, config);
-    const modal = getDomElement("#permissionModal");
-    modal.classList.add("hidden");
     let systemLowestGain = await getSystemLevel(dbManager);
     let fadeRate = 3;
     const playlistService = new PlaylistService(getDomElement("#playlistContainer"), async (type, name) => {

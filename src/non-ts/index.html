@@ -21,6 +21,7 @@
     <script type="module" src="./components/playlist.element.js"></script>
     <script type="module" src="./components/scratch-pad.element.js"></script> -->
 
+    <script type="module" src="./components/virtual-scroller.component.js"></script>
     <script type="module" src="./components/track.element.js"></script>
     <script type="module" src="./events/event-bus.js"></script>
 </head>
@@ -31,6 +32,8 @@
         <h1>Tanda Player Lite</h1>
         <label>View: <select id="modeSelector"></select></label>
     </header>
+
+    <div id="iframeContainer"></div>
 
     <div id="settingsPanel" class="slideable-panel content hiddenPanel">
         <header>
@@ -69,8 +72,8 @@
             the
             "Export" feature first.</p>
         <button class="active" id="exportDatabase">Export Database</button>
-        <button class="active" id="rescanButton">Re-scan for new files only</button>
-        <button class="active" id="rescanAnalyzeButton">Re-Analyze</button>
+        <button class="active" id="rescanButton">Scan for new files only</button>
+        <button class="active" id="rescanAnalyzeButton">Scan and Analyze</button>
         <button class="active" id="deleteDBButton">Reset Database</button>
         <button class="active" id="loadLibraryButton">Open existing Tanda Player Library</button>
 
@@ -158,16 +161,6 @@
   <label>Volume: <input id="volume" type="range" min="0" max="100" step="0.1" value="100"></label> -->
     <div id="output"></div>
 
-    <div id="permissionModal" class="overlay">
-        <div class="modal">
-            <h2>Permission Request</h2>
-            <p>Tanda Player needs your permission to read your music files folder for all files. Please click 'Allow' to
-                continue.</p>
-            <button class="active" id="askUserPermission">Allow</button>
-        </div>
-    </div>
-
-    <script type="module" src="./lib/ffmpeg.min.js"></script>
     <script type="module" src="./bundle.js"></script>
     <script type="module" src="./lib/howler.min.js"></script>
 </body>
