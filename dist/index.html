@@ -18,14 +18,6 @@
     <link rel="manifest" href="./manifest.json">
     <link rel="stylesheet" href="./css/styles.css">
 
-    <!-- <script type="module" src="./components/file.element.js"></script>
-    <script type="module" src="./components/tanda.element.js"></script>
-    <script type="module" src="./components/playlist.element.js"></script>
-    <script type="module" src="./components/scratch-pad.element.js"></script> -->
-
-    <script type="module" src="./components/virtual-scroller.component.js"></script>
-    <script type="module" src="./components/track.element.js"></script>
-    <script type="module" src="./events/event-bus.js"></script>
 </head>
 
 <body>
@@ -169,8 +161,18 @@
   <label>Volume: <input id="volume" type="range" min="0" max="100" step="0.1" value="100"></label> -->
     <div id="output"></div>
 
-    <script type="module" src="./bundle.js"></script>
     <script type="module" src="./lib/howler.min.js"></script>
+    <script type="module" src="./bundle.js"></script>
+
+    <div id="permissionModal" class="overlay hidden">
+        <div class="modal">
+          <h2>Permission Request</h2>
+          <p>Tanda Player needs your permission to read your music files folder for all files. Please click 'Allow' to
+            continue.</p>
+          <button class="active" id="askUserPermission">Allow</button>
+        </div>
+      </div>
+
 </body>
 
 </html>

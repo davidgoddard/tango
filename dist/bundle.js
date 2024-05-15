@@ -722,146 +722,6 @@
   };
   var eventBus = new EventBus();
 
-  // dist/components/search.element.js
-  var SearchElement = class extends HTMLElement {
-    searchInput;
-    filterSelect;
-    tracksTab;
-    tandasTab;
-    tracksContent;
-    tandasContent;
-    tracksCount;
-    tandasCount;
-    constructor() {
-      super();
-      this.attachShadow({ mode: "open" });
-      this.shadowRoot.innerHTML = `
-        <style>
-          /* Add CSS styles here */
-          .tab-container {
-            display: flex;
-          }
-          .tab {
-            flex: 1;
-            text-align: center;
-            cursor: pointer;
-            padding: 8px;
-            border: 1px solid #ccc;
-            border-bottom: none;
-          }
-          .tab.active {
-            background-color: orange;
-          }
-          .content {
-            border: 1px solid #ccc;
-            padding: 16px;
-          }
-          .hidden {
-            display: none;
-          }
-          section {
-            display: grid;
-            grid-template-rows: auto auto 1fr;
-          }
-          .scrollable {
-            overflow-y: auto;
-          }
-        </style>
-        <section>
-          <div>
-            <label for="search-input">Search:</label>
-            <input type="text" id="search-input" placeholder="Enter search string">
-            <label for="filter-select">Style:</label>
-            <select id="filter-select">
-              <option value="all">All</option>
-              <option value="rock">Rock</option>
-              <option value="pop">Pop</option>
-              <option value="jazz">Jazz</option>
-              <!-- Add more options as needed -->
-            </select>
-          </div>
-          <div class="tab-container">
-            <div id="tracks-tab" class="tab active">Tracks (<span id="tracks-count">0</span>)</div>
-            <div id="tandas-tab" class="tab">Tandas (<span id="tandas-count">0</span>)</div>
-          </div>
-          <div class="scrollable">
-            <div id="tracks-content" class="content">
-              <!-- Content for tracks -->
-            </div>
-            <div id="tandas-content" class="content hidden">
-              <!-- Content for tandas -->
-            </div>
-          </div>
-        <section>`;
-      this.searchInput = this.shadowRoot.querySelector("#search-input");
-      this.filterSelect = this.shadowRoot.querySelector("#filter-select");
-      this.tracksTab = this.shadowRoot.querySelector("#tracks-tab");
-      this.tandasTab = this.shadowRoot.querySelector("#tandas-tab");
-      this.tracksContent = this.shadowRoot.querySelector("#tracks-content");
-      this.tandasContent = this.shadowRoot.querySelector("#tandas-content");
-      this.tracksCount = this.shadowRoot.querySelector("#tracks-count");
-      this.tandasCount = this.shadowRoot.querySelector("#tandas-count");
-      this.searchInput.addEventListener("input", this.handleSearch.bind(this));
-      this.filterSelect.addEventListener("change", this.handleFilter.bind(this));
-      this.tracksTab.addEventListener("click", () => this.showContent("tracks"));
-      this.tandasTab.addEventListener("click", () => this.showContent("tandas"));
-      this.tracksCount.textContent = "0";
-      this.tandasCount.textContent = "0";
-      eventBus.on("search-results", (results) => {
-        console.log(this, "received results", results);
-      });
-    }
-    focus() {
-      this.searchInput.focus();
-    }
-    // Method to handle search input
-    handleSearch() {
-      const searchData = this.searchInput.value.trim();
-      const selectedStyle = this.filterSelect.value;
-      eventBus.emit("query", { searchData, selectedStyle });
-    }
-    // Method to handle filter selection
-    handleFilter() {
-      this.handleSearch();
-    }
-    // Method to update search results
-    results(resultset) {
-      this.tracksCount.textContent = resultset.tracks.length.toString();
-      this.tandasCount.textContent = resultset.tandas.length.toString();
-      this.tracksContent.innerHTML = resultset.tracks.map((track) => `<track-element 
-            trackid="${track.id}"
-            title="${track.metadata?.tags?.title || track.name}"
-            artist="${track.metadata?.tags?.artist || "unknown"}"
-            year="${track.metadata?.tags?.year || "unknown"}"
-        ></track-element>`).join("");
-      this.tandasContent.innerHTML = JSON.stringify(resultset.tandas);
-      const tracks = this.tracksContent.querySelectorAll("track-element");
-      for (const track of tracks) {
-        const button = document.createElement("button");
-        button.innerHTML = '<img src="./icons/notepad.png" alt="copy to scratch pad">';
-        button.addEventListener("click", () => {
-          this.dispatchEvent(new CustomEvent("moveToScratchPad", { detail: track }));
-        });
-        track.shadowRoot.querySelector("article .actions").appendChild(button);
-      }
-    }
-    // Method to show content based on tab clicked
-    showContent(tab) {
-      if (tab === "tracks") {
-        this.tracksTab.classList.add("active");
-        this.tandasTab.classList.remove("active");
-        this.tracksContent.classList.remove("hidden");
-        this.tandasContent.classList.add("hidden");
-      } else {
-        this.tracksTab.classList.remove("active");
-        this.tandasTab.classList.add("active");
-        this.tracksContent.classList.add("hidden");
-        this.tandasContent.classList.remove("hidden");
-      }
-    }
-  };
-  customElements.define("search-element", SearchElement);
-
   // dist/components/tanda.element.js
   var TandaElement = class extends HTMLElement {
     expanded = false;
@@ -1103,45 +963,6 @@
   };
   customElements.define("tanda-element", TandaElement);
 
-  // dist/components/tabs.component.js
-  var TabsContainer = class {
-    container;
-    tabs;
-    constructor(container, tabs) {
-      this.container = container;
-      this.tabs = tabs;
-      this.render();
-    }
-    render() {
-      this.container.innerHTML = `
-  <ul class="tab-list" role="tablist">
-    ${this.tabs.map((label, idx) => {
-        return `<li class="tab ${idx == 0 ? "active" : ""}" id="tab${idx + 1}" role="tab">${label}</li>`;
-      }).join("")}
-  </ul>
-  <div class="tab-panels">
-    ${this.tabs.map((label, idx) => {
-        return `<div class="tab-panel ${idx == 0 ? "" : "hidden"}" id="tab${idx + 1}-panel" role="tabpanel">
-      <!-- Content for Tab ${idx + 1} -->
-      <search-element></search-element>
-    </div>
-`;
-      }).join("")}
-  </div>
-`;
-      const tabs = Array.from(this.container.querySelectorAll(".tab"));
-      const panels = Array.from(this.container.querySelectorAll(".tab-panel"));
-      tabs.map((tab, idx) => tab.addEventListener("click", () => {
-        tabs.forEach((tab2) => tab2.classList.remove("active"));
-        tab.classList.add("active");
-        const childPanel = panels[idx];
-        panels.forEach((panel) => panel.classList.add("hidden"));
-        childPanel.classList.remove("hidden");
-        childPanel.querySelector("search-element").focus();
-      }));
-    }
-  };
-
   // dist/components/cortina.element.js
   var CortinaElement = class extends HTMLElement {
     isPlayingOnHeadphones = false;
@@ -1222,14 +1043,331 @@
         this.isPlayingOnHeadphones = false;
         this.shadowRoot.querySelector("#headphones").classList.remove("playing");
       }
-      const emitEvent = new CustomEvent("playOnHeadphones", {
-        detail: { element: this, playing: this.isPlayingOnHeadphones },
-        bubbles: true
-      });
-      this.dispatchEvent(emitEvent);
+      eventBus.emit("playOnHeadphones", { element: this, playing: this.isPlayingOnHeadphones });
     }
   };
   customElements.define("cortina-element", CortinaElement);
+
+  // dist/components/search.element.js
+  var SearchElement = class extends HTMLElement {
+    searchInput;
+    filterSelect;
+    tracksTab;
+    tandasTab;
+    tracksContent;
+    tandasContent;
+    tracksCount;
+    tandasCount;
+    constructor() {
+      super();
+      this.attachShadow({ mode: "open" });
+      this.shadowRoot.innerHTML = `
+        <style>
+          /* Add CSS styles here */
+          .tab-container {
+            display: flex;
+          }
+          .tab {
+            flex: 1;
+            text-align: center;
+            cursor: pointer;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-bottom: none;
+          }
+          .tab.active {
+            background-color: orange;
+          }
+          .content {
+            border: 1px solid #ccc;
+            padding: 16px;
+          }
+          .hidden {
+            display: none;
+          }
+          section {
+            display: grid;
+            grid-template-rows: auto auto 1fr;
+          }
+          .scrollable {
+            overflow-y: auto;
+          }
+        </style>
+        <section>
+          <div>
+            <label for="search-input">Search:</label>
+            <input type="text" id="search-input" placeholder="Enter search string">
+            <label for="filter-select">Style:</label>
+            <select id="filter-select">
+              <option value="all">All</option>
+              <option value="rock">Rock</option>
+              <option value="pop">Pop</option>
+              <option value="jazz">Jazz</option>
+              <!-- Add more options as needed -->
+            </select>
+          </div>
+          <div class="tab-container">
+            <div id="tracks-tab" class="tab active">Tracks (<span id="tracks-count">0</span>)</div>
+            <div id="tandas-tab" class="tab">Tandas (<span id="tandas-count">0</span>)</div>
+          </div>
+          <div class="scrollable">
+            <div id="tracks-content" class="content">
+              <!-- Content for tracks -->
+            </div>
+            <div id="tandas-content" class="content hidden">
+              <!-- Content for tandas -->
+            </div>
+          </div>
+        <section>`;
+      this.searchInput = this.shadowRoot.querySelector("#search-input");
+      this.filterSelect = this.shadowRoot.querySelector("#filter-select");
+      this.tracksTab = this.shadowRoot.querySelector("#tracks-tab");
+      this.tandasTab = this.shadowRoot.querySelector("#tandas-tab");
+      this.tracksContent = this.shadowRoot.querySelector("#tracks-content");
+      this.tandasContent = this.shadowRoot.querySelector("#tandas-content");
+      this.tracksCount = this.shadowRoot.querySelector("#tracks-count");
+      this.tandasCount = this.shadowRoot.querySelector("#tandas-count");
+      this.searchInput.addEventListener("input", this.handleSearch.bind(this));
+      this.filterSelect.addEventListener("change", this.handleFilter.bind(this));
+      this.tracksTab.addEventListener("click", () => this.showContent("tracks"));
+      this.tandasTab.addEventListener("click", () => this.showContent("tandas"));
+      this.tracksCount.textContent = "0";
+      this.tandasCount.textContent = "0";
+      eventBus.on("queryResults", this.results.bind(this));
+    }
+    focus() {
+      this.searchInput.focus();
+    }
+    // Method to handle search input
+    handleSearch() {
+      const searchData = this.searchInput.value.trim();
+      const selectedStyle = this.filterSelect.value;
+      eventBus.emit("query", { searchData, selectedStyle });
+    }
+    // Method to handle filter selection
+    handleFilter() {
+      this.handleSearch();
+    }
+    // Method to update search results
+    results(resultset) {
+      this.tracksCount.textContent = resultset.tracks.length.toString();
+      this.tandasCount.textContent = resultset.tandas.length.toString();
+      this.tracksContent.innerHTML = resultset.tracks.map((track) => `<track-element 
+            trackid="${track.id}"
+            title="${track.metadata?.tags?.title || track.name}"
+            artist="${track.metadata?.tags?.artist || "unknown"}"
+            year="${track.metadata?.tags?.year || "unknown"}"
+        ></track-element>`).join("");
+      this.tandasContent.innerHTML = JSON.stringify(resultset.tandas);
+    }
+    // Method to show content based on tab clicked
+    showContent(tab) {
+      if (tab === "tracks") {
+        this.tracksTab.classList.add("active");
+        this.tandasTab.classList.remove("active");
+        this.tracksContent.classList.remove("hidden");
+        this.tandasContent.classList.add("hidden");
+      } else {
+        this.tracksTab.classList.remove("active");
+        this.tandasTab.classList.add("active");
+        this.tracksContent.classList.add("hidden");
+        this.tandasContent.classList.remove("hidden");
+      }
+    }
+  };
+  customElements.define("search-element", SearchElement);
+
+  // dist/components/track.element.js
+  var TrackElement = class extends HTMLElement {
+    isPlaying = false;
+    isPlayingOnHeadphones = false;
+    actions = /* @__PURE__ */ new Set();
+    constructor() {
+      super();
+      this.attachShadow({ mode: "open" });
+    }
+    connectedCallback() {
+      this.render();
+      this.shadowRoot.querySelector("#headphones").addEventListener("click", this.playOnHeadphones.bind(this));
+      this.shadowRoot.querySelector(".actions").addEventListener("click", this.handleTargetButtonClick.bind(this));
+      this.shadowRoot.querySelector("main").addEventListener("click", this.handleTrackClick.bind(this));
+    }
+    addAction(action) {
+      this.actions.add(action);
+    }
+    stopPlayingOnHeadphones() {
+      this.isPlayingOnHeadphones = false;
+      this.shadowRoot.querySelector("#headphones").classList.remove("playing");
+    }
+    playOnHeadphones(event) {
+      event.stopPropagation();
+      event.preventDefault();
+      console.log("Play on headphones", this);
+      if (!this.isPlayingOnHeadphones) {
+        this.isPlayingOnHeadphones = true;
+        this.shadowRoot.querySelector("#headphones").classList.add("playing");
+      } else {
+        this.isPlayingOnHeadphones = false;
+        this.shadowRoot.querySelector("#headphones").classList.remove("playing");
+      }
+      eventBus.emit("playOnHeadphones", { element: this, playing: this.isPlayingOnHeadphones });
+    }
+    handleTargetButtonClick(event) {
+      const targetButton = event.target?.closest("button.target");
+      if (targetButton) {
+        event.stopPropagation();
+        event.preventDefault();
+        const emitEvent = new CustomEvent("clickedTargetTrack", {
+          detail: { actionId: targetButton.id, element: this },
+          bubbles: true
+        });
+        this.dispatchEvent(emitEvent);
+      }
+    }
+    handleTrackClick() {
+      const trackId = this.getAttribute("trackid");
+      if (trackId) {
+        const event = new CustomEvent("clickedTrack", {
+          detail: this,
+          bubbles: true
+        });
+        this.dispatchEvent(event);
+      }
+    }
+    render() {
+      this.shadowRoot.innerHTML = `
+        <style>
+        * {
+            background-color:transparent;
+        }
+        .track {
+            padding: 0.4rem;
+        }
+        header {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+        }
+        h2 {
+            margin: 0px;
+            padding: 0px;
+            font-size: medium;
+        }
+        p {
+            padding: 0px;
+            margin: 0.2rem 0;
+        }
+        :host-context(track-element:nth-child(1n).playing) article{
+            border: solid 2px orange;
+            display: block;
+            border-radius: 5px;
+            background-color: #ffe000a6;
+        }
+        :host-context(track-element.selected) {
+            border: dashed 2px orange;
+            display: block;
+            border-radius: 5px;
+            background-color: #fffbdea6;
+            margin: 1rem;
+        }
+        :host-context(track-element:nth-child(2n)) article{
+            background-color: #ffffffa6;
+        }
+        :host-context(track-element:nth-child(2n+1)) article{
+            background-color: #f9ede1a6;
+        }
+        :host-context(track-element.target) button.target {
+            display: block;
+        }
+        button.target {
+            display: none;
+        }
+        button {
+            background-color: transparent;
+            border: none;
+            margin-right: 10px;
+        }
+        img {
+            height: 20px;
+            width: 20px;
+        }
+        section.actions {
+            float: right;
+        }
+        #headphones {
+            border: solid 2px transparent;
+        }
+        #headphones.playing {
+            background-color: #00800040;
+            border: solid 2px red;
+            border-radius: 100%;
+        }
+    </style>
+    <article class="track">
+        <section class="actions">
+        ${[...this.actions].sort((a, b) => {
+        return a.sortOrder - b.sortOrder;
+      }).map((action) => {
+        return `<button id="${action.id}"><img src="${action.image}" alt="${action.alt}"></button>`;
+      })}
+        </section>
+        <header>
+            <button id="headphones" class="${this.isPlayingOnHeadphones ? "playing" : ""}">
+                <img src="./icons/headphones-icon.png" alt="Listen on headphones">
+            </button><h2>${this.getAttribute("title")}</h2>
+        </header>
+        <main>
+            <p>                
+                <span class='style'>${this.getAttribute("style")}</span>
+                By <span class='artist'>${this.getAttribute("artist")}</span>
+                Year <span class='year'>${this.getAttribute("year")}</span>
+                Duration: <span class='duration'>${this.getAttribute("duration")}</span>
+            </p>
+        </main>
+    </article>
+        `;
+    }
+  };
+  customElements.define("track-element", TrackElement);
+
+  // dist/components/tabs.component.js
+  var TabsContainer = class {
+    container;
+    tabs;
+    constructor(container, tabs) {
+      this.container = container;
+      this.tabs = tabs;
+      this.render();
+    }
+    render() {
+      this.container.innerHTML = `
+  <ul class="tab-list" role="tablist">
+    ${this.tabs.map((label, idx) => {
+        return `<li class="tab ${idx == 0 ? "active" : ""}" id="tab${idx + 1}" role="tab">${label}</li>`;
+      }).join("")}
+  </ul>
+  <div class="tab-panels">
+    ${this.tabs.map((label, idx) => {
+        return `<div class="tab-panel ${idx == 0 ? "" : "hidden"}" id="tab${idx + 1}-panel" role="tabpanel">
+      <!-- Content for Tab ${idx + 1} -->
+      <search-element></search-element>
+    </div>
+`;
+      }).join("")}
+  </div>
+`;
+      const tabs = Array.from(this.container.querySelectorAll(".tab"));
+      const panels = Array.from(this.container.querySelectorAll(".tab-panel"));
+      tabs.map((tab, idx) => tab.addEventListener("click", () => {
+        tabs.forEach((tab2) => tab2.classList.remove("active"));
+        tab.classList.add("active");
+        const childPanel = panels[idx];
+        panels.forEach((panel) => panel.classList.add("hidden"));
+        childPanel.classList.remove("hidden");
+        childPanel.querySelector("search-element").focus();
+      }));
+    }
+  };
 
   // dist/services/player.js
   var import_howler_min = __toESM(require_howler_min());
@@ -1787,7 +1925,6 @@
       return directoryHandle;
     } catch (err) {
       console.error(err);
-      alert("Error accessing the directory.");
       throw err;
     }
   }
@@ -1845,22 +1982,28 @@
     return libraryFileHandles;
   }
   async function getAllFiles(directoryHandle, relativePath = "", fileList = []) {
-    for await (const entry of directoryHandle.values()) {
-      if (entry.kind === "file" && relativePath.indexOf("/.AppleDouble") < 0) {
-        let extensionBits = entry.name.split(".");
-        let extension = extensionBits[extensionBits.length - 1];
-        if (musicFileExtensions.includes("." + extension) && !entry.name.startsWith("._")) {
-          fileList.push({
-            fileHandle: entry,
-            relativePath,
-            relativeFileName: relativePath + "/" + entry.name
-          });
+    try {
+      for await (const entry of directoryHandle.values()) {
+        if (entry.kind === "file" && relativePath.indexOf("/.AppleDouble") < 0) {
+          let extensionBits = entry.name.split(".");
+          let extension = extensionBits[extensionBits.length - 1];
+          if (musicFileExtensions.includes("." + extension) && !entry.name.startsWith("._")) {
+            fileList.push({
+              fileHandle: entry,
+              relativePath,
+              relativeFileName: relativePath + "/" + entry.name
+            });
+          }
+        } else if (entry.kind === "directory") {
+          await getAllFiles(entry, `${relativePath}/${entry.name}`, fileList);
         }
-      } else if (entry.kind === "directory") {
-        await getAllFiles(entry, `${relativePath}/${entry.name}`, fileList);
       }
+      return fileList;
+    } catch (error) {
+      console.log("Failed to read files");
+      eventBus.emit("requestAccessToDisk");
+      throw error;
     }
-    return fileList;
   }
   async function openMusicFolder(dbManager, config) {
     try {
@@ -1876,14 +2019,14 @@
       console.log(`Stored directory handle for "${directoryHandle.name}" in IndexedDB.`);
     } catch (error) {
       console.error(error);
-      alert(error);
+      eventBus.emit("requestAccessToDisk");
     }
   }
 
   // dist/app.js
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
-      navigator.serviceWorker.register("/service-worker.js").then((registration) => {
+      navigator.serviceWorker.register("service-worker.js").then((registration) => {
         console.log("Service Worker registered:", registration);
       }).catch((error) => {
         console.error("Service Worker registration failed:", error);
@@ -1983,7 +2126,6 @@
           scanFilePath.textContent = item.relativeFileName;
           scanProgress.textContent = ++n + "/" + files.length;
           const table = indexFileName.split(/\/|\\/g)[1] == "music" ? "track" : "cortina";
-          let { id } = await dbManager.getDataByName(table, indexFileName);
           let metadata = analysis ? analysis[batchIdx] : {
             start: 0,
             end: -1,
@@ -2001,10 +2143,15 @@
               favourite: true
             }
           };
-          if (!id) {
+          try {
+            let { id } = await dbManager.getDataByName(table, indexFileName);
+            if (!id) {
+              await dbManager.addData(table, newData);
+            } else {
+              await dbManager.updateData(table, id, newData);
+            }
+          } catch (error) {
             await dbManager.addData(table, newData);
-          } else {
-            await dbManager.updateData(table, id, newData);
           }
         }
       }
@@ -2107,7 +2254,10 @@
     return config;
   }
   async function processQuery(dbManager, query, selectedStyle) {
-    return [];
+    let tracks = await dbManager.processEntriesInBatches("track", (track, idx) => {
+      return true;
+    });
+    return { tracks, tandas: [] };
   }
   async function requestAudioPermission() {
     try {
@@ -2150,7 +2300,22 @@
     });
     const dbManager = await DatabaseManager();
     let config = await InitialiseConfig(dbManager);
+    eventBus.on("requestAccessToDisk", () => {
+      console.log("Requesting access to disk");
+      const modal = getDomElement("#permissionModal");
+      modal.classList.remove("hidden");
+    });
+    await openMusicFolder(dbManager, config);
+    const testTrack = dbManager.getDataById("track", 0);
     let quickClickHandlers = {
+      askUserPermission: async () => {
+        await openMusicFolder(dbManager, config).then(() => {
+          const modal = getDomElement("#permissionModal");
+          modal.classList.add("hidden");
+        }).catch((error) => {
+          alert(error);
+        });
+      },
       rescanButton: () => {
         scanFileSystem(config, dbManager, false);
       },
@@ -2214,7 +2379,6 @@
     await runApplication(dbManager, config);
   });
   async function runApplication(dbManager, config) {
-    await openMusicFolder(dbManager, config);
     let systemLowestGain = await getSystemLevel(dbManager);
     let fadeRate = 3;
     const playlistService = new PlaylistService(getDomElement("#playlistContainer"), async (type, name) => {
@@ -2282,14 +2446,14 @@
       headphonesPlayerConfig.useSoundLevelling = config.useSoundLevelling;
       headphonesOutputPlayer.updateOptions(headphonesPlayerConfig);
     });
-    document.addEventListener("playOnHeadphones", async (event) => {
-      console.log("Play on headphones in app", event.detail);
-      const track = event.detail.element;
-      Array.from(getDomElement("#playlistContainer").querySelectorAll("track-element,cortina-element")).forEach((x) => {
+    eventBus.on("playOnHeadphones", async (detail) => {
+      console.log("Play on headphones in app", detail);
+      const track = detail.element;
+      Array.from(document.querySelectorAll("track-element,cortina-element")).forEach((x) => {
         if (x !== track)
           x.stopPlayingOnHeadphones();
       });
-      if (!event.detail.playing) {
+      if (!detail.playing) {
         headphonesOutputPlayer.stop();
       } else {
         const table = track.getAttribute("title").split(/\/|\\/g)[1] == "music" ? "track" : "cortina";

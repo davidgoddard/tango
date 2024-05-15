@@ -1,5 +1,11 @@
 import { eventBus } from "../events/event-bus";
 
+export interface SearchResult {
+  tracks: any[],
+  tandas: any[]
+}
+
+
 class SearchElement extends HTMLElement {
     private searchInput: HTMLInputElement;
     private filterSelect: HTMLSelectElement;
@@ -94,11 +100,12 @@ class SearchElement extends HTMLElement {
 
         // Initialize counts
         this.tracksCount.textContent = '0';
-        this.tandasCount.textContent = '0';
+        this.tandasCount.textContent = '0'; 
 
-        eventBus.on('search-results', (results: any)=>{
-          console.log(this, 'received results', results)
-        })
+        eventBus.on('queryResults', this.results.bind(this));
+
+
+
     }
 
     public focus(){
@@ -118,7 +125,7 @@ class SearchElement extends HTMLElement {
     }
 
     // Method to update search results
-    public results(resultset: { tracks: any[], tandas: any[] }) {
+    public results(resultset: SearchResult) {
         this.tracksCount.textContent = resultset.tracks.length.toString();
         this.tandasCount.textContent = resultset.tandas.length.toString();
         this.tracksContent.innerHTML = resultset.tracks.map(track => `<track-element 
@@ -129,16 +136,16 @@ class SearchElement extends HTMLElement {
         ></track-element>`).join('');
         this.tandasContent.innerHTML = JSON.stringify(resultset.tandas);
 
-        // Add event listeners to buttons for moving tracks to scratch pad
-        const tracks = this.tracksContent.querySelectorAll('track-element');
-        for (const track of tracks) {
-            const button = document.createElement('button');
-            button.innerHTML = '<img src="./icons/notepad.png" alt="copy to scratch pad">';
-            button.addEventListener('click', () => {
-                this.dispatchEvent(new CustomEvent('moveToScratchPad', { detail: track }));
-            });
-            track.shadowRoot!.querySelector('article .actions')!.appendChild(button);
-        }
+        // // Add event listeners to buttons for moving tracks to scratch pad
+        // const tracks = this.tracksContent.querySelectorAll('track-element');
+        // for (const track of tracks) {
+        //     const button = document.createElement('button');
+        //     button.innerHTML = '<img src="./icons/notepad.png" alt="copy to scratch pad">';
+        //     button.addEventListener('click', () => {
+        //         this.dispatchEvent(new CustomEvent('moveToScratchPad', { detail: track }));
+        //     });
+        //     track.shadowRoot!.querySelector('article .actions')!.appendChild(button);
+        // }
     }
 
     // Method to show content based on tab clicked

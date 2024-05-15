@@ -1,6 +1,6 @@
-type EventHandler = (payload: any) => void;
+export type EventHandler = (payload: any) => void;
 
-interface EventHandlers {
+export interface EventHandlers {
     [event: string]: EventHandler[];
 }
 

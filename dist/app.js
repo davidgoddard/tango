@@ -1,9 +1,10 @@
 // Example usage in a component file
 import { eventBus } from "./events/event-bus";
-import "./components/search.element";
 import "./components/tanda.element";
-import { TabsContainer } from "./components/tabs.component";
 import "./components/cortina.element";
+import "./components/search.element";
+import "./components/track.element";
+import { TabsContainer } from "./components/tabs.component";
 import { Player } from "./services/player";
 import { PlaylistService } from "./services/playlist-service";
 import { DatabaseManager, convert, } from "./services/database";
@@ -11,7 +12,7 @@ import { fetchLibraryFiles, getAllFiles, openMusicFolder, } from "./services/fil
 if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
         navigator.serviceWorker
-            .register("/service-worker.js")
+            .register("service-worker.js")
             .then((registration) => {
             console.log("Service Worker registered:", registration);
         })
@@ -131,8 +132,6 @@ async function scanFileSystem(config, dbManager, analyze) {
                 scanFilePath.textContent = item.relativeFileName;
                 scanProgress.textContent = ++n + "/" + files.length;
                 const table = indexFileName.split(/\/|\\/g)[1] == "music" ? "track" : "cortina";
-                // Look up filename to see if we already have a trackid for it
-                let { id } = (await dbManager.getDataByName(table, indexFileName));
                 // Create new version of the record
                 let metadata = analysis
                     ? analysis[batchIdx]
@@ -153,11 +152,18 @@ async function scanFileSystem(config, dbManager, analyze) {
                         favourite: true,
                     },
                 };
-                if (!id) {
-                    await dbManager.addData(table, newData);
+                try {
+                    // Look up filename to see if we already have a trackid for it
+                    let { id } = (await dbManager.getDataByName(table, indexFileName));
+                    if (!id) {
+                        await dbManager.addData(table, newData);
+                    }
+                    else {
+                        await dbManager.updateData(table, id, newData);
+                    }
                 }
-                else {
-                    await dbManager.updateData(table, id, newData);
+                catch (error) {
+                    await dbManager.addData(table, newData);
                 }
             }
         }
@@ -265,7 +271,10 @@ async function deleteDatabase(dbManager) {
     return config;
 }
 async function processQuery(dbManager, query, selectedStyle) {
-    return [];
+    let tracks = (await dbManager.processEntriesInBatches("track", (track, idx) => {
+        return true;
+    }));
+    return { tracks, tandas: [] };
 }
 // Request permission to access audio devices
 async function requestAudioPermission() {
@@ -315,8 +324,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
     const dbManager = await DatabaseManager();
     let config = await InitialiseConfig(dbManager);
+    eventBus.on("requestAccessToDisk", () => {
+        console.log('Requesting access to disk');
+        const modal = getDomElement("#permissionModal");
+        modal.classList.remove("hidden");
+    });
+    await openMusicFolder(dbManager, config);
+    // test one file
+    const testTrack = dbManager.getDataById('track', 0);
     // Setup the quick key click to function mappings
     let quickClickHandlers = {
+        askUserPermission: async () => {
+            await openMusicFolder(dbManager, config)
+                .then(() => {
+                const modal = getDomElement("#permissionModal");
+                modal.classList.add("hidden");
+            })
+                .catch((error) => {
+                alert(error);
+            });
+        },
         rescanButton: () => {
             scanFileSystem(config, dbManager, false);
         },
@@ -349,10 +376,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         getDomElement((key.charAt(0) != "." ? "#" : "") + key).addEventListener("click", quickClickHandlers[key]);
     }
     // Handle configuration changes
-    const useSoundLevelling = getDomElement('#useSoundLevelling');
-    useSoundLevelling.addEventListener('change', () => {
+    const useSoundLevelling = getDomElement("#useSoundLevelling");
+    useSoundLevelling.addEventListener("change", () => {
         config.useSoundLevelling = useSoundLevelling.checked;
-        eventBus.emit('config-change');
+        eventBus.emit("config-change");
     });
     // Set up the search tabs
     // Main application logic
@@ -390,7 +417,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     await runApplication(dbManager, config);
 });
 async function runApplication(dbManager, config) {
-    await openMusicFolder(dbManager, config);
     // await verifyPermission(config.musicFolder, 'readonly')
     // Scan all files in database to find system's lowest gain for normalisation purposes
     let systemLowestGain = await getSystemLevel(dbManager);
@@ -458,21 +484,21 @@ async function runApplication(dbManager, config) {
         headphonesPlayerConfig.ctx = context;
         headphonesOutputPlayer.updateOptions(headphonesPlayerConfig);
     });
-    eventBus.on('config-change', () => {
+    eventBus.on("config-change", () => {
         speakerPlayerConfig.useSoundLevelling = config.useSoundLevelling;
         speakerOutputPlayer.updateOptions(speakerPlayerConfig);
         headphonesPlayerConfig.useSoundLevelling = config.useSoundLevelling;
         headphonesOutputPlayer.updateOptions(headphonesPlayerConfig);
     });
-    document.addEventListener("playOnHeadphones", async (event) => {
-        console.log('Play on headphones in app', event.detail);
-        const track = event.detail.element;
+    eventBus.on("playOnHeadphones", async (detail) => {
+        console.log("Play on headphones in app", detail);
+        const track = detail.element;
         // Clear all other tracks from playing
-        Array.from(getDomElement("#playlistContainer").querySelectorAll("track-element,cortina-element")).forEach((x) => {
+        Array.from(document.querySelectorAll("track-element,cortina-element")).forEach((x) => {
             if (x !== track)
                 x.stopPlayingOnHeadphones();
         });
-        if (!event.detail.playing) {
+        if (!detail.playing) {
             headphonesOutputPlayer.stop();
         }
         else {

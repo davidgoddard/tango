@@ -34,18 +34,18 @@ let ffmpeg; // Define ffmpeg variable
         //     };
         // }
 
-        // Event listener to handle iframe removal
-        window.addEventListener('beforeunload', () => {
-            // Clean up FFmpeg resources if iframe is removed
-            cleanupFFmpeg();
-        });
+        // // Event listener to handle iframe removal
+        // window.addEventListener('beforeunload', () => {
+        //     // Clean up FFmpeg resources if iframe is removed
+        //     cleanupFFmpeg();
+        // });
 
-        // Function to clean up FFmpeg resources
-        function cleanupFFmpeg() {
-            // Clean up FFmpeg process or any allocated resources
-            ffmpeg = null; // Reset FFmpeg process
-            // You may add additional cleanup logic here if needed
-        }
+        // // Function to clean up FFmpeg resources
+        // function cleanupFFmpeg() {
+        //     // Clean up FFmpeg process or any allocated resources
+        //     ffmpeg = null; // Reset FFmpeg process
+        //     // You may add additional cleanup logic here if needed
+        // }
 
         const initializeFFmpeg = async () => {
             console.log('FFmpeg initialized');

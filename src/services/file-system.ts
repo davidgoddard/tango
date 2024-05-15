@@ -1,3 +1,5 @@
+import { eventBus } from "../events/event-bus";
+
 interface SaveFilePickerOptions {
   types?: SaveFilePickerAcceptType[];
 }
@@ -21,7 +23,7 @@ const CONFIG_ID: number = 1;
 async function selectFolder(): Promise<FileSystemDirectoryHandle> {
   if (!window.showDirectoryPicker) {
     alert("The File System Access API is not supported in your browser.");
-    throw new Error('User has not given access to folder.')
+    throw new Error("User has not given access to folder.");
   }
 
   try {
@@ -29,7 +31,6 @@ async function selectFolder(): Promise<FileSystemDirectoryHandle> {
     return directoryHandle;
   } catch (err) {
     console.error(err);
-    alert("Error accessing the directory.");
     throw err;
   }
 }
@@ -116,30 +117,40 @@ export async function getAllFiles(
     relativeFileName: string;
   }[]
 > {
-  for await (const entry of directoryHandle.values()) {
-    if (entry.kind === "file" && relativePath.indexOf("/.AppleDouble") < 0) {
-      let extensionBits = entry.name.split(".");
-      let extension = extensionBits[extensionBits.length - 1];
-      if (
-        musicFileExtensions.includes("." + extension) &&
-        !entry.name.startsWith("._")
-      ) {
-        fileList.push({
-          fileHandle: entry as FileSystemFileHandle,
-          relativePath: relativePath,
-          relativeFileName: relativePath + "/" + entry.name,
-        });
+  try {
+    for await (const entry of directoryHandle.values()) {
+      if (entry.kind === "file" && relativePath.indexOf("/.AppleDouble") < 0) {
+        let extensionBits = entry.name.split(".");
+        let extension = extensionBits[extensionBits.length - 1];
+        if (
+          musicFileExtensions.includes("." + extension) &&
+          !entry.name.startsWith("._")
+        ) {
+          fileList.push({
+            fileHandle: entry as FileSystemFileHandle,
+            relativePath: relativePath,
+            relativeFileName: relativePath + "/" + entry.name,
+          });
+        }
+      } else if (entry.kind === "directory") {
+        await getAllFiles(
+          entry as FileSystemDirectoryHandle,
+          `${relativePath}/${entry.name}`,
+          fileList
+        );
       }
-    } else if (entry.kind === "directory") {
-      await getAllFiles(entry as FileSystemDirectoryHandle, `${relativePath}/${entry.name}`, fileList);
     }
+    return fileList;
+  } catch (error) {
+    console.log("Failed to read files");
+    eventBus.emit("requestAccessToDisk");
+    throw error;
   }
-  return fileList;
 }
 
 interface FileSystemHandlePermissionDescriptor {
-    mode?: "read" | "readwrite";
-  }
+  mode?: "read" | "readwrite";
+}
 
 // export async function verifyPermission(
 //   fileHandle: FileSystemFileHandle,
@@ -149,7 +160,7 @@ interface FileSystemHandlePermissionDescriptor {
 //   if (readWrite) {
 //     options.mode = "readwrite";
 //   }
-//   if ((await fileHandle.queryPermission(options)) === "granted") {
+//   if ((await (await fileHandle.()).queryPermission(options)) === "granted") {
 //     return true;
 //   }
 //   return (await fileHandle.requestPermission(options)) === "granted";
@@ -174,9 +185,9 @@ export async function openMusicFolder(
     console.log(
       `Stored directory handle for "${directoryHandle.name}" in IndexedDB.`
     );
-  } catch (error:any) {
+  } catch (error: any) {
     console.error(error);
-    alert(error);
+    eventBus.emit("requestAccessToDisk");
   }
 }
 

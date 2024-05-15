@@ -1,11 +1,12 @@
 // Example usage in a component file
-
 import { eventBus } from "./events/event-bus";
-import "./components/search.element";
 import "./components/tanda.element";
+import "./components/cortina.element";
+import "./components/search.element";
+import "./components/track.element";
 import { TabsContainer } from "./components/tabs.component";
 import { TrackElement } from "./components/track.element";
-import "./components/cortina.element";
+import { SearchResult } from "./components/search.element";
 
 import { Track, Tanda, Playlist, BaseRecord, TableNames } from "./data-types";
 import { Player, PlayerOptions, ProgressData } from "./services/player";
@@ -24,7 +25,7 @@ import {
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("/service-worker.js")
+      .register("service-worker.js")
       .then((registration) => {
         console.log("Service Worker registered:", registration);
       })
@@ -192,13 +193,6 @@ async function scanFileSystem(
         const table =
           indexFileName.split(/\/|\\/g)[1] == "music" ? "track" : "cortina";
 
-        // Look up filename to see if we already have a trackid for it
-
-        let { id }: Track = (await dbManager.getDataByName(
-          table,
-          indexFileName
-        )) as Track;
-
         // Create new version of the record
 
         let metadata: any = analysis
@@ -222,10 +216,20 @@ async function scanFileSystem(
           },
         };
 
-        if (!id) {
+        try {
+          // Look up filename to see if we already have a trackid for it
+          let { id }: Track = (await dbManager.getDataByName(
+            table,
+            indexFileName
+          )) as Track;
+
+          if (!id) {
+            await dbManager.addData(table, newData);
+          } else {
+            await dbManager.updateData(table, id!, newData);
+          }
+        } catch (error) {
           await dbManager.addData(table, newData);
-        } else {
-          await dbManager.updateData(table, id!, newData);
         }
       }
     }
@@ -360,8 +364,15 @@ async function processQuery(
   dbManager: IndexedDBManager,
   query: string,
   selectedStyle: string
-): Promise<Track[]> {
-  return [];
+): Promise<SearchResult> {
+  let tracks = (await dbManager.processEntriesInBatches(
+    "track",
+    (track, idx) => {
+      return true;
+    }
+  )) as Track[];
+
+  return { tracks, tandas: [] };
 }
 
 // Request permission to access audio devices
@@ -425,9 +436,30 @@ document.addEventListener("DOMContentLoaded", async () => {
   const dbManager = await DatabaseManager();
   let config = await InitialiseConfig(dbManager);
 
+  eventBus.on("requestAccessToDisk", () => {
+    console.log('Requesting access to disk')
+    const modal = getDomElement("#permissionModal");
+    modal.classList.remove("hidden");
+  });
+  await openMusicFolder(dbManager, config)
+
+  // test one file
+  const testTrack = dbManager.getDataById('track', 0)
+
+
   // Setup the quick key click to function mappings
 
   let quickClickHandlers: { [key: string]: EventListener } = {
+    askUserPermission: async () => {
+      await openMusicFolder(dbManager, config)
+        .then(() => {
+          const modal = getDomElement("#permissionModal");
+          modal.classList.add("hidden");
+        })
+        .catch((error) => {
+          alert(error);
+        });
+    },
     rescanButton: () => {
       scanFileSystem(config, dbManager, false);
     },
@@ -465,11 +497,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // Handle configuration changes
-  const useSoundLevelling = getDomElement('#useSoundLevelling')! as HTMLInputElement;
-  useSoundLevelling.addEventListener('change', ()=>{
-    config.useSoundLevelling = useSoundLevelling.checked
-    eventBus.emit('config-change')
-  })
+  const useSoundLevelling = getDomElement(
+    "#useSoundLevelling"
+  )! as HTMLInputElement;
+  useSoundLevelling.addEventListener("change", () => {
+    config.useSoundLevelling = useSoundLevelling.checked;
+    eventBus.emit("config-change");
+  });
 
   // Set up the search tabs
 
@@ -487,7 +521,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     "query",
     async (searchData: { query: string; selectedStyle: string }) => {
       // Process the query (e.g., fetch data from a server)
-      const results: Track[] = await processQuery(
+      const results: SearchResult = await processQuery(
         dbManager,
         searchData.query,
         searchData.selectedStyle
@@ -531,7 +565,6 @@ async function runApplication(
   dbManager: IndexedDBManager,
   config: ConfigOptions
 ) {
-  await openMusicFolder(dbManager, config);
   // await verifyPermission(config.musicFolder, 'readonly')
 
   // Scan all files in database to find system's lowest gain for normalisation purposes
@@ -608,30 +641,27 @@ async function runApplication(
     headphonesPlayerConfig.ctx = context;
     headphonesOutputPlayer.updateOptions(headphonesPlayerConfig);
   });
-  eventBus.on('config-change', ()=>{
+  eventBus.on("config-change", () => {
     speakerPlayerConfig.useSoundLevelling = config.useSoundLevelling;
     speakerOutputPlayer.updateOptions(speakerPlayerConfig);
     headphonesPlayerConfig.useSoundLevelling = config.useSoundLevelling;
     headphonesOutputPlayer.updateOptions(headphonesPlayerConfig);
-    
-  })
+  });
 
-  document.addEventListener("playOnHeadphones", async (event: any) => {
-    console.log('Play on headphones in app', event.detail)
-    const track = event.detail.element;
+  eventBus.on("playOnHeadphones", async (detail: any) => {
+    console.log("Play on headphones in app", detail);
+    const track = detail.element;
     // Clear all other tracks from playing
 
     (
       Array.from(
-        getDomElement("#playlistContainer").querySelectorAll(
-          "track-element,cortina-element"
-        )
+        document.querySelectorAll("track-element,cortina-element")
       ) as TrackElement[]
     ).forEach((x: TrackElement) => {
       if (x !== track) x.stopPlayingOnHeadphones();
     });
 
-    if (!event.detail.playing) {
+    if (!detail.playing) {
       headphonesOutputPlayer.stop();
     } else {
       const table =

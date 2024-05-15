@@ -1,5 +1,4 @@
-import { eventBus } from "./event-bus";
-
+import { eventBus } from "../events/event-bus";
 // Define types for event payloads
 interface TandaUpdatedPayload {
     id: string;

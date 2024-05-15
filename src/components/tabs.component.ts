@@ -1,5 +1,3 @@
-import { SearchComponent } from "./search.component";
-
 export class TabsContainer {
   constructor(private container: HTMLElement, private tabs: string[]) {
     this.render();
@@ -34,7 +32,7 @@ export class TabsContainer {
       const childPanel = panels[idx];
       panels.forEach((panel:HTMLElement)=>panel.classList.add('hidden'))
       childPanel.classList.remove('hidden');
-      (childPanel.querySelector('search-element')! as HTMLElement).focus();
+      (childPanel!.querySelector('search-element')! as HTMLElement).focus();
     }))
 
   }

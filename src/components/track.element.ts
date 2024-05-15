@@ -1,3 +1,4 @@
+import { eventBus } from "../events/event-bus";
 export type Action = {
     id: string;
   image: string;
@@ -60,11 +61,7 @@ class TrackElement extends HTMLElement {
         this.isPlayingOnHeadphones = false;
         this.shadowRoot!.querySelector("#headphones")!.classList.remove("playing");
     }
-    const emitEvent = new CustomEvent("playOnHeadphones", {
-      detail: { element: this, playing: this.isPlayingOnHeadphones },
-      bubbles: true,
-    });
-    this.dispatchEvent(emitEvent);
+    eventBus.emit('playOnHeadphones', { element: this, playing: this.isPlayingOnHeadphones })
   }
 
   handleTargetButtonClick(event: Event) {

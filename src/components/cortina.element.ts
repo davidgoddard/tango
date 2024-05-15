@@ -1,3 +1,5 @@
+import { eventBus } from "../events/event-bus";
+
 class CortinaElement extends HTMLElement {
   private isPlayingOnHeadphones: boolean = false;
   constructor() {
@@ -92,11 +94,8 @@ class CortinaElement extends HTMLElement {
         "playing"
       );
     }
-    const emitEvent = new CustomEvent("playOnHeadphones", {
-      detail: { element: this, playing: this.isPlayingOnHeadphones },
-      bubbles: true,
-    });
-    this.dispatchEvent(emitEvent);
+    eventBus.emit('playOnHeadphones', { element: this, playing: this.isPlayingOnHeadphones })
+
   }
 }
 customElements.define("cortina-element", CortinaElement);
