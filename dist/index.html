@@ -13,6 +13,8 @@
 
     <meta name="theme-color" content="#317EFB"/>
 
+    <link rel="icon" type="image/x-icon" href="./icons/favicon.ico">
+
     <link rel="manifest" href="./manifest.json">
     <link rel="stylesheet" href="./css/styles.css">
 
@@ -46,9 +48,9 @@
         <button class="active" id="refreshAudioLists">Refresh Audio Device Lists</button>
         <br/>
   
-        <label for="speaker-output-devices"><img src="./icons/speaker-icon.jpg" alt="Select Speakers device">:</label>
+        <label for="speaker-output-devices"><img src="./icons/speaker.png" alt="Select Speakers device">:</label>
         <select id="speaker-output-devices"></select>
-        <label for="headphones-output-devices"><img src="./icons/headphones-icon.png" alt="Select Headphones device">:</label>
+        <label for="headphones-output-devices"><img src="./icons/headphones.png" alt="Select Headphones device">:</label>
         <select id="headphones-output-devices"></select>
 
         <h3>Aspirations</h3>
@@ -58,6 +60,12 @@
             <li>Reset column widths to defaults</li>
             <li>Edit preferred text items</li>
         </ul>
+
+        <h3>Playback options</h3>
+        <form>
+            <legend>Defaults</legend>
+            <label>Use sound levelling: <input type="checkbox" id="useSoundLevelling" checked="checked"></label>
+        </form>
 
         <h3>Default Playlist options</h3>
         <form>

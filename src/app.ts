@@ -39,10 +39,12 @@ interface ConfigOptions extends BaseRecord {
   defaultTandaStyleSequence: string;
   mainOutput?: string;
   headphoneOutput?: string;
+  useSoundLevelling: boolean;
 }
 
 const SYSTEM: ConfigOptions = {
   defaultTandaStyleSequence: "4T 4T 3W 4T 3M",
+  useSoundLevelling: true,
 };
 
 const CONFIG_ID = 1;
@@ -462,6 +464,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     );
   }
 
+  // Handle configuration changes
+  const useSoundLevelling = getDomElement('#useSoundLevelling')! as HTMLInputElement;
+  useSoundLevelling.addEventListener('change', ()=>{
+    config.useSoundLevelling = useSoundLevelling.checked
+    eventBus.emit('config-change')
+  })
+
   // Set up the search tabs
 
   // Main application logic
@@ -545,6 +554,7 @@ async function runApplication(
     ctx: config.mainOutput,
     systemLowestGain,
     fadeRate,
+    useSoundLevelling: config.useSoundLevelling,
     fetchNext: async (N: number) => {
       let silence = 0;
       let nextTrack: Track = playlistService.fetch(N);
@@ -573,6 +583,7 @@ async function runApplication(
     ctx: config.headphoneOutput,
     systemLowestGain,
     fadeRate: 0.5,
+    useSoundLevelling: config.useSoundLevelling,
     fetchNext: async (N: number) => {
       if (N == 0) {
         console.log("Headphones next", {
@@ -597,6 +608,13 @@ async function runApplication(
     headphonesPlayerConfig.ctx = context;
     headphonesOutputPlayer.updateOptions(headphonesPlayerConfig);
   });
+  eventBus.on('config-change', ()=>{
+    speakerPlayerConfig.useSoundLevelling = config.useSoundLevelling;
+    speakerOutputPlayer.updateOptions(speakerPlayerConfig);
+    headphonesPlayerConfig.useSoundLevelling = config.useSoundLevelling;
+    headphonesOutputPlayer.updateOptions(headphonesPlayerConfig);
+    
+  })
 
   document.addEventListener("playOnHeadphones", async (event: any) => {
     console.log('Play on headphones in app', event.detail)

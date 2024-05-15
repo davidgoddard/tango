@@ -1272,7 +1272,7 @@
             let timeEnd = 1e3 * track.metadata.end + Math.min(0, silence ?? 0);
             if (timeNow >= timeEnd - 500 && !ending) {
               this.current.ending = true;
-              player.fade(_Player.dBtoLinear(gainReduction), 0, this.options.fadeRate * 1e3);
+              player.fade(this.options.useSoundLevelling ? _Player.dBtoLinear(gainReduction) : 1, 0, this.options.fadeRate * 1e3);
               this.reportProgress("Fading");
               let obj = this.current;
               setTimeout(() => {
@@ -1413,7 +1413,7 @@
             track.metadata.end = player.duration();
             track.metadata.end = Math.min(20, track.metadata.end);
           }
-          if (track.metadata?.meanVolume !== null && track.metadata?.meanVolume !== void 0) {
+          if (this.options.useSoundLevelling && track.metadata?.meanVolume !== null && track.metadata?.meanVolume !== void 0) {
             const reduction = this.systemGain - (track.metadata.meanVolume - track.metadata.maxVolume);
             player.volume(_Player.dBtoLinear(reduction));
           }
@@ -1456,7 +1456,7 @@
     stop() {
       if (this.isPlaying) {
         this.current.ending = true;
-        this.current.player.fade(_Player.dBtoLinear(this.current.gainReduction), 0, this.options.fadeRate * 1e3);
+        this.current.player.fade(this.options.useSoundLevelling ? _Player.dBtoLinear(this.current.gainReduction) : 1, 0, this.options.fadeRate * 1e3);
         this.reportProgress("Fading");
         let obj = this.current;
         setTimeout(() => {
@@ -1500,7 +1500,7 @@
       this.container.innerHTML = (await Promise.all(this.tandaList.map(async (tanda, idx) => {
         const cortinaElement = tanda.cortina ? (async () => {
           let track = await this.getDetail("cortina", tanda.cortina);
-          let year = track.metadata?.tags?.year;
+          let year = track.metadata?.tags?.date || track.metadata?.tags?.year || track.metadata?.tags?.creation_time;
           if (year) {
             year = year.substring(0, 4);
           }
@@ -1514,7 +1514,7 @@
         })() : "";
         const trackElements = await Promise.all(tanda.tracks.map(async (trackName) => {
           let track = await this.getDetail("track", trackName);
-          let year = track.metadata?.tags?.year;
+          let year = track.metadata?.tags?.date || track.metadata?.tags?.year || track.metadata?.tags?.creation_time;
           if (year) {
             year = year.substring(0, 4);
           }
@@ -1891,7 +1891,8 @@
     });
   }
   var SYSTEM = {
-    defaultTandaStyleSequence: "4T 4T 3W 4T 3M"
+    defaultTandaStyleSequence: "4T 4T 3W 4T 3M",
+    useSoundLevelling: true
   };
   var CONFIG_ID2 = 1;
   function getDomElement(selector) {
@@ -2181,6 +2182,11 @@
     for (const key of Object.keys(quickClickHandlers)) {
       getDomElement((key.charAt(0) != "." ? "#" : "") + key).addEventListener("click", quickClickHandlers[key]);
     }
+    const useSoundLevelling = getDomElement("#useSoundLevelling");
+    useSoundLevelling.addEventListener("change", () => {
+      config.useSoundLevelling = useSoundLevelling.checked;
+      eventBus.emit("config-change");
+    });
     const tabs = ["Search", "Favourites", "Recent"];
     const tabsContainer = new TabsContainer(getDomElement("#tabsContainer"), tabs);
     eventBus.on("query", async (searchData) => {
@@ -2219,6 +2225,7 @@
       ctx: config.mainOutput,
       systemLowestGain,
       fadeRate,
+      useSoundLevelling: config.useSoundLevelling,
       fetchNext: async (N) => {
         let silence = 0;
         let nextTrack = playlistService.fetch(N);
@@ -2246,6 +2253,7 @@
       ctx: config.headphoneOutput,
       systemLowestGain,
       fadeRate: 0.5,
+      useSoundLevelling: config.useSoundLevelling,
       fetchNext: async (N) => {
         if (N == 0) {
           console.log("Headphones next", {
@@ -2266,6 +2274,12 @@
     });
     eventBus.on("change-headphones", (context) => {
       headphonesPlayerConfig.ctx = context;
+      headphonesOutputPlayer.updateOptions(headphonesPlayerConfig);
+    });
+    eventBus.on("config-change", () => {
+      speakerPlayerConfig.useSoundLevelling = config.useSoundLevelling;
+      speakerOutputPlayer.updateOptions(speakerPlayerConfig);
+      headphonesPlayerConfig.useSoundLevelling = config.useSoundLevelling;
       headphonesOutputPlayer.updateOptions(headphonesPlayerConfig);
     });
     document.addEventListener("playOnHeadphones", async (event) => {

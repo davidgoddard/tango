@@ -24,6 +24,7 @@ export interface Track extends BaseRecord {
           style?: string;
           year?: string;
           date?: string;
+          creation_time?: string;
         }
       },
       classifiers: Classifiers;

@@ -22,6 +22,7 @@ if ("serviceWorker" in navigator) {
 }
 const SYSTEM = {
     defaultTandaStyleSequence: "4T 4T 3W 4T 3M",
+    useSoundLevelling: true,
 };
 const CONFIG_ID = 1;
 function getDomElementAll(selector) {
@@ -347,6 +348,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     for (const key of Object.keys(quickClickHandlers)) {
         getDomElement((key.charAt(0) != "." ? "#" : "") + key).addEventListener("click", quickClickHandlers[key]);
     }
+    // Handle configuration changes
+    const useSoundLevelling = getDomElement('#useSoundLevelling');
+    useSoundLevelling.addEventListener('change', () => {
+        config.useSoundLevelling = useSoundLevelling.checked;
+        eventBus.emit('config-change');
+    });
     // Set up the search tabs
     // Main application logic
     const tabs = ["Search", "Favourites", "Recent"];
@@ -398,6 +405,7 @@ async function runApplication(dbManager, config) {
         ctx: config.mainOutput,
         systemLowestGain,
         fadeRate,
+        useSoundLevelling: config.useSoundLevelling,
         fetchNext: async (N) => {
             let silence = 0;
             let nextTrack = playlistService.fetch(N);
@@ -426,6 +434,7 @@ async function runApplication(dbManager, config) {
         ctx: config.headphoneOutput,
         systemLowestGain,
         fadeRate: 0.5,
+        useSoundLevelling: config.useSoundLevelling,
         fetchNext: async (N) => {
             if (N == 0) {
                 console.log("Headphones next", {
@@ -447,6 +456,12 @@ async function runApplication(dbManager, config) {
     });
     eventBus.on("change-headphones", (context) => {
         headphonesPlayerConfig.ctx = context;
+        headphonesOutputPlayer.updateOptions(headphonesPlayerConfig);
+    });
+    eventBus.on('config-change', () => {
+        speakerPlayerConfig.useSoundLevelling = config.useSoundLevelling;
+        speakerOutputPlayer.updateOptions(speakerPlayerConfig);
+        headphonesPlayerConfig.useSoundLevelling = config.useSoundLevelling;
         headphonesOutputPlayer.updateOptions(headphonesPlayerConfig);
     });
     document.addEventListener("playOnHeadphones", async (event) => {

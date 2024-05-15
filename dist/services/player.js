@@ -40,7 +40,7 @@ export class Player {
                     let timeEnd = 1000 * track.metadata.end + Math.min(0, silence ?? 0);
                     if (timeNow >= timeEnd - 500 && !ending) {
                         this.current.ending = true;
-                        player.fade(Player.dBtoLinear(gainReduction), 0, this.options.fadeRate * 1000);
+                        player.fade((this.options.useSoundLevelling ? Player.dBtoLinear(gainReduction) : 1), 0, this.options.fadeRate * 1000);
                         this.reportProgress("Fading");
                         let obj = this.current;
                         setTimeout(() => {
@@ -200,7 +200,8 @@ export class Player {
                     track.metadata.end = player.duration();
                     track.metadata.end = Math.min(20, track.metadata.end);
                 }
-                if (track.metadata?.meanVolume !== null &&
+                if (this.options.useSoundLevelling &&
+                    track.metadata?.meanVolume !== null &&
                     track.metadata?.meanVolume !== undefined) {
                     const reduction = this.systemGain -
                         (track.metadata.meanVolume - track.metadata.maxVolume);
@@ -249,7 +250,7 @@ export class Player {
     stop() {
         if (this.isPlaying) {
             this.current.ending = true;
-            this.current.player.fade(Player.dBtoLinear(this.current.gainReduction), 0, this.options.fadeRate * 1000);
+            this.current.player.fade((this.options.useSoundLevelling ? Player.dBtoLinear(this.current.gainReduction) : 1), 0, this.options.fadeRate * 1000);
             this.reportProgress("Fading");
             let obj = this.current;
             setTimeout(() => {

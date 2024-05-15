@@ -9,6 +9,7 @@ export interface PlayerOptions {
   ctx: any; // output context - i.e. headphones or speakers
   systemLowestGain: { meanVolume: number; maxVolume: number };
   fadeRate: number; // time over which to fade out.
+  useSoundLevelling: boolean;
   fetchNext: (N: number) => Promise<{ track?: Track; silence: number }>;
   progress?: (data: ProgressData) => void;
 }
@@ -79,7 +80,7 @@ export class Player {
           if (timeNow >= timeEnd - 500 && !ending) {
             this.current.ending = true;
             player.fade(
-              Player.dBtoLinear(gainReduction),
+              (this.options.useSoundLevelling ? Player.dBtoLinear(gainReduction) : 1),
               0,
               this.options.fadeRate * 1000
             );
@@ -261,6 +262,7 @@ export class Player {
           track.metadata.end = Math.min(20, track.metadata.end);
         }
         if (
+          this.options.useSoundLevelling && 
           track.metadata?.meanVolume !== null &&
           track.metadata?.meanVolume !== undefined
         ) {
@@ -314,7 +316,7 @@ export class Player {
     if (this.isPlaying) {
       this.current!.ending = true;
       this.current!.player.fade(
-        Player.dBtoLinear(this.current!.gainReduction),
+        (this.options.useSoundLevelling ? Player.dBtoLinear(this.current!.gainReduction) : 1),
         0,
         this.options.fadeRate * 1000
       );
