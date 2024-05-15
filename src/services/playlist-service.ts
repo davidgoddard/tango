@@ -113,6 +113,7 @@ export class PlaylistService {
                             style="${track.metadata?.tags?.style!}" 
                             title="${track.metadata?.tags?.title!}" 
                             artist="${track.metadata?.tags?.artist!}"
+                            duration="${track.metadata?.end ? track.metadata?.end - track.metadata?.start : ''}"
                             year="${year}"></track-element>`;
             })
           );
