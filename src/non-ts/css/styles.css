@@ -355,3 +355,9 @@ label img {
   bottom: 0px;
   height: 0px;
 }
+
+#playlistContainer {
+  display: grid;
+  grid-template-rows: auto;
+  overflow-y: auto;
+}

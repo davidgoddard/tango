@@ -1,4 +1,5 @@
 import { eventBus } from "../events/event-bus";
+import { renderTrackDetail } from "../services/utils";
 
 export interface SearchResult {
   tracks: any[],
@@ -128,12 +129,7 @@ class SearchElement extends HTMLElement {
     public results(resultset: SearchResult) {
         this.tracksCount.textContent = resultset.tracks.length.toString();
         this.tandasCount.textContent = resultset.tandas.length.toString();
-        this.tracksContent.innerHTML = resultset.tracks.map(track => `<track-element 
-            trackid="${track.id}"
-            title="${track.metadata?.tags?.title || track.name}"
-            artist="${track.metadata?.tags?.artist || 'unknown'}"
-            year="${track.metadata?.tags?.year || 'unknown'}"
-        ></track-element>`).join('');
+        this.tracksContent.innerHTML = resultset.tracks.map(track => renderTrackDetail(0, track, 'track')).join('');
         this.tandasContent.innerHTML = JSON.stringify(resultset.tandas);
 
         // // Add event listeners to buttons for moving tracks to scratch pad

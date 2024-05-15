@@ -1,3 +1,5 @@
+import { formatTime, timeStringToSeconds } from "../services/utils";
+
 export type Action = {
   id: string;
 image: string;
@@ -21,49 +23,6 @@ class TandaElement extends HTMLElement {
 
   connectedCallback() {
     this.render();
-  }
-
-  private timeStringToSeconds(timeString: string | null): number | string {
-    if (timeString) {
-      const parts = timeString.split(":").map(Number);
-      let seconds = 0;
-
-      if (parts.length === 3) {
-        seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
-      } else if (parts.length === 2) {
-        seconds = parts[0] * 60 + parts[1];
-      } else {
-        return "?";
-      }
-
-      return seconds;
-    } else {
-      return "";
-    }
-  }
-
-  private toTime(seconds: number): string {
-    if (isNaN(seconds)) return "?";
-
-    let minutes = Math.floor(seconds / 60);
-    let hours = Math.floor(minutes / 60);
-
-    seconds %= 60;
-    minutes %= 60;
-
-    const formattedSeconds = seconds < 10 ? "0" + seconds : seconds;
-    const formattedMinutes = minutes < 10 ? "0" + minutes : minutes;
-
-    const parts = [];
-    if (hours > 0) {
-      parts.push(hours);
-      parts.push(formattedMinutes);
-    } else {
-      parts.push(minutes);
-    }
-    parts.push(formattedSeconds);
-
-    return parts.join(":");
   }
 
   private findMinMaxYears(years: (string | null)[]): string {
@@ -120,9 +79,9 @@ class TandaElement extends HTMLElement {
     let duration = 0;
     tracks.forEach(
       (track) =>
-        (duration += this.timeStringToSeconds(track.getAttribute("duration")) as number)
+        (duration += timeStringToSeconds(track.getAttribute("duration")) as number)
     );
-    const summary = `(${titles.length} Tracks; Duration: ${this.toTime(
+    const summary = `(${titles.length} Tracks; Duration: ${formatTime(
       duration
     )}):  ${
       [...titleSet][0] == "place holder" ? "Place Holder" : ""

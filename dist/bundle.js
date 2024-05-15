@@ -722,6 +722,51 @@
   };
   var eventBus = new EventBus();
 
+  // dist/services/utils.js
+  function formatTime(totalSeconds, includeHours = false) {
+    if (totalSeconds < 0) {
+      return "?";
+    }
+    totalSeconds = Math.floor(totalSeconds);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor(totalSeconds % 3600 / 60);
+    const seconds = totalSeconds % 60;
+    const hoursString = includeHours ? `${hours.toString().padStart(2, "0")}:` : "";
+    const minutesString = minutes.toString().padStart(2, "0");
+    const secondsString = seconds.toString().padStart(2, "0");
+    return `${hoursString}${minutesString}:${secondsString}`;
+  }
+  function timeStringToSeconds(timeString) {
+    if (timeString) {
+      const parts = timeString.split(":").map(Number);
+      let seconds = 0;
+      if (parts.length === 3) {
+        seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+      } else if (parts.length === 2) {
+        seconds = parts[0] * 60 + parts[1];
+      } else {
+        return "?";
+      }
+      return seconds;
+    } else {
+      return "";
+    }
+  }
+  function renderTrackDetail(idx, track, typeName) {
+    let year = track.metadata?.tags?.date || track.metadata?.tags?.year || track.metadata?.tags?.creation_time;
+    if (year) {
+      year = year.substring(0, 4);
+    }
+    return `<${typeName}-element
+                  tandaid="${idx}"
+                  trackid="${String(track.id)}" 
+                  style="${track.metadata?.tags?.style}" 
+                  title="${track.metadata?.tags?.title}" 
+                  artist="${track.metadata?.tags?.artist}"
+                  duration="${track.metadata?.end ? formatTime(track.metadata?.end - track.metadata?.start) : ""}"
+                  year="${year}"></${typeName}-element>`;
+  }
+
   // dist/components/tanda.element.js
   var TandaElement = class extends HTMLElement {
     expanded = false;
@@ -731,41 +776,6 @@
     }
     connectedCallback() {
       this.render();
-    }
-    timeStringToSeconds(timeString) {
-      if (timeString) {
-        const parts = timeString.split(":").map(Number);
-        let seconds = 0;
-        if (parts.length === 3) {
-          seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
-        } else if (parts.length === 2) {
-          seconds = parts[0] * 60 + parts[1];
-        } else {
-          return "?";
-        }
-        return seconds;
-      } else {
-        return "";
-      }
-    }
-    toTime(seconds) {
-      if (isNaN(seconds))
-        return "?";
-      let minutes = Math.floor(seconds / 60);
-      let hours = Math.floor(minutes / 60);
-      seconds %= 60;
-      minutes %= 60;
-      const formattedSeconds = seconds < 10 ? "0" + seconds : seconds;
-      const formattedMinutes = minutes < 10 ? "0" + minutes : minutes;
-      const parts = [];
-      if (hours > 0) {
-        parts.push(hours);
-        parts.push(formattedMinutes);
-      } else {
-        parts.push(minutes);
-      }
-      parts.push(formattedSeconds);
-      return parts.join(":");
     }
     findMinMaxYears(years) {
       const numericYears = years.map((year) => year ? Number(year) : NaN).filter((year) => !isNaN(year));
@@ -798,8 +808,8 @@
         styles.add(this.getAttribute("style"));
       }
       let duration = 0;
-      tracks.forEach((track2) => duration += this.timeStringToSeconds(track2.getAttribute("duration")));
-      const summary = `(${titles.length} Tracks; Duration: ${this.toTime(duration)}):  ${[...titleSet][0] == "place holder" ? "Place Holder" : ""} ${this.findMinMaxYears(years)} ${[...artists].join(", ")}`;
+      tracks.forEach((track2) => duration += timeStringToSeconds(track2.getAttribute("duration")));
+      const summary = `(${titles.length} Tracks; Duration: ${formatTime(duration)}):  ${[...titleSet][0] == "place holder" ? "Place Holder" : ""} ${this.findMinMaxYears(years)} ${[...artists].join(", ")}`;
       const track = cortina[0];
       let cortinaArtist;
       let cortinaTitle;
@@ -973,6 +983,18 @@
     connectedCallback() {
       this.render();
       this.shadowRoot.querySelector("#headphones").addEventListener("click", this.playOnHeadphones.bind(this));
+      this.shadowRoot.querySelector(".cortina").addEventListener("click", this.handleTrackClick.bind(this));
+    }
+    handleTrackClick() {
+      const trackId = this.getAttribute("trackid");
+      if (trackId) {
+        const event = new CustomEvent("clickedTrack", {
+          detail: this,
+          bubbles: true
+        });
+        this.dispatchEvent(event);
+        console.log("Sending event", event);
+      }
     }
     render() {
       this.shadowRoot.innerHTML = `
@@ -1023,7 +1045,7 @@
             <h2>(Cortina) ${this.getAttribute("title")}</h2>
           </header>
           <main>          
-            <p>${this.getAttribute("style")} By ${this.getAttribute("artist")} Year ${this.getAttribute("year")} Duration: ${this.getAttribute("duration")}</p>
+            <p><span class='style'>${this.getAttribute("style") == "undefined" ? "Style undefined" : this.getAttribute("style")}</span> By ${this.getAttribute("artist")} Year ${this.getAttribute("year")} Duration: ${this.getAttribute("duration")}</p>
             </main>
         </article>
         `;
@@ -1043,7 +1065,10 @@
         this.isPlayingOnHeadphones = false;
         this.shadowRoot.querySelector("#headphones").classList.remove("playing");
       }
-      eventBus.emit("playOnHeadphones", { element: this, playing: this.isPlayingOnHeadphones });
+      eventBus.emit("playOnHeadphones", {
+        element: this,
+        playing: this.isPlayingOnHeadphones
+      });
     }
   };
   customElements.define("cortina-element", CortinaElement);
@@ -1152,12 +1177,7 @@
     results(resultset) {
       this.tracksCount.textContent = resultset.tracks.length.toString();
       this.tandasCount.textContent = resultset.tandas.length.toString();
-      this.tracksContent.innerHTML = resultset.tracks.map((track) => `<track-element 
-            trackid="${track.id}"
-            title="${track.metadata?.tags?.title || track.name}"
-            artist="${track.metadata?.tags?.artist || "unknown"}"
-            year="${track.metadata?.tags?.year || "unknown"}"
-        ></track-element>`).join("");
+      this.tracksContent.innerHTML = resultset.tracks.map((track) => renderTrackDetail(0, track, "track")).join("");
       this.tandasContent.innerHTML = JSON.stringify(resultset.tandas);
     }
     // Method to show content based on tab clicked
@@ -1190,7 +1210,7 @@
       this.render();
       this.shadowRoot.querySelector("#headphones").addEventListener("click", this.playOnHeadphones.bind(this));
       this.shadowRoot.querySelector(".actions").addEventListener("click", this.handleTargetButtonClick.bind(this));
-      this.shadowRoot.querySelector("main").addEventListener("click", this.handleTrackClick.bind(this));
+      this.shadowRoot.querySelector(".track").addEventListener("click", this.handleTrackClick.bind(this));
     }
     addAction(action) {
       this.actions.add(action);
@@ -1232,6 +1252,7 @@
           bubbles: true
         });
         this.dispatchEvent(event);
+        console.log("Sending event", event);
       }
     }
     render() {
@@ -1318,7 +1339,7 @@
         </header>
         <main>
             <p>                
-                <span class='style'>${this.getAttribute("style")}</span>
+                <span class='style'>${this.getAttribute("style") == "undefined" ? "Style undefined" : this.getAttribute("style")}</span>
                 By <span class='artist'>${this.getAttribute("artist")}</span>
                 Year <span class='year'>${this.getAttribute("year")}</span>
                 Duration: <span class='duration'>${this.getAttribute("duration")}</span>
@@ -1371,20 +1392,6 @@
 
   // dist/services/player.js
   var import_howler_min = __toESM(require_howler_min());
-
-  // dist/services/utils.js
-  function formatTime(milliseconds, includeHours = false) {
-    const totalSeconds = Math.floor(milliseconds / 1e3);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor(totalSeconds % 3600 / 60);
-    const seconds = totalSeconds % 60;
-    const hoursString = includeHours ? `${hours.toString().padStart(2, "0")}:` : "";
-    const minutesString = minutes.toString().padStart(2, "0");
-    const secondsString = seconds.toString().padStart(2, "0");
-    return `${hoursString}${minutesString}:${secondsString}`;
-  }
-
-  // dist/services/player.js
   var Player = class _Player {
     options;
     current = null;
@@ -1436,7 +1443,7 @@
       const { player, track, state } = this.current;
       if (player) {
         const pos = !(track.metadata?.end >= 0) ? state == "Stopped" ? 0 : player.seek() * 1e3 : state == "Stopped" ? 0 : Math.min(player.seek() * 1e3 - track.metadata?.start, 1e3 * (track.metadata.end - track.metadata.start));
-        const displayName = track.metadata?.end < 0 ? `${state}:  ${this.current.displayName} ( ${formatTime(player.seek() * 1e3)} / ? )` : `${state}: ${this.current.displayName}  ( ${formatTime(pos)} / ${formatTime(1e3 * (track.metadata.end - track.metadata.start))} )`;
+        const displayName = track.metadata?.end < 0 ? `${state}:  ${this.current.displayName} ( ${formatTime(player.seek())} / ? )` : `${state}: ${this.current.displayName}  ( ${formatTime(pos / 1e3)} / ${formatTime(track.metadata.end - track.metadata.start)} )`;
         if (this.options.progress) {
           this.options.progress({
             track,
@@ -1634,35 +1641,29 @@
     async setTandas(tandaList) {
       this.tandaList = tandaList;
       await this.extractTracks();
+      function render(idx, track, typeName) {
+        let year = track.metadata?.tags?.date || track.metadata?.tags?.year || track.metadata?.tags?.creation_time;
+        if (year) {
+          year = year.substring(0, 4);
+        }
+        return `<${typeName}-element
+                    tandaid="${idx}"
+                    trackid="${String(track.id)}" 
+                    style="${track.metadata?.tags?.style}" 
+                    title="${track.metadata?.tags?.title}" 
+                    artist="${track.metadata?.tags?.artist}"
+                    duration="${track.metadata?.end ? formatTime(track.metadata?.end - track.metadata?.start) : ""}"
+                    year="${year}"></${typeName}-element>`;
+      }
       eventBus.emit("new-playlist");
       this.container.innerHTML = (await Promise.all(this.tandaList.map(async (tanda, idx) => {
         const cortinaElement = tanda.cortina ? (async () => {
           let track = await this.getDetail("cortina", tanda.cortina);
-          let year = track.metadata?.tags?.date || track.metadata?.tags?.year || track.metadata?.tags?.creation_time;
-          if (year) {
-            year = year.substring(0, 4);
-          }
-          return `<cortina-element
-                                tandaid="${idx}"
-                                trackid="${String(track.id)}" 
-                                style="${track.metadata?.tags?.style}" 
-                                title="${track.metadata?.tags?.title}" 
-                                artist="${track.metadata?.tags?.artist}"
-                                year="${year}"></cortina-element>`;
+          return render(idx, track, "cortina");
         })() : "";
         const trackElements = await Promise.all(tanda.tracks.map(async (trackName) => {
           let track = await this.getDetail("track", trackName);
-          let year = track.metadata?.tags?.date || track.metadata?.tags?.year || track.metadata?.tags?.creation_time;
-          if (year) {
-            year = year.substring(0, 4);
-          }
-          return `<track-element 
-                            tandaid="${idx}"
-                            trackid="${String(track.id)}" 
-                            style="${track.metadata?.tags?.style}" 
-                            title="${track.metadata?.tags?.title}" 
-                            artist="${track.metadata?.tags?.artist}"
-                            year="${year}"></track-element>`;
+          return render(idx, track, "track");
         }));
         return `<tanda-element style='unknown'>
                         ${await cortinaElement}
@@ -1699,6 +1700,17 @@
     }
     fetch(N) {
       return this.trackList[N];
+    }
+    getN(track) {
+      const tracks = Array.from(this.container.querySelectorAll("track-element, cortina-element")).filter((track2) => track2.getAttribute("trackid"));
+      let N = 0;
+      for (let i = 0; i < tracks.length; i++) {
+        if (tracks[i] === track) {
+          N = i;
+          console.log("Clicked on track N ", N);
+        }
+      }
+      return N;
     }
   };
 
@@ -2342,6 +2354,9 @@
       },
       refreshAudioLists: () => {
         populateOutputDeviceOptions(config);
+      },
+      stopButton: () => {
+        eventBus.emit("stopPlaying");
       }
     };
     for (const key of Object.keys(quickClickHandlers)) {
@@ -2381,10 +2396,31 @@
   async function runApplication(dbManager, config) {
     let systemLowestGain = await getSystemLevel(dbManager);
     let fadeRate = 3;
-    const playlistService = new PlaylistService(getDomElement("#playlistContainer"), async (type, name) => {
+    const playlistContainer = getDomElement("#playlistContainer");
+    const playlistService = new PlaylistService(playlistContainer, async (type, name) => {
       return await dbManager.getDataByName(type, name);
     });
+    playlistContainer.addEventListener("clickedTrack", async (event) => {
+      try {
+        const detail = event.detail;
+        console.log("Playlist detected clicked on tanda track", detail);
+        if (!speakerOutputPlayer.isPlaying) {
+          let N = playlistService.getN(detail);
+          console.log("Nothing playing at the moment");
+          await speakerOutputPlayer.updatePosition(N - 1);
+          if (speakerOutputPlayer.next) {
+            speakerOutputPlayer.next.silence = 0;
+          }
+          speakerOutputPlayer.startNext();
+          getDomElement("#stopButton").classList.add("active");
+        }
+      } catch (error) {
+        console.error(error);
+        alert(error);
+      }
+    });
     const headerField = getDomElement("body > header > h1");
+    const stopButton = getDomElement("#stopButton");
     const speakerPlayerConfig = {
       ctx: config.mainOutput,
       systemLowestGain,
@@ -2409,6 +2445,11 @@
         return { track: nextTrack, silence };
       },
       progress: (data) => {
+        if (data.state === "Playing") {
+          stopButton.classList.add("active");
+        } else {
+          stopButton.classList.remove("active");
+        }
         headerField.textContent = data.display;
       }
     };
@@ -2446,6 +2487,9 @@
       headphonesPlayerConfig.useSoundLevelling = config.useSoundLevelling;
       headphonesOutputPlayer.updateOptions(headphonesPlayerConfig);
     });
+    eventBus.on("stopPlaying", () => {
+      speakerOutputPlayer.stop();
+    });
     eventBus.on("playOnHeadphones", async (detail) => {
       console.log("Play on headphones in app", detail);
       const track = detail.element;
@@ -2465,8 +2509,8 @@
         headphonePlaylist = [];
       }
     });
-    eventBus.on("new-playlist", async () => {
-      await speakerOutputPlayer.updatePosition(-1);
+    eventBus.on("new-playlist", async (N = -1) => {
+      await speakerOutputPlayer.updatePosition(N);
       speakerOutputPlayer.startNext();
     });
     const tracks = await dbManager.processEntriesInBatches("track", (record) => true);

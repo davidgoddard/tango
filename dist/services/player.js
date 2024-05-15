@@ -75,8 +75,8 @@ export class Player {
                     ? 0
                     : Math.min(player.seek() * 1000 - track.metadata?.start, 1000 * (track.metadata.end - track.metadata.start));
             const displayName = track.metadata?.end < 0
-                ? `${state}:  ${this.current.displayName} ( ${formatTime(player.seek() * 1000)} / ? )`
-                : `${state}: ${this.current.displayName}  ( ${formatTime(pos)} / ${formatTime(1000 * (track.metadata.end - track.metadata.start))} )`;
+                ? `${state}:  ${this.current.displayName} ( ${formatTime(player.seek())} / ? )`
+                : `${state}: ${this.current.displayName}  ( ${formatTime(pos / 1000)} / ${formatTime((track.metadata.end - track.metadata.start))} )`;
             if (this.options.progress) {
                 this.options.progress({
                     track,

@@ -35,7 +35,7 @@ class TrackElement extends HTMLElement {
       this.handleTargetButtonClick.bind(this)
     );
 
-    this.shadowRoot!.querySelector("main")!.addEventListener(
+    this.shadowRoot!.querySelector(".track")!.addEventListener(
       "click",
       this.handleTrackClick.bind(this)
     );
@@ -87,6 +87,7 @@ class TrackElement extends HTMLElement {
         bubbles: true,
       });
       this.dispatchEvent(event);
+      console.log('Sending event', event)
     }
   }
 
@@ -178,7 +179,7 @@ class TrackElement extends HTMLElement {
         </header>
         <main>
             <p>                
-                <span class='style'>${this.getAttribute("style")}</span>
+                <span class='style'>${this.getAttribute("style") == 'undefined' ?  'Style undefined' : this.getAttribute("style")}</span>
                 By <span class='artist'>${this.getAttribute("artist")}</span>
                 Year <span class='year'>${this.getAttribute("year")}</span>
                 Duration: <span class='duration'>${this.getAttribute(

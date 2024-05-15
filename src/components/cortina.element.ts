@@ -10,9 +10,26 @@ class CortinaElement extends HTMLElement {
   connectedCallback() {
     this.render();
     this.shadowRoot!.querySelector("#headphones")!.addEventListener(
-        "click",
-        this.playOnHeadphones.bind(this)
-      );
+      "click",
+      this.playOnHeadphones.bind(this)
+    );
+
+    this.shadowRoot!.querySelector(".cortina")!.addEventListener(
+      "click",
+      this.handleTrackClick.bind(this)
+    );
+  }
+
+  handleTrackClick() {
+    const trackId = this.getAttribute("trackid");
+    if (trackId) {
+      const event = new CustomEvent("clickedTrack", {
+        detail: this,
+        bubbles: true,
+      });
+      this.dispatchEvent(event);
+      console.log('Sending event', event)
+    }
   }
 
   render() {
@@ -61,16 +78,16 @@ class CortinaElement extends HTMLElement {
         <article class="cortina">
           <header>
             <button id="headphones" class="${
-                this.isPlayingOnHeadphones ? "playing" : ""
+              this.isPlayingOnHeadphones ? "playing" : ""
             }"><img src="./icons/headphones-icon.png" alt="Listen on headphones"></button>
             <h2>(Cortina) ${this.getAttribute("title")}</h2>
           </header>
           <main>          
-            <p>${this.getAttribute("style")} By ${this.getAttribute(
-                "artist"
-                )} Year ${this.getAttribute("year")} Duration: ${this.getAttribute(
-                "duration"
-                )}</p>
+            <p><span class='style'>${this.getAttribute("style") == 'undefined' ?  'Style undefined' : this.getAttribute("style")}</span> By ${this.getAttribute(
+      "artist"
+    )} Year ${this.getAttribute("year")} Duration: ${this.getAttribute(
+      "duration"
+    )}</p>
             </main>
         </article>
         `;
@@ -94,8 +111,10 @@ class CortinaElement extends HTMLElement {
         "playing"
       );
     }
-    eventBus.emit('playOnHeadphones', { element: this, playing: this.isPlayingOnHeadphones })
-
+    eventBus.emit("playOnHeadphones", {
+      element: this,
+      playing: this.isPlayingOnHeadphones,
+    });
   }
 }
 customElements.define("cortina-element", CortinaElement);

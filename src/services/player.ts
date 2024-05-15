@@ -121,12 +121,12 @@ export class Player {
       const displayName =
         track.metadata?.end < 0
           ? `${state}:  ${this.current.displayName} ( ${formatTime(
-              player.seek() * 1000
+              player.seek()
             )} / ? )`
           : `${state}: ${this.current.displayName}  ( ${formatTime(
-              pos
+              pos / 1000
             )} / ${formatTime(
-              1000 * (track.metadata.end - track.metadata.start)
+              (track.metadata.end - track.metadata.start)
             )} )`;
       if (this.options.progress) {
         this.options.progress({

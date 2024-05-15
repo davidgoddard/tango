@@ -437,15 +437,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   let config = await InitialiseConfig(dbManager);
 
   eventBus.on("requestAccessToDisk", () => {
-    console.log('Requesting access to disk')
+    console.log("Requesting access to disk");
     const modal = getDomElement("#permissionModal");
     modal.classList.remove("hidden");
   });
-  await openMusicFolder(dbManager, config)
+  await openMusicFolder(dbManager, config);
 
   // test one file
-  const testTrack = dbManager.getDataById('track', 0)
-
+  const testTrack = dbManager.getDataById("track", 0);
 
   // Setup the quick key click to function mappings
 
@@ -486,6 +485,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     },
     refreshAudioLists: () => {
       populateOutputDeviceOptions(config);
+    },
+    stopButton: () => {
+      eventBus.emit("stopPlaying");
     },
   };
 
@@ -572,17 +574,39 @@ async function runApplication(
   let systemLowestGain = await getSystemLevel(dbManager);
   let fadeRate = 3;
 
+  const playlistContainer = getDomElement("#playlistContainer");
   const playlistService = new PlaylistService(
-    getDomElement("#playlistContainer"),
+    playlistContainer,
     async (type: string, name: string): Promise<Track> => {
       return (await dbManager.getDataByName(type as TableNames, name)) as Track;
     }
   );
 
+  playlistContainer.addEventListener("clickedTrack", async (event: Event) => {
+    try {
+      const detail = (event as CustomEvent).detail;
+      console.log("Playlist detected clicked on tanda track", detail);
+      if (!speakerOutputPlayer.isPlaying) {
+        let N = playlistService.getN(detail);
+        console.log("Nothing playing at the moment");
+        await speakerOutputPlayer.updatePosition(N - 1);
+        if (speakerOutputPlayer.next) {
+          speakerOutputPlayer.next.silence = 0;
+        }
+        speakerOutputPlayer.startNext();
+        getDomElement("#stopButton").classList.add("active");
+      }
+    } catch (error) {
+      console.error(error);
+      alert(error);
+    }
+  });
+
   // Prepare the new music speakerOutputPlayer to play music adjusted to the given system gain
   // and fade songs using the given fade rate.
 
   const headerField = getDomElement("body > header > h1");
+  const stopButton = getDomElement('#stopButton')
   const speakerPlayerConfig: PlayerOptions = {
     ctx: config.mainOutput,
     systemLowestGain,
@@ -607,6 +631,11 @@ async function runApplication(
       return { track: nextTrack, silence };
     },
     progress: (data: ProgressData) => {
+      if (data.state === "Playing") {
+        stopButton.classList.add("active");
+      } else {
+        stopButton.classList.remove("active");
+      }
       headerField.textContent = data.display;
     },
   };
@@ -647,6 +676,9 @@ async function runApplication(
     headphonesPlayerConfig.useSoundLevelling = config.useSoundLevelling;
     headphonesOutputPlayer.updateOptions(headphonesPlayerConfig);
   });
+  eventBus.on("stopPlaying", () => {
+    speakerOutputPlayer.stop();
+  });
 
   eventBus.on("playOnHeadphones", async (detail: any) => {
     console.log("Play on headphones in app", detail);
@@ -680,9 +712,9 @@ async function runApplication(
     }
   });
 
-  eventBus.on("new-playlist", async () => {
+  eventBus.on("new-playlist", async (N = -1) => {
     // make the next track the first in the playlist
-    await speakerOutputPlayer.updatePosition(-1);
+    await speakerOutputPlayer.updatePosition(N);
     speakerOutputPlayer.startNext();
   });
 
