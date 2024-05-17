@@ -1,6 +1,11 @@
-// Example usage:
-// console.log(formatTime(5000)); // Output: "00:05"
-// console.log(formatTime(5000, true)); // Output: "00:00:05"
+export function convert(input) {
+    return input.normalize("NFC");
+    // const encoder = new TextEncoder();
+    // const uint8Array = encoder.encode(input);
+    // let decoder = new TextDecoder('utf-16');
+    // let text = decoder.decode(uint8Array);
+    // return text;
+}
 export function formatTime(totalSeconds, includeHours = false) {
     if (totalSeconds < 0) {
         return '?';
@@ -55,4 +60,10 @@ export function renderTrackDetail(idx, track, typeName) {
         ? formatTime((track.metadata?.end - track.metadata?.start))
         : ""}"
                   data-year="${year}"></${typeName}-element>`;
+}
+export function getDomElementAll(selector) {
+    return document.querySelectorAll(selector);
+}
+export function getDomElement(selector) {
+    return document.querySelector(selector);
 }

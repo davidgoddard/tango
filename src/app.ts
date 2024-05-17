@@ -7,39 +7,24 @@ import { TabsContainer } from "./components/tabs.component";
 import { TrackElement } from "./components/track.element";
 import { SearchResult } from "./components/search.element";
 
-import { Track, Tanda, Playlist, BaseRecord, TableNames } from "./data-types";
+import { Track, Tanda, ConfigOptions, TableNames } from "./data-types";
 import { Player, PlayerOptions, ProgressData } from "./services/player";
 import { PlaylistService } from "./services/playlist-service";
-import {
-  DatabaseManager,
-  IndexedDBManager,
-  convert,
-} from "./services/database";
-import {
-  fetchLibraryFiles,
-  getAllFiles,
-  openMusicFolder,
-} from "./services/file-system";
+import { DatabaseManager, IndexedDBManager } from "./services/database";
+import { openMusicFolder } from "./services/file-system";
+import { getDomElement } from "./services/utils";
+import { enumerateOutputDevices, requestAudioPermission, verifyPermission } from "./services/permissions.service";
+import { loadLibraryIntoDB, scanFileSystem } from "./services/file-database.interface";
+import { TandaElement } from "./components/tanda.element";
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register("service-worker.js")
-      .then((registration) => {
-        console.log("Service Worker registered:", registration);
-      })
       .catch((error) => {
         console.error("Service Worker registration failed:", error);
       });
   });
-}
-
-interface ConfigOptions extends BaseRecord {
-  musicFolder?: FileSystemDirectoryHandle;
-  defaultTandaStyleSequence: string;
-  mainOutput?: string;
-  headphoneOutput?: string;
-  useSoundLevelling: boolean;
 }
 
 const SYSTEM: ConfigOptions = {
@@ -49,13 +34,6 @@ const SYSTEM: ConfigOptions = {
 
 const CONFIG_ID = 1;
 
-function getDomElementAll(selector: string): NodeList {
-  return document.querySelectorAll(selector);
-}
-function getDomElement(selector: string): HTMLElement {
-  return document.querySelector(selector) as HTMLElement;
-}
-
 async function InitialiseConfig(
   dbManager: IndexedDBManager
 ): Promise<ConfigOptions> {
@@ -64,9 +42,7 @@ async function InitialiseConfig(
     if (!config) {
       // Set defaults
       await dbManager.addData("system", SYSTEM);
-      console.log(`Set default config`);
     } else {
-      console.log(config, "Combined", { ...SYSTEM, ...config });
       await dbManager.updateData("system", config.id!, {
         ...SYSTEM,
         ...config,
@@ -92,271 +68,14 @@ async function getSystemLevel(
     extension = extension[extension.length - 1];
     return true;
   });
-  console.log(
-    "Fetched all files",
-    files.length,
-    "Lowest gain",
-    systemLowestGain
-  );
   return systemLowestGain;
 }
 
-// Event listener to receive messages from the child frame
-window.addEventListener("message", (event) => {
-  if (event.origin !== window.origin) return; // Security check
-
-  const data = event.data;
-  if (data.type === "ffmpeg_output") {
-    console.log("Received FFmpeg output from child:", data);
-  }
-});
-
-// Find all song files and add to the database any not yet known
-
-async function scanFileSystem(
-  config: ConfigOptions,
-  dbManager: IndexedDBManager,
-  analyze: boolean
-) {
-  try {
-    async function analyzeBatch(
-      fileHandles: FileSystemFileHandle[]
-    ): Promise<any> {
-      // Create an iframe containing the ffmpeg code
-
-      let iframe: HTMLIFrameElement; // Track reference to iframe
-      iframe = document.createElement("iframe");
-      iframe.src = "ffmpeg-frame.html";
-      document.getElementById("iframeContainer")!.appendChild(iframe);
-
-      // Wait for the FFmpeg module to be initialised
-
-      await new Promise((resolve) => {
-        iframe.addEventListener("load", () => {
-          resolve(null);
-        });
-      });
-
-      //@ts-ignore
-      let results = await iframe.contentWindow!.readMetadataFromFileHandle(
-        fileHandles
-      );
-
-      // Tear down the FFmpeg module to free resources
-
-      if (iframe) {
-        console.log("Cleaning up FFmpeg resources...");
-        // Remove iframe from DOM
-        iframe.remove();
-      }
-
-      return results;
-    }
-    const scanProgress = getDomElement("#scanProgress");
-    const scanFilePath = getDomElement("#scanFilePath");
-    scanFilePath.textContent = analyze
-      ? "Please wait - progress is reported in batches ..."
-      : "";
-    scanProgress.textContent = "";
-
-    let files = await getAllFiles(
-      config.musicFolder as FileSystemDirectoryHandle
-    );
-
-    function splitArrayIntoBatches<T>(array: T[], batchSize: number): T[][] {
-      const batches: T[][] = [];
-      for (let i = 0; i < array.length; i += batchSize) {
-        batches.push(array.slice(i, i + batchSize));
-      }
-      return batches;
-    }
-
-    let batchSize = 20;
-    const batches = splitArrayIntoBatches(files, batchSize);
-
-    let n = 0;
-    for (const batch of batches) {
-      let analysis;
-      if (analyze) {
-        // Get results on a one-to-one match to the batch
-        analysis = await analyzeBatch(batch.map((item) => item.fileHandle));
-      }
-      for (let batchIdx = 0; batchIdx < batch.length; batchIdx++) {
-        const item = batch[batchIdx];
-        let indexFileName = convert(item.relativeFileName);
-
-        // Keep user informed as this will take a long time
-        scanFilePath.textContent = item.relativeFileName;
-        scanProgress.textContent = ++n + "/" + files.length;
-
-        const table =
-          indexFileName.split(/\/|\\/g)[1] == "music" ? "track" : "cortina";
-
-        // Create new version of the record
-
-        let metadata: any = analysis
-          ? analysis[batchIdx]
-          : {
-              start: 0,
-              end: -1,
-              meanVolume: -20,
-              maxVolume: 0,
-              tags: { title: indexFileName, artist: "unknown" },
-            };
-
-        const newData: Track = {
-          type: table,
-          name: indexFileName,
-          fileHandle: item.fileHandle,
-          metadata,
-          classifiers: {
-            favourite: true,
-          },
-        };
-
-        try {
-          // Look up filename to see if we already have a trackid for it
-          let { id }: Track = (await dbManager.getDataByName(
-            table,
-            indexFileName
-          )) as Track;
-
-          if (!id) {
-            await dbManager.addData(table, newData);
-          } else {
-            await dbManager.updateData(table, id!, newData);
-          }
-        } catch (error) {
-          await dbManager.addData(table, newData);
-        }
-      }
-    }
-
-    console.log("Have now updated the database with all tracks");
-  } catch (error) {
-    console.error(error);
-  }
-}
-
-async function loadLibraryIntoDB(
-  config: ConfigOptions,
-  dbManager: IndexedDBManager
-): Promise<void> {
-  const scanProgress = getDomElement("#scanProgress");
-  const scanFilePath = getDomElement("#scanFilePath");
-
-  const libraryFileHandles = await fetchLibraryFiles(
-    config.musicFolder as FileSystemDirectoryHandle
-  );
-
-  async function getJSON(file: File) {
-    const text = await file.text();
-    const json = JSON.parse(text);
-    return json;
-  }
-
-  async function setTrackDetails(library: any, table: "track" | "cortina") {
-    let n = 0;
-    let files = await getAllFiles(
-      config.musicFolder as FileSystemDirectoryHandle
-    );
-    for (const file of files) {
-      scanFilePath.textContent = file.relativeFileName;
-      scanProgress.textContent = ++n + "/" + files.length;
-
-      let tn = convert(file.relativeFileName);
-
-      const libTrack = library[tn.substring(1)];
-      if (libTrack) {
-        const newData: Track = {
-          type: table,
-          name: tn,
-          fileHandle: file.fileHandle,
-          metadata: {
-            tags: {
-              title: libTrack.track.title,
-              artist: libTrack.track.artist,
-              notes: libTrack.classifiers?.notes,
-              year: libTrack.track.date,
-              bpm: libTrack.classifiers?.bpm,
-            },
-            start: libTrack.analysis.start,
-            end: libTrack.analysis.silence,
-            style: libTrack.classifiers?.style,
-            meanVolume: libTrack.analysis.meanGain || -20,
-            maxVolume: libTrack.analysis.gain || 0,
-          },
-          classifiers: {
-            favourite: true,
-          },
-        };
-        await dbManager.addData(table, newData);
-      } else {
-        console.log("Not found in library", tn.substring(1));
-      }
-    }
-  }
-
-  if (libraryFileHandles) {
-    let library: any;
-    let cortinas: any;
-    let tandas: any;
-    let playlists: any;
-    console.log(libraryFileHandles);
-    if (libraryFileHandles.library) {
-      library = await getJSON(await libraryFileHandles.library.getFile());
-      console.log(library);
-      await dbManager.clearAllData("track");
-      await setTrackDetails(library, "track");
-    }
-    if (libraryFileHandles.cortinas) {
-      cortinas = await getJSON(await libraryFileHandles.cortinas.getFile());
-      console.log("cortinas", cortinas);
-      await dbManager.clearAllData("cortina");
-      await setTrackDetails(cortinas, "cortina");
-    }
-    if (libraryFileHandles.tandas) {
-      tandas = await getJSON(await libraryFileHandles.tandas.getFile());
-      console.log("tandas", tandas);
-    }
-    if (libraryFileHandles.playlists) {
-      playlists = await getJSON(await libraryFileHandles.playlists.getFile());
-      console.log("playlists", playlists);
-    }
-
-    for (let tanda of tandas) {
-      tanda.tracks = tanda.tracks.map((track: string) => "/" + track);
-      if (tanda.cortina && tanda.cortina[0]) {
-        tanda.cortina = await dbManager.getDataByName(
-          "cortina",
-          tanda.cortina.map(
-            (cortina: { track: string }) => "/" + cortina.track
-          )[0]
-        );
-      } else {
-        tanda.cortina = undefined;
-      }
-      try {
-        const existing = await dbManager.getDataById("tanda", tanda.id);
-        if (!existing) {
-          await dbManager.addData("tanda", tanda);
-        } else {
-          await dbManager.updateData("tanda", tanda.id, tanda);
-        }
-      } catch (error) {
-        delete tanda.id;
-        await dbManager.addData("tanda", tanda);
-      }
-    }
-  }
-}
-
+// THIS MUST ONLY BE CALLED FROM A BUTTON
 async function deleteDatabase(
   dbManager: IndexedDBManager
 ): Promise<ConfigOptions> {
-  console.log("Deleting the database");
   await dbManager.resetDatabase();
-  console.log("Restoring config");
   await dbManager.addData("system", SYSTEM);
   let config = (await dbManager.getDataById(
     "system",
@@ -381,27 +100,6 @@ async function processQuery(
   return { tracks, tandas: [] };
 }
 
-// Request permission to access audio devices
-async function requestAudioPermission() {
-  try {
-    await navigator.mediaDevices.getUserMedia({ audio: true });
-    // Permission granted
-    console.log("Permission to access audio devices granted.");
-  } catch (error) {
-    // Permission denied or error
-    console.error("Error accessing audio devices:", error);
-  }
-}
-
-// Function to enumerate available audio output devices
-async function enumerateOutputDevices() {
-  const devices = await navigator.mediaDevices.enumerateDevices();
-  console.log("Available audio devices", devices);
-  const outputDevices = devices.filter(
-    (device) => device.kind === "audiooutput"
-  );
-  return outputDevices;
-}
 
 // Function to populate the select element with output device options
 async function populateOutputDeviceOptions(config: ConfigOptions) {
@@ -425,6 +123,9 @@ async function populateOutputDeviceOptions(config: ConfigOptions) {
   );
 }
 
+//=====================================================================================================================
+// Setup application layout and check file permissions and create database etc.
+//=====================================================================================================================
 document.addEventListener("DOMContentLoaded", async () => {
   try {
     await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -442,9 +143,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const dbManager = await DatabaseManager();
   let config = await InitialiseConfig(dbManager);
 
-  // test one file
-  const testTrack = dbManager.getDataById("track", 0);
-
   // Setup the quick key click to function mappings
 
   let quickClickHandlers: { [key: string]: EventListener } = {
@@ -453,6 +151,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         .then(() => {
           const modal = getDomElement("#permissionModal");
           modal.classList.add("hidden");
+          eventBus.emit('UserGrantedPermission');
         })
         .catch((error) => {
           alert(error);
@@ -488,6 +187,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     stopButton: () => {
       eventBus.emit("stopPlaying");
     },
+    playAll: ()=>{
+      eventBus.emit('playAll')
+    },
+    stopPlayAll: ()=>{
+      eventBus.emit('stopAll')
+    },
     createTandaButton: () => {
       const scratchPad = getDomElement("#scratchPad");
       const newTanda = document.createElement("tanda-element");
@@ -502,6 +207,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       quickClickHandlers[key]
     );
   }
+
+
+    await new Promise((resolve)=>{
+      eventBus.once('UserGrantedPermission', resolve)
+    }) 
+  
 
   // Handle configuration changes
   const useSoundLevelling = getDomElement(
@@ -551,7 +262,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     const selectedDeviceId = (outputDeviceSelector as HTMLSelectElement).value;
     config.mainOutput = selectedDeviceId;
     dbManager.updateData("system", 1, config);
-    console.log("Audio Setting: ", config);
     eventBus.emit("change-speaker", selectedDeviceId);
   });
   const headphoneDeviceSelector = getDomElement("#headphones-output-devices");
@@ -560,7 +270,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       .value;
     config.headphoneOutput = selectedDeviceId;
     dbManager.updateData("system", 1, config);
-    console.log("Audio Setting: ", config);
     eventBus.emit("change-headphones", selectedDeviceId);
   });
 
@@ -568,11 +277,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   await runApplication(dbManager, config);
 });
 
+//============================================================================================================
+// Only run this if permissions are all OK
+//============================================================================================================
 async function runApplication(
   dbManager: IndexedDBManager,
   config: ConfigOptions
 ) {
-  // await verifyPermission(config.musicFolder, 'readonly')
 
   // Scan all files in database to find system's lowest gain for normalisation purposes
 
@@ -590,10 +301,8 @@ async function runApplication(
   playlistContainer.addEventListener("clickedTrack", async (event: Event) => {
     try {
       const detail = (event as CustomEvent).detail;
-      console.log("Playlist detected clicked on tanda track", detail);
       if (!speakerOutputPlayer.isPlaying) {
         let N = playlistService.getN(detail);
-        console.log("Nothing playing at the moment");
         await speakerOutputPlayer.updatePosition(N - 1);
         if (speakerOutputPlayer.next) {
           speakerOutputPlayer.next.silence = 0;
@@ -622,7 +331,6 @@ async function runApplication(
       let nextTrack: Track = playlistService.fetch(N);
       if (N > 0) {
         let previousTrack = playlistService.fetch(N - 1);
-        console.log("Next & previous", nextTrack, previousTrack);
         silence = 2;
         if (nextTrack.type == "track" && previousTrack.type == "cortina") {
           silence = 4;
@@ -638,8 +346,14 @@ async function runApplication(
     progress: (data: ProgressData) => {
       if (data.state === "Playing") {
         stopButton.classList.add("active");
+        if ( data.track!.type == 'cortina' ){
+          playlistService.playingCortina(true)
+        } else {
+          playlistService.playingCortina(false)
+        }
       } else {
         stopButton.classList.remove("active");
+        playlistService.playingCortina(false)
       }
       headerField.textContent = data.display;
     },
@@ -656,10 +370,6 @@ async function runApplication(
     useSoundLevelling: config.useSoundLevelling,
     fetchNext: async (N: number) => {
       if (N == 0) {
-        console.log("Headphones next", {
-          track: headphonePlaylist[0],
-          silence: 0,
-        });
         return { track: headphonePlaylist[0], silence: 0 };
       } else {
         return { track: undefined, silence: 0 };
@@ -684,12 +394,28 @@ async function runApplication(
     headphonesPlayerConfig.useSoundLevelling = config.useSoundLevelling;
     headphonesOutputPlayer.updateOptions(headphonesPlayerConfig);
   });
+  eventBus.on('playAll', ()=>{
+    speakerOutputPlayer.extendEndTime(-1)
+  })
+  eventBus.on('stopAll', ()=>{
+    speakerOutputPlayer.startNext();
+  })
   eventBus.on("stopPlaying", () => {
-    speakerOutputPlayer.stop();
+    speakerOutputPlayer.stop();    
+    (
+      Array.from(
+        document.querySelectorAll("tanda-element,track-element,cortina-element")
+      ) as (TrackElement|TandaElement)[]
+    ).forEach(x => {
+      x.draggable = true;
+      x.setPlaying(false);
+      if ( (x as TandaElement).setPlayed )
+        (x as TandaElement).setPlayed(false);
+    });
+
   });
 
   eventBus.on("playOnHeadphones", async (detail: any) => {
-    console.log("Play on headphones in app", detail);
     const track = detail.element;
     // Clear all other tracks from playing
 
@@ -714,7 +440,6 @@ async function runApplication(
       )) as Track;
       headphonesOutputPlayer.stop();
       await headphonesOutputPlayer.updatePosition(-1);
-      console.log(headphonesOutputPlayer.next);
       headphonesOutputPlayer.startNext();
       headphonePlaylist = [];
     }
@@ -725,6 +450,18 @@ async function runApplication(
     await speakerOutputPlayer.updatePosition(N);
     speakerOutputPlayer.startNext();
   });
+
+  eventBus.on('swapped-playlist', ()=> {
+    // Find current song and workout how moved.
+    const allTracks = Array.from(playlistContainer.querySelectorAll('track-element,cortina-element'))
+    const playing = playlistContainer.querySelector('track-element.playing, cortina-element.playing') as TrackElement;
+    console.log('Swapped so update playing state', playing, allTracks)
+    if ( playing ){
+      const N = allTracks.findIndex(track => track == playing)
+      console.log('Found N to be', N)
+      speakerOutputPlayer.updatePosition(N);
+    }
+  })
 
   // Simulate user request to start playing
   // setTimeout(() => {
@@ -763,8 +500,10 @@ async function runApplication(
     }
 
     allTandas.push(tanda);
+    allTandas.push(tanda);
+    allTandas.push(tanda);
   }
-  console.log(allTandas);
+  // console.log(allTandas);
   await playlistService.setTandas(allTandas);
 
   // eventBus.once("next-track-ready", async () => {

@@ -29,15 +29,12 @@ async function readFileContents(fileHandle: FileSystemFileHandle) {
         if (!contents) {
             console.log('Failed to read file');
         } else {
-            console.log('File read successfully', contents);
             const uint8Array = new Uint8Array(contents);
-            console.log('Got unit8 array', uint8Array.byteLength);
             contents = uint8Array;
         }
     } catch (error) {
         console.error('Error reading file contents:', error);
     }
-    console.log('Read file size: ', contents?.byteLength);
     return contents;
 }
 
@@ -45,10 +42,8 @@ let totalCalls = 0;
 
 // All commands must feature the output to "output.wav"
 export const runFFmpegCommand = async (fileHandle: FileSystemFileHandle, ...args: string[]) => {
-    console.log('FFMPEG call ', totalCalls);
     totalCalls++;
     if (totalCalls % 50 === 0) {
-        console.log('RE-INITIALISING FFMPEG');
         ffmpeg.terminate();
         setTimeout(async ()=>{
             await initializeFFmpeg()
@@ -131,7 +126,6 @@ export const decodeFFmpegOutput = (outputLines: string[]) => {
     let tags: Record<string, string> = {};
     let tagsContext = '';
     for (const line of outputLines) {
-        console.log(line);
         if (tagsContext === '' && line.match(/Output.*to 'pipe:'/)) {
             tagsContext = 'output';
         }
@@ -141,9 +135,7 @@ export const decodeFFmpegOutput = (outputLines: string[]) => {
             tags[tagName] = tagValue;
         }
         if (line.match(/Parsed_volumedetect_0.*_volume/)) {
-            console.log('GAIN ', line);
             const tokens = line.split(' ');
-            console.log(tokens);
             if (tokens[4] === 'mean_volume:') {
                 meanVolume = parseFloat(tokens[5]);
             }
@@ -152,22 +144,15 @@ export const decodeFFmpegOutput = (outputLines: string[]) => {
             }
         }
         if (line.match(/\[fferr\]   Duration: /i)) {
-            console.log('DURATION', line);
             const tokens = line.split(' ');
-            console.log(tokens);
             duration = timeStringToSeconds(tokens[4]);
         }
         if (line.match(/silencedetect @.* silence_start/)) {
-            console.log('SILENCE START', line);
             const tokens = line.split(' ');
-            console.log(tokens);
             silenceEndCommences = parseFloat(tokens[5]);
         }
         if (line.match(/silencedetect @.* silence_end: .* | silence_duration: .*/)) {
-            console.log('SILENCE END', line);
             const tokens = line.split(' ');
-            console.log(tokens);
-            let duration = parseFloat(tokens[8]);
             let time = parseFloat(tokens[5]);
             if (time < 10) {
                 silenceStartFinishes = time;
@@ -180,9 +165,6 @@ export const decodeFFmpegOutput = (outputLines: string[]) => {
     if (silenceEndCommences < duration - 20) {
         silenceEndCommences = duration;
     }
-    console.log('Derived duration', duration);
-    console.log('Derived silence at start finishes @', silenceStartFinishes);
-    console.log('Derived silence at end starts @', silenceEndCommences);
 
     const metadata = {
         start: silenceStartFinishes,

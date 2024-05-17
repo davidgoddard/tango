@@ -73,6 +73,7 @@ header button {
   justify-self: flex-start;
   display: none;
   flex-grow: 0;
+  margin-right: 1rem 
 }
 
 header button.active {
@@ -274,10 +275,14 @@ form p {
 }
 
 .playlistHeading {
-  display: flex;
+  display: grid;
   width: 100%;
-  justify-content: space-between;
   padding: 0.2rem 0.2rem 0.2rem 0.5rem;
+  grid-template-columns: auto auto auto;
+}
+
+.playlistHeading #stopButton {
+  margin-right: 1rem;
 }
 
 .playlistHeading section {
@@ -361,4 +366,15 @@ label img {
   display: grid;
   grid-template-rows: auto;
   overflow-y: auto;
+}
+
+.valid-drop-zone {
+  margin: 1rem !important;
+  border: dashed 2px green !important;
+}
+
+.controlButtons {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }

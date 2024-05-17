@@ -11,7 +11,7 @@
     <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
     <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
 
-    <meta name="theme-color" content="#317EFB"/>
+    <meta name="theme-color" content="#317EFB" />
 
     <link rel="icon" type="image/x-icon" href="./icons/favicon.ico">
 
@@ -38,11 +38,12 @@
         <h3>Audio Output Selector</h3>
 
         <button class="active" id="refreshAudioLists">Refresh Audio Device Lists</button>
-        <br/>
-  
+        <br />
+
         <label for="speaker-output-devices"><img src="./icons/speaker.png" alt="Select Speakers device">:</label>
         <select id="speaker-output-devices"></select>
-        <label for="headphones-output-devices"><img src="./icons/headphones.png" alt="Select Headphones device">:</label>
+        <label for="headphones-output-devices"><img src="./icons/headphones.png"
+                alt="Select Headphones device">:</label>
         <select id="headphones-output-devices"></select>
 
         <h3>Aspirations</h3>
@@ -110,8 +111,12 @@
             <section class="fixedColumnContent">
                 <header class="playlistHeading">
                     <h2>Playlist</h2>
-                    <section>
+                    <section class="controlButtons">
                         <button id="stopButton"><img src="./icons/stopNow.png" alt="stop now"></button>
+                        <button id="playAll" class="active"><img src="./icons/player_play 2.png"
+                                alt="Play whole cortina"></button>
+                        <button id="stopPlayAll" class="active"><img src="./icons/player_stop 2.png"
+                                alt="Play whole cortina"></button>
                     </section>
                     <section>
                         <p>Show times:
@@ -168,12 +173,12 @@
 
     <div id="permissionModal" class="overlay">
         <div class="modal">
-          <h2>Permission Request</h2>
-          <p>Tanda Player needs your permission to read your music files folder for all files. Please click 'Allow' to
-            continue.</p>
-          <button class="active" id="askUserPermission">Allow</button>
+            <h2>Permission Request</h2>
+            <p>Tanda Player needs your permission to read your music files folder for all files. Please click 'Allow' to
+                continue.</p>
+            <button class="active" id="askUserPermission">Allow</button>
         </div>
-      </div>
+    </div>
 
 </body>
 

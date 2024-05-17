@@ -41,7 +41,6 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     for (const search of searches) {
         search.addEventListener('search', async (event) => {
-            console.log(search, 'Search text', event.detail)
             switch (search.id) {
                 case 'generalSearch':
                     search.results(await generalSearch(event.detail));

@@ -1,9 +1,14 @@
-// Example usage:
-// console.log(formatTime(5000)); // Output: "00:05"
-
 import { Track } from "../data-types";
 
-// console.log(formatTime(5000, true)); // Output: "00:00:05"
+export function convert(input: string): string {
+  return input.normalize("NFC");
+      // const encoder = new TextEncoder();
+  // const uint8Array = encoder.encode(input);
+  // let decoder = new TextDecoder('utf-16');
+  // let text = decoder.decode(uint8Array);
+  // return text;
+}
+
 export function formatTime(
     totalSeconds: number,
   includeHours: boolean = false
@@ -73,4 +78,9 @@ export function renderTrackDetail(idx: number, track: Track, typeName:string): s
 
   }
 
-  
+  export function getDomElementAll(selector: string): NodeList {
+    return document.querySelectorAll(selector);
+  }
+  export function getDomElement(selector: string): HTMLElement {
+    return document.querySelector(selector) as HTMLElement;
+  }

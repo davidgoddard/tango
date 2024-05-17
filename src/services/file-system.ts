@@ -1,3 +1,4 @@
+
 import { eventBus } from "../events/event-bus";
 
 interface SaveFilePickerOptions {
@@ -152,26 +153,11 @@ interface FileSystemHandlePermissionDescriptor {
   mode?: "read" | "readwrite";
 }
 
-// export async function verifyPermission(
-//   fileHandle: FileSystemFileHandle,
-//   readWrite: boolean
-// ): Promise<boolean> {
-//   const options: FileSystemHandlePermissionDescriptor = {};
-//   if (readWrite) {
-//     options.mode = "readwrite";
-//   }
-//   if ((await (await fileHandle.()).queryPermission(options)) === "granted") {
-//     return true;
-//   }
-//   return (await fileHandle.requestPermission(options)) === "granted";
-// }
-
 export async function openMusicFolder(
   dbManager: any,
   config: any
 ): Promise<void> {
   try {
-    console.log(`Using config ${JSON.stringify(config)}`);
     const directoryHandleOrUndefined = config.musicFolder;
     if (directoryHandleOrUndefined) {
       console.log(
@@ -214,3 +200,4 @@ export async function saveFileWithWritePermission(
   }
   return fileHandle;
 }
+

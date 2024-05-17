@@ -3,15 +3,6 @@
 import { Track, BaseRecord, Playlist, TableNames } from '../data-types'
 
 
-export function convert(input: string): string {
-    return input.normalize("NFC");
-        // const encoder = new TextEncoder();
-    // const uint8Array = encoder.encode(input);
-    // let decoder = new TextDecoder('utf-16');
-    // let text = decoder.decode(uint8Array);
-    // return text;
-}
-
 export type IndexedDBRecord = BaseRecord | Track | Playlist ;
 
 export class IndexedDBManager {

@@ -21,18 +21,18 @@ class BaseTrackElement extends HTMLElement {
     super();
     this.attachShadow({ mode: "open" });
     this.draggable = true;
-    this.addEventListener("dragstart", this.handleDragStart);
-    this.addEventListener("dragend", this.handleDragEnd);
+    // this.addEventListener("dragstart", this.handleDragStart);
+    // this.addEventListener("dragend", this.handleDragEnd);
   }
 
-  handleDragStart(event: DragEvent) {
-    const trackId = this.dataset.trackId!;
-    event.dataTransfer!.setData("text/plain", trackId);
-  }
+  // handleDragStart(event: DragEvent) {
+  //   const trackId = this.dataset.trackId!;
+  //   event.dataTransfer!.setData("text/plain", JSON.stringify({type: 'track', id: trackId}));
+  // }
 
-  handleDragEnd() {
-    // Clean up after drag operation, if needed
-  }
+  // handleDragEnd() {
+  //   // Clean up after drag operation, if needed
+  // }
 
   connectedCallback() {
     this.render();
@@ -65,7 +65,6 @@ class BaseTrackElement extends HTMLElement {
   playOnHeadphones(event: Event) {
     event.stopPropagation();
     event.preventDefault();
-    console.log("Play on headphones", this);
     if (!this.isPlayingOnHeadphones) {
       this.isPlayingOnHeadphones = true;
       this.shadowRoot!.querySelector("#headphones")!.classList.add("playing");
@@ -83,6 +82,8 @@ class BaseTrackElement extends HTMLElement {
 
   setPlaying(state: boolean){
     this.isPlaying = state;
+    this.draggable = !state && (this.parentElement!.draggable);
+    this.classList.toggle('playing')
     this.shadowRoot!.querySelector('article')?.classList.toggle('playing')
   }
 
@@ -109,7 +110,6 @@ class BaseTrackElement extends HTMLElement {
         bubbles: true,
       });
       this.dispatchEvent(event);
-      console.log("Sending event", event);
     }
   }
 
@@ -120,7 +120,7 @@ class BaseTrackElement extends HTMLElement {
             background-color:transparent;
         }
         .track {
-            padding: 0.4rem;
+            padding: 0 0 0 0.4rem;
         }
         header {
           display: grid;
@@ -144,12 +144,15 @@ class BaseTrackElement extends HTMLElement {
         }
         p {
             padding: 0px;
-            margin: 0.2rem 0;
+            margin: 0px;
         }
+        article {
+          border: solid 2px transparent;
+          display: block;
+          border-radius: 5px;
+      }
         article.playing {
             border: solid 2px orange;
-            display: block;
-            border-radius: 5px;
             background-color: #ffe000a6 !important;
         }
         :host-context(track-element:nth-child(2n)) article{
@@ -157,6 +160,10 @@ class BaseTrackElement extends HTMLElement {
         }
         :host-context(track-element:nth-child(2n+1)) article{
             background-color: #f9ede1a6;
+        }
+        :host-context(.valid-drop-zone) article {
+            margin: 1rem !important;
+            border: dashed 2px green !important;
         }
         
         button.target {
@@ -200,9 +207,9 @@ class BaseTrackElement extends HTMLElement {
         <button id="headphones" class="${
           this.isPlayingOnHeadphones ? "playing" : ""
         }">
-            <img src="./icons/headphones-icon.png" alt="Listen on headphones">
+            <img src="./icons/headphones.png" alt="Listen on headphones">
         </button>
-        <h2>${this.dataset.title}</h2>
+        <h2>${this.dataset.tandaId} ${this.dataset.title}</h2>
             <div id="floated">
               ${
                 !/undefined|null/.test(this.dataset.bpm!)

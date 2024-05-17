@@ -723,6 +723,9 @@
   var eventBus = new EventBus();
 
   // dist/services/utils.js
+  function convert(input) {
+    return input.normalize("NFC");
+  }
   function formatTime(totalSeconds, includeHours = false) {
     if (totalSeconds < 0) {
       return "?";
@@ -768,13 +771,19 @@
                   data-duration="${track.metadata?.end ? formatTime(track.metadata?.end - track.metadata?.start) : ""}"
                   data-year="${year}"></${typeName}-element>`;
   }
+  function getDomElement(selector) {
+    return document.querySelector(selector);
+  }
 
   // dist/components/tanda.element.js
   var TandaElement = class extends HTMLElement {
     expanded = false;
+    isPlaying = false;
+    hasPlayed = false;
     constructor() {
       super();
       this.attachShadow({ mode: "open" });
+      this.draggable = true;
     }
     connectedCallback() {
       this.render();
@@ -797,6 +806,30 @@
         return "";
       }
     }
+    setPlaying(state) {
+      this.isPlaying = state;
+      if (this.isPlaying) {
+        this.classList.add("playing");
+        this.draggable = false;
+        this.shadowRoot.querySelector("#container article")?.classList.add("playing");
+      } else {
+        this.classList.remove("playing");
+        this.draggable = true;
+        this.shadowRoot.querySelector("#container article")?.classList.remove("playing");
+      }
+    }
+    setPlayed(state) {
+      this.hasPlayed = state;
+      if (this.hasPlayed) {
+        this.classList.add("played");
+        this.draggable = false;
+        this.shadowRoot.querySelector("#container article")?.classList.add("played");
+      } else {
+        this.classList.remove("played");
+        this.draggable = true;
+        this.shadowRoot.querySelector("#container article")?.classList.remove("played");
+      }
+    }
     render() {
       const tracks = Array.from(this.querySelectorAll("track-element"));
       const cortina = Array.from(this.querySelectorAll("cortina-element"));
@@ -806,7 +839,6 @@
       const years = tracks.map((track2) => track2.dataset.year).filter((x) => x).map((year) => year.substring(0, 4));
       const styles = new Set(tracks.map((track2) => track2.dataset.style)?.filter((x) => x));
       if (styles.size == 0) {
-        console.log("Getting tanda style from attribute", this.dataset.style);
         styles.add(this.dataset.style);
       }
       let duration = 0;
@@ -843,6 +875,12 @@
                 #container {
                   width: 100%;
                 }
+                #container article.playing {
+                  border: solid 2px orange;
+                }
+                #container article.played {
+                  background-color: grey;
+                }
                 #container article {
                     border: solid 2px #ccc;
                     border-radius: 7px;
@@ -876,9 +914,9 @@
                     border: dashed 2px green;
                     margin: 1rem;
                 }
-                :host-context(tanda-element.target) #actions button {
-                    display: block;
-                }
+                // :host-context(tanda-element.target) #actions button {
+                //     display: block;
+                // }
                 #actions button.target {
                     display: none;
                 }
@@ -886,17 +924,17 @@
                     height: 20px;
                     width: 20px;
                 }
-                :host-context(.playing) #container article {
-                    border: dashed 2px #cf8805;
-                    display: block;
-                    border-radius: 10px;
-                    margin: 1rem!important;
-                }
-                :host-context(.played) {
-                    display: block;
-                    background-color: #777;
-                    border-radius: 10px;
-                }
+                // #container article {
+                //     border: dashed 2px #cf8805;
+                //     display: block;
+                //     border-radius: 10px;
+                //     margin: 1rem!important;
+                // }
+                // :host-context(.played) {
+                //     display: block;
+                //     background-color: #777;
+                //     border-radius: 10px;
+                // }
                 .cortinaControls {
                     display: none;
                 }
@@ -922,8 +960,9 @@
                     margin-bottom: 0.3rem;
                 }
             </style>
-            <div id="container">
+            <div id="container" class="${this.hasPlayed ? "played" : ""}">
                 <article>
+                <h1>${this.dataset.tandaId}</h1>
                     <div id="toggle" class="summary">
                         <header>
                             <span>${styles.size == 1 ? [...styles]?.[0]?.charAt(0)?.toUpperCase() : "?"}</span>
@@ -931,10 +970,6 @@
                         <main>
                                                      
                             <section>
-                                <div class="cortinaControls">
-                                    <button class="playAll"><img src="./icons/player_play 2.png" alt="Play whole cortina"></button>
-                                    <button class="stopPlayAll"><img src="./icons/player_stop 2.png" alt="Play whole cortina"></button>
-                                </div>
                                 ${cortinaSummary}
                                 <section id="actions"></section>
                             </section>
@@ -949,8 +984,6 @@
             </div>
         `;
       this.shadowRoot.querySelector("#toggle main").addEventListener("click", () => this.toggleExpand());
-      this.shadowRoot.querySelector(".playAll").addEventListener("click", this.notifyPlayAll.bind(this));
-      this.shadowRoot.querySelector(".stopPlayAll").addEventListener("click", this.notifyStopPlayAll.bind(this));
     }
     toggleExpand() {
       this.expanded = !this.expanded;
@@ -963,14 +996,6 @@
         details.classList.remove("expanded");
         span.textContent = "";
       }
-    }
-    notifyPlayAll() {
-      const event = new CustomEvent("playFullCortina", { bubbles: true });
-      this.dispatchEvent(event);
-    }
-    notifyStopPlayAll() {
-      const event = new CustomEvent("stopPlayFullCortina", { bubbles: true });
-      this.dispatchEvent(event);
     }
   };
   customElements.define("tanda-element", TandaElement);
@@ -1108,15 +1133,14 @@
       super();
       this.attachShadow({ mode: "open" });
       this.draggable = true;
-      this.addEventListener("dragstart", this.handleDragStart);
-      this.addEventListener("dragend", this.handleDragEnd);
     }
-    handleDragStart(event) {
-      const trackId = this.dataset.trackId;
-      event.dataTransfer.setData("text/plain", trackId);
-    }
-    handleDragEnd() {
-    }
+    // handleDragStart(event: DragEvent) {
+    //   const trackId = this.dataset.trackId!;
+    //   event.dataTransfer!.setData("text/plain", JSON.stringify({type: 'track', id: trackId}));
+    // }
+    // handleDragEnd() {
+    //   // Clean up after drag operation, if needed
+    // }
     connectedCallback() {
       this.render();
       this.shadowRoot.querySelector("#headphones").addEventListener("click", this.playOnHeadphones.bind(this));
@@ -1133,7 +1157,6 @@
     playOnHeadphones(event) {
       event.stopPropagation();
       event.preventDefault();
-      console.log("Play on headphones", this);
       if (!this.isPlayingOnHeadphones) {
         this.isPlayingOnHeadphones = true;
         this.shadowRoot.querySelector("#headphones").classList.add("playing");
@@ -1148,6 +1171,8 @@
     }
     setPlaying(state) {
       this.isPlaying = state;
+      this.draggable = !state && this.parentElement.draggable;
+      this.classList.toggle("playing");
       this.shadowRoot.querySelector("article")?.classList.toggle("playing");
     }
     handleTargetButtonClick(event) {
@@ -1170,7 +1195,6 @@
           bubbles: true
         });
         this.dispatchEvent(event);
-        console.log("Sending event", event);
       }
     }
     render() {
@@ -1180,7 +1204,7 @@
             background-color:transparent;
         }
         .track {
-            padding: 0.4rem;
+            padding: 0 0 0 0.4rem;
         }
         header {
           display: grid;
@@ -1204,12 +1228,15 @@
         }
         p {
             padding: 0px;
-            margin: 0.2rem 0;
+            margin: 0px;
         }
+        article {
+          border: solid 2px transparent;
+          display: block;
+          border-radius: 5px;
+      }
         article.playing {
             border: solid 2px orange;
-            display: block;
-            border-radius: 5px;
             background-color: #ffe000a6 !important;
         }
         :host-context(track-element:nth-child(2n)) article{
@@ -1217,6 +1244,10 @@
         }
         :host-context(track-element:nth-child(2n+1)) article{
             background-color: #f9ede1a6;
+        }
+        :host-context(.valid-drop-zone) article {
+            margin: 1rem !important;
+            border: dashed 2px green !important;
         }
         
         button.target {
@@ -1256,9 +1287,9 @@
         </section>
         <header>
         <button id="headphones" class="${this.isPlayingOnHeadphones ? "playing" : ""}">
-            <img src="./icons/headphones-icon.png" alt="Listen on headphones">
+            <img src="./icons/headphones.png" alt="Listen on headphones">
         </button>
-        <h2>${this.dataset.title}</h2>
+        <h2>${this.dataset.tandaId} ${this.dataset.title}</h2>
             <div id="floated">
               ${!/undefined|null/.test(this.dataset.bpm) ? `<span>BPM: <span>${this.dataset.bpm}</span></span>` : ""}
               ${!/undefined|null/.test(this.dataset.year) ? `<span>Year: ${this.dataset.year}</span></span>` : ""}
@@ -1338,7 +1369,6 @@
     updateOptions(newOptions) {
       this.options = newOptions;
       this.systemGain = this.options.systemLowestGain.meanVolume - this.options.systemLowestGain.maxVolume;
-      console.log("New config", this.options, this.systemGain);
     }
     checkProgress() {
       if (this.current) {
@@ -1414,10 +1444,10 @@
       try {
         const N = this.playlistPos + 1;
         const { track, silence } = await this.options.fetchNext(N);
-        console.log("Result from fetch next", track, silence);
         if (track) {
-          track.metadata.end = 20;
-          const { player, url } = await this.createPlayer(track);
+          track.metadata.originalEnd = track.metadata.end;
+          track.metadata.end = 10;
+          const { player, url } = await this.createPlayer(N, track);
           if (player) {
             const next = {
               position: N,
@@ -1456,11 +1486,9 @@
     get playing() {
       return this.playlistPos;
     }
-    async createPlayer(track) {
+    async createPlayer(N, track) {
       try {
         const url = URL.createObjectURL(await track.fileHandle.getFile());
-        console.log("Creating music player for context: ", this.options.ctx);
-        let N = this.playlistPos;
         const howlerConfig = {
           src: [url],
           html5: true,
@@ -1468,7 +1496,6 @@
           autoplay: false,
           ctx: this.options.ctx,
           onplay: () => {
-            console.log("starting howler playing");
             eventBus.emit("startingPlaying", {
               player: this,
               track,
@@ -1476,7 +1503,6 @@
             });
           },
           onstop: () => {
-            console.log("ending howler playing");
             eventBus.emit("stoppedPlaying", {
               player: this,
               track,
@@ -1484,7 +1510,6 @@
             });
           }
         };
-        console.log("New player config: ", howlerConfig);
         const player = new import_howler_min.Howl(howlerConfig);
         player.once("load", async () => {
           if (this.options.ctx) {
@@ -1492,7 +1517,6 @@
               const audioElement = player._sounds[0]._node;
               if (typeof audioElement.setSinkId === "function") {
                 await audioElement.setSinkId(this.options.ctx);
-                console.log("Selected output device successfully");
               }
             } catch (error) {
               console.error(error, this.options.ctx);
@@ -1564,7 +1588,7 @@
     }
     extendEndTime(period) {
       if (this.isPlaying) {
-        this.current.track.metadata.end = period;
+        this.current.track.metadata.end = period == -1 ? this.current.track.metadata.originalEnd : period;
         this.current.ending = false;
       }
     }
@@ -1584,26 +1608,105 @@
       eventBus.on("track-request", this.requestTrack.bind(this));
       eventBus.on("startingPlaying", this.markPlaying.bind(this));
       eventBus.on("stoppedPlaying", this.unmarkPlaying.bind(this));
-      const dropTarget = this.container;
-      dropTarget.addEventListener("dragover", function(event) {
-        event.preventDefault();
+      const playlist = this.container;
+      let draggingElement;
+      let draggingElementTagName;
+      function hasPlayed(element) {
+        if (element.classList.contains("playing") || element.classList.contains("played")) {
+          return true;
+        }
+        if (element.tagName != "TANDA-ELEMENT") {
+          const parent = element.parentElement;
+          if (parent.classList.contains("played")) {
+            return true;
+          }
+        }
+        return false;
+      }
+      playlist.addEventListener("dragstart", function(event) {
+        draggingElement = event.target;
+        draggingElementTagName = draggingElement.tagName;
+        if (hasPlayed(draggingElement))
+          return;
+        event.dataTransfer.setData("text/plain", "");
       });
-      dropTarget.addEventListener("drop", function(event) {
+      playlist.addEventListener("dragover", function(event) {
         event.preventDefault();
-        const trackId = event.dataTransfer.getData("text/plain");
-        const trackElement = document.querySelector(`[data-track-id="${trackId}"]`);
-        dropTarget.appendChild(trackElement);
+        const targetElement = event.target;
+        if (isValidDropTarget(targetElement)) {
+          targetElement.classList.add("valid-drop-zone");
+        }
       });
+      playlist.addEventListener("dragleave", function(event) {
+        const targetElement = event.target;
+        if (isValidDropTarget(targetElement)) {
+          targetElement.classList.remove("valid-drop-zone");
+        }
+      });
+      function swapElements(element1, element2) {
+        const temp = document.createElement("div");
+        element1.parentNode.insertBefore(temp, element1);
+        element2.parentNode.insertBefore(element1, element2);
+        temp.parentNode.insertBefore(element2, temp);
+        temp.parentNode.removeChild(temp);
+      }
+      playlist.addEventListener("drop", function(event) {
+        event.preventDefault();
+        const targetElement = event.target.closest(draggingElementTagName);
+        if (isValidDropTarget(targetElement)) {
+          console.log("Valid drop - Target:", targetElement, "Drop element", draggingElement);
+          swapElements(targetElement, draggingElement);
+        }
+        targetElement.classList.remove("valid-drop-zone");
+        eventBus.emit("swapped-playlist");
+      });
+      function isValidDropTarget(targetElement) {
+        if (hasPlayed(targetElement))
+          return false;
+        const draggingItem = draggingElement.closest(draggingElementTagName);
+        const draggingStyle = draggingItem.dataset.style;
+        const targetStyle = targetElement.dataset.style;
+        return draggingStyle === targetStyle && draggingElement.tagName === targetElement.tagName;
+      }
+    }
+    playingCortina(state) {
+      if (state) {
+        getDomElement("#playAll").classList.add("active");
+        getDomElement("#stopPlayAll").classList.add("active");
+      } else {
+        getDomElement("#playAll").classList.remove("active");
+        getDomElement("#stopPlayAll").classList.remove("active");
+      }
     }
     markPlaying(details) {
       const trackElement = Array.from(this.container.querySelectorAll("track-element,cortina-element"))[details.N];
       console.log("Found track to mark as playing", trackElement);
-      trackElement.setPlaying(false);
+      trackElement.setPlaying(true);
+      const tandaId = trackElement.dataset.tandaId;
+      const tandaElement = this.container.querySelector(`tanda-element[data-tanda-id="${tandaId}"]`);
+      const total = Array.from(tandaElement.querySelectorAll("track-element"));
+      const playing = 1 + total.findIndex((item) => item.classList.contains("playing"));
+      console.log(`Playing ${playing}/${total.length}`);
+      tandaElement.setPlaying(true);
+      const allTandas = Array.from(this.container.querySelectorAll("tanda-element"));
+      allTandas.map((tanda) => {
+        tanda.setPlayed(false);
+      });
+      console.log("All tandas", allTandas);
+      for (let i = 0; i < allTandas.length; i++) {
+        if (allTandas[i] === tandaElement)
+          break;
+        console.log("Prior tanda now played");
+        allTandas[i].setPlayed(true);
+      }
     }
     unmarkPlaying(details) {
       const trackElement = Array.from(this.container.querySelectorAll("track-element,cortina-element"))[details.N];
       console.log("Found track to unmark as playing", trackElement);
       trackElement.setPlaying(false);
+      const tandaId = trackElement.dataset.tandaId;
+      const tandaElement = this.container.querySelector(`tanda-element[data-tanda-id="${tandaId}"]`);
+      tandaElement.setPlaying(false);
     }
     async setTandas(tandaList) {
       this.tandaList = tandaList;
@@ -1618,7 +1721,7 @@
           let track = await this.getDetail("track", trackName);
           return renderTrackDetail(idx, track, "track");
         }));
-        return `<tanda-element style='unknown'>
+        return `<tanda-element data-tanda-id="${idx}" data-style='unknown'>
                         ${await cortinaElement}
                         ${trackElements.join("")}
                     </tanda-element>`;
@@ -1654,15 +1757,15 @@
     fetch(N) {
       return this.trackList[N];
     }
+    fetchElement(N) {
+      return Array.from(this.container.querySelectorAll("track-element, cortina-element"))[N];
+    }
     getN(track) {
       return Array.from(this.container.querySelectorAll("track-element, cortina-element")).findIndex((t) => t == track);
     }
   };
 
   // dist/services/database.js
-  function convert(input) {
-    return input.normalize("NFC");
-  }
   var IndexedDBManager = class {
     dbName = "Tanda Player Database";
     dbVersion = 1;
@@ -1978,7 +2081,6 @@
   }
   async function openMusicFolder(dbManager, config) {
     try {
-      console.log(`Using config ${JSON.stringify(config)}`);
       const directoryHandleOrUndefined = config.musicFolder;
       if (directoryHandleOrUndefined) {
         console.log(`Retrieved directory handle "${directoryHandleOrUndefined.name}" from IndexedDB.`);
@@ -1994,64 +2096,22 @@
     }
   }
 
-  // dist/app.js
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("service-worker.js").then((registration) => {
-        console.log("Service Worker registered:", registration);
-      }).catch((error) => {
-        console.error("Service Worker registration failed:", error);
-      });
-    });
-  }
-  var SYSTEM = {
-    defaultTandaStyleSequence: "4T 4T 3W 4T 3M",
-    useSoundLevelling: true
-  };
-  var CONFIG_ID2 = 1;
-  function getDomElement(selector) {
-    return document.querySelector(selector);
-  }
-  async function InitialiseConfig(dbManager) {
+  // dist/services/permissions.service.js
+  async function requestAudioPermission() {
     try {
-      const config = await dbManager.getDataById("system", CONFIG_ID2);
-      if (!config) {
-        await dbManager.addData("system", SYSTEM);
-        console.log(`Set default config`);
-      } else {
-        console.log(config, "Combined", { ...SYSTEM, ...config });
-        await dbManager.updateData("system", config.id, {
-          ...SYSTEM,
-          ...config
-        });
-      }
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.log("Permission to access audio devices granted.");
     } catch (error) {
-      console.error("Database operation failed", error);
+      console.error("Error accessing audio devices:", error);
     }
-    return await dbManager.getDataById("system", CONFIG_ID2);
   }
-  async function getSystemLevel(dbManager) {
-    let systemLowestGain = { meanVolume: -20, maxVolume: 0 };
-    const files = await dbManager.processEntriesInBatches("track", (record) => {
-      let trackLevel = record.metadata.meanVolume - record.metadata.maxVolume;
-      let systemLevel = systemLowestGain.meanVolume - systemLowestGain.maxVolume;
-      if (trackLevel < systemLevel)
-        systemLowestGain = record.metadata;
-      let extension = record.name.split(".");
-      extension = extension[extension.length - 1];
-      return true;
-    });
-    console.log("Fetched all files", files.length, "Lowest gain", systemLowestGain);
-    return systemLowestGain;
+  async function enumerateOutputDevices() {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const outputDevices = devices.filter((device) => device.kind === "audiooutput");
+    return outputDevices;
   }
-  window.addEventListener("message", (event) => {
-    if (event.origin !== window.origin)
-      return;
-    const data = event.data;
-    if (data.type === "ffmpeg_output") {
-      console.log("Received FFmpeg output from child:", data);
-    }
-  });
+
+  // dist/services/file-database.interface.js
   async function scanFileSystem(config, dbManager, analyze) {
     try {
       let splitArrayIntoBatches = function(array, batchSize2) {
@@ -2223,10 +2283,51 @@
       }
     }
   }
+
+  // dist/app.js
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("service-worker.js").catch((error) => {
+        console.error("Service Worker registration failed:", error);
+      });
+    });
+  }
+  var SYSTEM = {
+    defaultTandaStyleSequence: "4T 4T 3W 4T 3M",
+    useSoundLevelling: true
+  };
+  var CONFIG_ID2 = 1;
+  async function InitialiseConfig(dbManager) {
+    try {
+      const config = await dbManager.getDataById("system", CONFIG_ID2);
+      if (!config) {
+        await dbManager.addData("system", SYSTEM);
+      } else {
+        await dbManager.updateData("system", config.id, {
+          ...SYSTEM,
+          ...config
+        });
+      }
+    } catch (error) {
+      console.error("Database operation failed", error);
+    }
+    return await dbManager.getDataById("system", CONFIG_ID2);
+  }
+  async function getSystemLevel(dbManager) {
+    let systemLowestGain = { meanVolume: -20, maxVolume: 0 };
+    const files = await dbManager.processEntriesInBatches("track", (record) => {
+      let trackLevel = record.metadata.meanVolume - record.metadata.maxVolume;
+      let systemLevel = systemLowestGain.meanVolume - systemLowestGain.maxVolume;
+      if (trackLevel < systemLevel)
+        systemLowestGain = record.metadata;
+      let extension = record.name.split(".");
+      extension = extension[extension.length - 1];
+      return true;
+    });
+    return systemLowestGain;
+  }
   async function deleteDatabase(dbManager) {
-    console.log("Deleting the database");
     await dbManager.resetDatabase();
-    console.log("Restoring config");
     await dbManager.addData("system", SYSTEM);
     let config = await dbManager.getDataById("system", CONFIG_ID2);
     await openMusicFolder(dbManager, config);
@@ -2237,20 +2338,6 @@
       return true;
     });
     return { tracks, tandas: [] };
-  }
-  async function requestAudioPermission() {
-    try {
-      await navigator.mediaDevices.getUserMedia({ audio: true });
-      console.log("Permission to access audio devices granted.");
-    } catch (error) {
-      console.error("Error accessing audio devices:", error);
-    }
-  }
-  async function enumerateOutputDevices() {
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    console.log("Available audio devices", devices);
-    const outputDevices = devices.filter((device) => device.kind === "audiooutput");
-    return outputDevices;
   }
   async function populateOutputDeviceOptions(config) {
     const outputDevices = await enumerateOutputDevices();
@@ -2279,12 +2366,12 @@
     });
     const dbManager = await DatabaseManager();
     let config = await InitialiseConfig(dbManager);
-    const testTrack = dbManager.getDataById("track", 0);
     let quickClickHandlers = {
       askUserPermission: async () => {
         await openMusicFolder(dbManager, config).then(() => {
           const modal = getDomElement("#permissionModal");
           modal.classList.add("hidden");
+          eventBus.emit("UserGrantedPermission");
         }).catch((error) => {
           alert(error);
         });
@@ -2319,6 +2406,12 @@
       stopButton: () => {
         eventBus.emit("stopPlaying");
       },
+      playAll: () => {
+        eventBus.emit("playAll");
+      },
+      stopPlayAll: () => {
+        eventBus.emit("stopAll");
+      },
       createTandaButton: () => {
         const scratchPad = getDomElement("#scratchPad");
         const newTanda = document.createElement("tanda-element");
@@ -2329,6 +2422,9 @@
     for (const key of Object.keys(quickClickHandlers)) {
       getDomElement((key.charAt(0) != "." ? "#" : "") + key).addEventListener("click", quickClickHandlers[key]);
     }
+    await new Promise((resolve) => {
+      eventBus.once("UserGrantedPermission", resolve);
+    });
     const useSoundLevelling = getDomElement("#useSoundLevelling");
     useSoundLevelling.addEventListener("change", () => {
       config.useSoundLevelling = useSoundLevelling.checked;
@@ -2347,7 +2443,6 @@
       const selectedDeviceId = outputDeviceSelector.value;
       config.mainOutput = selectedDeviceId;
       dbManager.updateData("system", 1, config);
-      console.log("Audio Setting: ", config);
       eventBus.emit("change-speaker", selectedDeviceId);
     });
     const headphoneDeviceSelector = getDomElement("#headphones-output-devices");
@@ -2355,7 +2450,6 @@
       const selectedDeviceId = headphoneDeviceSelector.value;
       config.headphoneOutput = selectedDeviceId;
       dbManager.updateData("system", 1, config);
-      console.log("Audio Setting: ", config);
       eventBus.emit("change-headphones", selectedDeviceId);
     });
     await runApplication(dbManager, config);
@@ -2370,10 +2464,8 @@
     playlistContainer.addEventListener("clickedTrack", async (event) => {
       try {
         const detail = event.detail;
-        console.log("Playlist detected clicked on tanda track", detail);
         if (!speakerOutputPlayer.isPlaying) {
           let N = playlistService.getN(detail);
-          console.log("Nothing playing at the moment");
           await speakerOutputPlayer.updatePosition(N - 1);
           if (speakerOutputPlayer.next) {
             speakerOutputPlayer.next.silence = 0;
@@ -2398,7 +2490,6 @@
         let nextTrack = playlistService.fetch(N);
         if (N > 0) {
           let previousTrack = playlistService.fetch(N - 1);
-          console.log("Next & previous", nextTrack, previousTrack);
           silence = 2;
           if (nextTrack.type == "track" && previousTrack.type == "cortina") {
             silence = 4;
@@ -2414,8 +2505,14 @@
       progress: (data) => {
         if (data.state === "Playing") {
           stopButton.classList.add("active");
+          if (data.track.type == "cortina") {
+            playlistService.playingCortina(true);
+          } else {
+            playlistService.playingCortina(false);
+          }
         } else {
           stopButton.classList.remove("active");
+          playlistService.playingCortina(false);
         }
         headerField.textContent = data.display;
       }
@@ -2428,10 +2525,6 @@
       useSoundLevelling: config.useSoundLevelling,
       fetchNext: async (N) => {
         if (N == 0) {
-          console.log("Headphones next", {
-            track: headphonePlaylist[0],
-            silence: 0
-          });
           return { track: headphonePlaylist[0], silence: 0 };
         } else {
           return { track: void 0, silence: 0 };
@@ -2454,11 +2547,22 @@
       headphonesPlayerConfig.useSoundLevelling = config.useSoundLevelling;
       headphonesOutputPlayer.updateOptions(headphonesPlayerConfig);
     });
+    eventBus.on("playAll", () => {
+      speakerOutputPlayer.extendEndTime(-1);
+    });
+    eventBus.on("stopAll", () => {
+      speakerOutputPlayer.startNext();
+    });
     eventBus.on("stopPlaying", () => {
       speakerOutputPlayer.stop();
+      Array.from(document.querySelectorAll("tanda-element,track-element,cortina-element")).forEach((x) => {
+        x.draggable = true;
+        x.setPlaying(false);
+        if (x.setPlayed)
+          x.setPlayed(false);
+      });
     });
     eventBus.on("playOnHeadphones", async (detail) => {
-      console.log("Play on headphones in app", detail);
       const track = detail.element;
       Array.from(document.querySelectorAll("track-element,cortina-element")).forEach((x) => {
         if (x !== track)
@@ -2471,7 +2575,6 @@
         headphonePlaylist[0] = await dbManager.getDataById(table, parseInt(track.dataset.trackId));
         headphonesOutputPlayer.stop();
         await headphonesOutputPlayer.updatePosition(-1);
-        console.log(headphonesOutputPlayer.next);
         headphonesOutputPlayer.startNext();
         headphonePlaylist = [];
       }
@@ -2479,6 +2582,16 @@
     eventBus.on("new-playlist", async (N = -1) => {
       await speakerOutputPlayer.updatePosition(N);
       speakerOutputPlayer.startNext();
+    });
+    eventBus.on("swapped-playlist", () => {
+      const allTracks = Array.from(playlistContainer.querySelectorAll("track-element,cortina-element"));
+      const playing = playlistContainer.querySelector("track-element.playing, cortina-element.playing");
+      console.log("Swapped so update playing state", playing, allTracks);
+      if (playing) {
+        const N = allTracks.findIndex((track) => track == playing);
+        console.log("Found N to be", N);
+        speakerOutputPlayer.updatePosition(N);
+      }
     });
     const tracks = await dbManager.processEntriesInBatches("track", (record) => true);
     const cortinas = await dbManager.processEntriesInBatches("cortina", (record) => true);
@@ -2500,8 +2613,9 @@
         tanda.tracks.push(tracks[t++].name);
       }
       allTandas.push(tanda);
+      allTandas.push(tanda);
+      allTandas.push(tanda);
     }
-    console.log(allTandas);
     await playlistService.setTandas(allTandas);
   }
 })();

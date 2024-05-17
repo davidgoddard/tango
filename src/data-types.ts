@@ -16,6 +16,7 @@ export interface Track extends BaseRecord {
     metadata: {
         start: number; // milliseconds offset
         end: number; // milliseconds offset (duration = start - end when reporting)
+        originalEnd?: number;
         meanVolume: number;
         maxVolume: number;
         style: string;
@@ -48,3 +49,11 @@ export interface Tanda extends BaseRecord {
     lastPlayed?: string;
     created?: string;
 }
+
+export interface ConfigOptions extends BaseRecord {
+    musicFolder?: FileSystemDirectoryHandle;
+    defaultTandaStyleSequence: string;
+    mainOutput?: string;
+    headphoneOutput?: string;
+    useSoundLevelling: boolean;
+  }

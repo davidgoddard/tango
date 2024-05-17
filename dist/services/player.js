@@ -29,7 +29,6 @@ export class Player {
         this.systemGain =
             this.options.systemLowestGain.meanVolume -
                 this.options.systemLowestGain.maxVolume;
-        console.log("New config", this.options, this.systemGain);
     }
     checkProgress() {
         if (this.current) {
@@ -116,10 +115,11 @@ export class Player {
         try {
             const N = this.playlistPos + 1;
             const { track, silence } = await this.options.fetchNext(N);
-            console.log("Result from fetch next", track, silence);
             if (track) {
-                track.metadata.end = 20;
-                const { player, url } = await this.createPlayer(track);
+                //@ts-ignore
+                track.metadata.originalEnd = track.metadata.end;
+                track.metadata.end = 10;
+                const { player, url } = await this.createPlayer(N, track);
                 if (player) {
                     const next = {
                         position: N,
@@ -164,11 +164,9 @@ export class Player {
     get playing() {
         return this.playlistPos;
     }
-    async createPlayer(track) {
+    async createPlayer(N, track) {
         try {
             const url = URL.createObjectURL(await track.fileHandle.getFile());
-            console.log("Creating music player for context: ", this.options.ctx);
-            let N = this.playlistPos;
             const howlerConfig = {
                 src: [url],
                 html5: true,
@@ -176,7 +174,6 @@ export class Player {
                 autoplay: false,
                 ctx: this.options.ctx,
                 onplay: () => {
-                    console.log("starting howler playing");
                     eventBus.emit('startingPlaying', {
                         player: this,
                         track,
@@ -184,7 +181,6 @@ export class Player {
                     });
                 },
                 onstop: () => {
-                    console.log("ending howler playing");
                     eventBus.emit('stoppedPlaying', {
                         player: this,
                         track,
@@ -192,7 +188,6 @@ export class Player {
                     });
                 }
             };
-            console.log("New player config: ", howlerConfig);
             const player = new Howl(howlerConfig);
             player.once("load", async () => {
                 // Try to route the audio where required
@@ -201,7 +196,6 @@ export class Player {
                         const audioElement = player._sounds[0]._node; // Access the underlying HTMLAudioElement
                         if (typeof audioElement.setSinkId === "function") {
                             await audioElement.setSinkId(this.options.ctx);
-                            console.log("Selected output device successfully");
                         }
                     }
                     catch (error) {
@@ -281,7 +275,7 @@ export class Player {
     }
     extendEndTime(period) {
         if (this.isPlaying) {
-            this.current.track.metadata.end = period;
+            this.current.track.metadata.end = period == -1 ? this.current.track.metadata.originalEnd : period;
             this.current.ending = false;
         }
     }

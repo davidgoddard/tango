@@ -2,23 +2,20 @@ import { formatTime, timeStringToSeconds } from "../services/utils";
 
 export type Action = {
   id: string;
-image: string;
-alt: string;
-sortOrder: number;
+  image: string;
+  alt: string;
+  sortOrder: number;
 };
-
-interface State {
-  isPlaying: boolean,
-  isPlayingOnHeadphones: boolean,
-  actions: Set<Action>
-}
 
 class TandaElement extends HTMLElement {
   private expanded: boolean = false;
+  private isPlaying: boolean = false;
+  private hasPlayed: boolean = false;
 
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
+    this.draggable = true;
   }
 
   connectedCallback() {
@@ -52,6 +49,32 @@ class TandaElement extends HTMLElement {
     }
   }
 
+  public setPlaying(state: boolean) {
+    this.isPlaying = state;
+    if (this.isPlaying) {
+      this.classList.add('playing')
+      this.draggable = false;
+      this.shadowRoot!.querySelector('#container article')?.classList.add('playing')
+    } else {
+      this.classList.remove('playing')
+      this.draggable = true;
+      this.shadowRoot!.querySelector('#container article')?.classList.remove('playing')
+    }
+  }
+
+  public setPlayed(state: boolean) {
+    this.hasPlayed = state;
+    if (this.hasPlayed) {
+      this.classList.add('played')
+      this.draggable = false;
+      this.shadowRoot!.querySelector('#container article')?.classList.add('played')
+    } else {
+      this.classList.remove('played')
+      this.draggable = true;
+      this.shadowRoot!.querySelector('#container article')?.classList.remove('played')
+    }
+  }
+
   private render() {
     const tracks = Array.from(this.querySelectorAll("track-element")) as HTMLElement[];
     const cortina = Array.from(this.querySelectorAll("cortina-element")) as HTMLElement[];
@@ -70,10 +93,6 @@ class TandaElement extends HTMLElement {
       tracks.map((track) => track.dataset.style)?.filter((x) => x)
     );
     if (styles.size == 0) {
-      console.log(
-        "Getting tanda style from attribute",
-        this.dataset.style
-      );
       styles.add(this.dataset.style);
     }
     let duration = 0;
@@ -83,9 +102,8 @@ class TandaElement extends HTMLElement {
     );
     const summary = `(${titles.length} Tracks; Duration: ${formatTime(
       duration
-    )}):  ${
-      [...titleSet][0] == "place holder" ? "Place Holder" : ""
-    } ${this.findMinMaxYears(years)} ${[...artists].join(", ")}`;
+    )}):  ${[...titleSet][0] == "place holder" ? "Place Holder" : ""
+      } ${this.findMinMaxYears(years)} ${[...artists].join(", ")}`;
 
     const track = cortina[0];
     let cortinaArtist;
@@ -104,9 +122,8 @@ class TandaElement extends HTMLElement {
 
     const cortinaSummary =
       cortinaTitle.length > 0
-        ? `<button>${cortinaTitle}${
-            cortinaArtist ? "<br/>" + cortinaArtist : ""
-          }</button>`
+        ? `<button>${cortinaTitle}${cortinaArtist ? "<br/>" + cortinaArtist : ""
+        }</button>`
         : "";
 
     this.shadowRoot!.innerHTML = `
@@ -124,6 +141,12 @@ class TandaElement extends HTMLElement {
                 }
                 #container {
                   width: 100%;
+                }
+                #container article.playing {
+                  border: solid 2px orange;
+                }
+                #container article.played {
+                  background-color: grey;
                 }
                 #container article {
                     border: solid 2px #ccc;
@@ -158,9 +181,9 @@ class TandaElement extends HTMLElement {
                     border: dashed 2px green;
                     margin: 1rem;
                 }
-                :host-context(tanda-element.target) #actions button {
-                    display: block;
-                }
+                // :host-context(tanda-element.target) #actions button {
+                //     display: block;
+                // }
                 #actions button.target {
                     display: none;
                 }
@@ -168,17 +191,17 @@ class TandaElement extends HTMLElement {
                     height: 20px;
                     width: 20px;
                 }
-                :host-context(.playing) #container article {
-                    border: dashed 2px #cf8805;
-                    display: block;
-                    border-radius: 10px;
-                    margin: 1rem!important;
-                }
-                :host-context(.played) {
-                    display: block;
-                    background-color: #777;
-                    border-radius: 10px;
-                }
+                // #container article {
+                //     border: dashed 2px #cf8805;
+                //     display: block;
+                //     border-radius: 10px;
+                //     margin: 1rem!important;
+                // }
+                // :host-context(.played) {
+                //     display: block;
+                //     background-color: #777;
+                //     border-radius: 10px;
+                // }
                 .cortinaControls {
                     display: none;
                 }
@@ -204,23 +227,19 @@ class TandaElement extends HTMLElement {
                     margin-bottom: 0.3rem;
                 }
             </style>
-            <div id="container">
+            <div id="container" class="${this.hasPlayed ? 'played' : ''}">
                 <article>
+                <h1>${this.dataset.tandaId}</h1>
                     <div id="toggle" class="summary">
                         <header>
-                            <span>${
-                              styles.size == 1
-                                ? [...styles]?.[0]?.charAt(0)?.toUpperCase()
-                                : "?"
-                            }</span>
+                            <span>${styles.size == 1
+        ? [...styles]?.[0]?.charAt(0)?.toUpperCase()
+        : "?"
+      }</span>
                         </header>
                         <main>
                                                      
                             <section>
-                                <div class="cortinaControls">
-                                    <button class="playAll"><img src="./icons/player_play 2.png" alt="Play whole cortina"></button>
-                                    <button class="stopPlayAll"><img src="./icons/player_stop 2.png" alt="Play whole cortina"></button>
-                                </div>
                                 ${cortinaSummary}
                                 <section id="actions"></section>
                             </section>
@@ -234,18 +253,11 @@ class TandaElement extends HTMLElement {
                 </article>
             </div>
         `;
+
     this.shadowRoot!
       .querySelector("#toggle main")!
       .addEventListener("click", () => this.toggleExpand());
 
-
-    this.shadowRoot!
-      .querySelector(".playAll")!
-      .addEventListener("click", this.notifyPlayAll.bind(this));
-
-    this.shadowRoot!
-      .querySelector(".stopPlayAll")!
-      .addEventListener("click", this.notifyStopPlayAll.bind(this));
   }
 
   private toggleExpand() {
@@ -261,15 +273,6 @@ class TandaElement extends HTMLElement {
     }
   }
 
-  private notifyPlayAll() {
-    const event = new CustomEvent("playFullCortina", { bubbles: true });
-    this.dispatchEvent(event);
-  }
-
-  private notifyStopPlayAll() {
-    const event = new CustomEvent("stopPlayFullCortina", { bubbles: true });
-    this.dispatchEvent(event);
-  }
 }
 
 customElements.define("tanda-element", TandaElement);
