@@ -53,33 +53,33 @@ class TandaElement extends HTMLElement {
   }
 
   private render() {
-    const tracks = Array.from(this.querySelectorAll("track-element"));
-    const cortina = Array.from(this.querySelectorAll("cortina-element"));
+    const tracks = Array.from(this.querySelectorAll("track-element")) as HTMLElement[];
+    const cortina = Array.from(this.querySelectorAll("cortina-element")) as HTMLElement[];
     const titles = tracks
-      .map((track) => track.getAttribute("title"))
+      .map((track) => track.dataset.title)
       .filter((x) => x);
     const titleSet = new Set(titles);
     const artists = new Set(
-      tracks.map((track) => track.getAttribute("artist")).filter((x) => x)
+      tracks.map((track) => track.dataset.artist).filter((x) => x)
     );
     const years = tracks
-      .map((track) => track.getAttribute("year"))
+      .map((track) => track.dataset.year)
       .filter((x) => x)
       .map((year) => year!.substring(0, 4));
     const styles = new Set(
-      tracks.map((track) => track.getAttribute("style"))?.filter((x) => x)
+      tracks.map((track) => track.dataset.style)?.filter((x) => x)
     );
     if (styles.size == 0) {
       console.log(
         "Getting tanda style from attribute",
-        this.getAttribute("style")
+        this.dataset.style
       );
-      styles.add(this.getAttribute("style"));
+      styles.add(this.dataset.style);
     }
     let duration = 0;
     tracks.forEach(
       (track) =>
-        (duration += timeStringToSeconds(track.getAttribute("duration")) as number)
+        (duration += timeStringToSeconds(track.dataset.duration!) as number)
     );
     const summary = `(${titles.length} Tracks; Duration: ${formatTime(
       duration
@@ -91,8 +91,8 @@ class TandaElement extends HTMLElement {
     let cortinaArtist;
     let cortinaTitle;
     if (track) {
-      cortinaTitle = track.getAttribute("title")!;
-      cortinaArtist = track.getAttribute("artist")!;
+      cortinaTitle = track.dataset.title!;
+      cortinaArtist = track.dataset.artist!;
       if (cortinaTitle.length > 15)
         cortinaTitle = cortinaTitle.substring(0, 15) + "...";
       if (cortinaArtist.length > 15)

@@ -1,7 +1,6 @@
 // Example usage in a component file
 import { eventBus } from "./events/event-bus";
 import "./components/tanda.element";
-import "./components/cortina.element";
 import "./components/search.element";
 import "./components/track.element";
 import { TabsContainer } from "./components/tabs.component";
@@ -200,7 +199,6 @@ async function scanFileSystem(
           : {
               start: 0,
               end: -1,
-              duration: undefined,
               meanVolume: -20,
               maxVolume: 0,
               tags: { title: indexFileName, artist: "unknown" },
@@ -259,36 +257,42 @@ async function loadLibraryIntoDB(
 
   async function setTrackDetails(library: any, table: "track" | "cortina") {
     let n = 0;
-    let keys = Object.keys(library);
-    for (const trackName of keys) {
-      scanFilePath.textContent = trackName;
-      scanProgress.textContent = ++n + "/" + keys.length;
+    let files = await getAllFiles(
+      config.musicFolder as FileSystemDirectoryHandle
+    );
+    for (const file of files) {
+      scanFilePath.textContent = file.relativeFileName;
+      scanProgress.textContent = ++n + "/" + files.length;
 
-      let tn = convert("/" + trackName);
+      let tn = convert(file.relativeFileName);
 
-      const existing: Track = (await dbManager.getDataByName(
-        table,
-        tn
-      )) as Track;
-      if (!existing) {
-        console.log("Missing file", tn, trackName);
-      } else {
-        const libTrack = library[trackName];
-        const metadata = {
-          tags: {
-            title: libTrack.track.title,
-            artist: libTrack.track.artist,
-            year: libTrack.track.date || libTrack.track.notes,
+      const libTrack = library[tn.substring(1)];
+      if (libTrack) {
+        const newData: Track = {
+          type: table,
+          name: tn,
+          fileHandle: file.fileHandle,
+          metadata: {
+            tags: {
+              title: libTrack.track.title,
+              artist: libTrack.track.artist,
+              notes: libTrack.classifiers?.notes,
+              year: libTrack.track.date,
+              bpm: libTrack.classifiers?.bpm,
+            },
+            start: libTrack.analysis.start,
+            end: libTrack.analysis.silence,
+            style: libTrack.classifiers?.style,
+            meanVolume: libTrack.analysis.meanGain || -20,
+            maxVolume: libTrack.analysis.gain || 0,
           },
-          start: libTrack.analysis.start,
-          end: libTrack.analysis.silence,
-          style: libTrack.classifiers?.style,
-          duration: libTrack.analysis.duration,
-          meanVolume: libTrack.analysis.meanGain || -20,
-          maxVolume: libTrack.analysis.gain || 0,
+          classifiers: {
+            favourite: true,
+          },
         };
-        existing.metadata = metadata;
-        await dbManager.updateData("track", existing.id!, existing);
+        await dbManager.addData(table, newData);
+      } else {
+        console.log("Not found in library", tn.substring(1));
       }
     }
   }
@@ -302,11 +306,13 @@ async function loadLibraryIntoDB(
     if (libraryFileHandles.library) {
       library = await getJSON(await libraryFileHandles.library.getFile());
       console.log(library);
+      await dbManager.clearAllData("track");
       await setTrackDetails(library, "track");
     }
     if (libraryFileHandles.cortinas) {
       cortinas = await getJSON(await libraryFileHandles.cortinas.getFile());
       console.log("cortinas", cortinas);
+      await dbManager.clearAllData("cortina");
       await setTrackDetails(cortinas, "cortina");
     }
     if (libraryFileHandles.tandas) {
@@ -436,13 +442,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const dbManager = await DatabaseManager();
   let config = await InitialiseConfig(dbManager);
 
-  eventBus.on("requestAccessToDisk", () => {
-    console.log("Requesting access to disk");
-    const modal = getDomElement("#permissionModal");
-    modal.classList.remove("hidden");
-  });
-  await openMusicFolder(dbManager, config);
-
   // test one file
   const testTrack = dbManager.getDataById("track", 0);
 
@@ -488,6 +487,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     },
     stopButton: () => {
       eventBus.emit("stopPlaying");
+    },
+    createTandaButton: () => {
+      const scratchPad = getDomElement("#scratchPad");
+      const newTanda = document.createElement("tanda-element");
+      newTanda.setAttribute("style", "undefined");
+      scratchPad.appendChild(newTanda);
     },
   };
 
@@ -606,7 +611,7 @@ async function runApplication(
   // and fade songs using the given fade rate.
 
   const headerField = getDomElement("body > header > h1");
-  const stopButton = getDomElement('#stopButton')
+  const stopButton = getDomElement("#stopButton");
   const speakerPlayerConfig: PlayerOptions = {
     ctx: config.mainOutput,
     systemLowestGain,
@@ -639,6 +644,9 @@ async function runApplication(
       headerField.textContent = data.display;
     },
   };
+
+
+
   let headphonePlaylist: Track[] = [];
 
   const headphonesPlayerConfig: PlayerOptions = {
@@ -697,12 +705,12 @@ async function runApplication(
       headphonesOutputPlayer.stop();
     } else {
       const table =
-        track.getAttribute("title").split(/\/|\\/g)[1] == "music"
+        track.dataset.title.split(/\/|\\/g)[1] == "music"
           ? "track"
           : "cortina";
       headphonePlaylist[0] = (await dbManager.getDataById(
         table,
-        parseInt(track.getAttribute("trackid"))
+        parseInt(track.dataset.trackId)
       )) as Track;
       headphonesOutputPlayer.stop();
       await headphonesOutputPlayer.updatePosition(-1);

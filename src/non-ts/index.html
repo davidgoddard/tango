@@ -47,7 +47,6 @@
 
         <h3>Aspirations</h3>
         <ul>
-            <li>Links to classification page</li>
             <li>Define playlist timings: between tracks, after tanda, before tanda</li>
             <li>Reset column widths to defaults</li>
             <li>Edit preferred text items</li>
@@ -94,6 +93,9 @@
             <header class="playlistHeading">
                 <h2>Scratch Pad</h2>
             </header>
+            <menu>
+                <button id="createTandaButton">New Tanda</button>
+            </menu>
             <ul>
                 <li>New items added to top</li>
                 <li>User can drag/drop and move items about</li>
@@ -164,7 +166,7 @@
     <script type="module" src="./lib/howler.min.js"></script>
     <script type="module" src="./bundle.js"></script>
 
-    <div id="permissionModal" class="overlay hidden">
+    <div id="permissionModal" class="overlay">
         <div class="modal">
           <h2>Permission Request</h2>
           <p>Tanda Player needs your permission to read your music files folder for all files. Please click 'Allow' to

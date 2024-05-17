@@ -1,11 +1,17 @@
 import { eventBus } from "../events/event-bus";
 import { Track, Tanda } from "../data-types";
-import { formatTime } from "./utils";
+import { formatTime, renderTrackDetail } from "./utils";
+import { TrackElement } from "../components/track.element";
 
 interface TandaTrack extends Track {
   tandaOffset: number;
 }
 
+type PlayDetail = {
+  N: number,
+  track: Track,
+  player: any
+}
 export type ChangeDetails = {
   type: string;
   oldPos: number;
@@ -23,6 +29,37 @@ export class PlaylistService {
     this.tandaList = [];
     this.trackList = [];
     eventBus.on("track-request", this.requestTrack.bind(this));
+
+    eventBus.on("startingPlaying", this.markPlaying.bind(this));
+    eventBus.on("stoppedPlaying", this.unmarkPlaying.bind(this));
+
+    // Parent container where tracks can be dropped
+    const dropTarget = this.container;
+
+    dropTarget.addEventListener("dragover", function (event) {
+      event.preventDefault();
+    });
+
+    dropTarget.addEventListener("drop", function (event) {
+      event.preventDefault();
+      const trackId = event.dataTransfer!.getData("text/plain");
+      // Do something with the dropped track ID, like append it to the drop target
+      const trackElement = document.querySelector(
+        `[data-track-id="${trackId}"]`
+      )!;
+      dropTarget.appendChild(trackElement);
+    });
+  }
+
+  markPlaying(details: PlayDetail){
+    const trackElement = Array.from(this.container.querySelectorAll('track-element,cortina-element'))[details.N] as TrackElement;
+    console.log('Found track to mark as playing', trackElement)
+    trackElement.setPlaying(false)
+  }
+  unmarkPlaying(details: PlayDetail){
+    const trackElement = Array.from(this.container.querySelectorAll('track-element,cortina-element'))[details.N] as TrackElement;
+    console.log('Found track to unmark as playing', trackElement)
+    trackElement.setPlaying(false)
   }
 
   async setTandas(tandaList: Tanda[]) {
@@ -80,30 +117,6 @@ export class PlaylistService {
     // this.container.innerHTML = "";
     // this.container.appendChild(virtualList);
 
-    function render(idx: number, track: Track, typeName:string): string {
-      let year =
-      track.metadata?.tags?.date ||
-      track.metadata?.tags?.year ||
-      track.metadata?.tags?.creation_time;
-    if (year) {
-      year = year.substring(0, 4);
-    }
-    return `<${typeName}-element
-                    tandaid="${idx}"
-                    trackid="${String(track.id)}" 
-                    style="${track.metadata?.tags?.style!}" 
-                    title="${track.metadata?.tags?.title!}" 
-                    artist="${track.metadata?.tags?.artist!}"
-                    duration="${
-                      track.metadata?.end
-                        ? formatTime((track.metadata?.end - track.metadata?.start))
-                        : ""
-                    }"
-                    year="${year}"></${typeName}-element>`;
-
-    }
-
-
     eventBus.emit("new-playlist");
     this.container.innerHTML = (
       await Promise.all(
@@ -111,14 +124,14 @@ export class PlaylistService {
           const cortinaElement = tanda.cortina
             ? (async () => {
                 let track = await this.getDetail("cortina", tanda.cortina);
-                return render(idx, track, 'cortina')
+                return renderTrackDetail(idx, track, "cortina");
               })()
             : "";
 
           const trackElements = await Promise.all(
             tanda.tracks.map(async (trackName: string) => {
               let track = await this.getDetail("track", trackName);
-              return render(idx, track, 'track')
+              return renderTrackDetail(idx, track, "track");
             })
           );
 
@@ -165,17 +178,13 @@ export class PlaylistService {
     return this.trackList[N];
   }
 
+  fetchElement(N: number): TrackElement {
+    return Array.from(
+      this.container.querySelectorAll("track-element, cortina-element"))[N] as TrackElement
+  }
+
   getN(track: HTMLTrackElement) {
-    const tracks = Array.from(
-      this.container.querySelectorAll("track-element, cortina-element")
-    ).filter((track) => track.getAttribute("trackid"));
-    let N = 0;
-    for (let i = 0; i < tracks.length; i++) {
-      if (tracks[i] === track) {
-        N = i;
-        console.log("Clicked on track N ", N);
-      }
-    }
-    return N;
+    return Array.from(
+      this.container.querySelectorAll("track-element, cortina-element")).findIndex(t => t == track)
   }
 }

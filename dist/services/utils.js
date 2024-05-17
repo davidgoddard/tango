@@ -39,20 +39,20 @@ export function timeStringToSeconds(timeString) {
     }
 }
 export function renderTrackDetail(idx, track, typeName) {
-    let year = track.metadata?.tags?.date ||
-        track.metadata?.tags?.year ||
-        track.metadata?.tags?.creation_time;
+    let year = track.metadata?.tags?.year;
     if (year) {
         year = year.substring(0, 4);
     }
     return `<${typeName}-element
-                  tandaid="${idx}"
-                  trackid="${String(track.id)}" 
-                  style="${track.metadata?.tags?.style}" 
-                  title="${track.metadata?.tags?.title}" 
-                  artist="${track.metadata?.tags?.artist}"
-                  duration="${track.metadata?.end
+                  data-tanda-id="${idx}"
+                  data-track-id="${String(track.id)}" 
+                  data-style="${track.metadata?.style}" 
+                  data-title="${track.metadata?.tags?.title}" 
+                  data-artist="${track.metadata?.tags?.artist}"
+                  data-notes="${track.metadata?.tags?.notes}"
+                  data-bpm="${track.metadata?.tags?.bpm}"
+                  data-duration="${track.metadata?.end
         ? formatTime((track.metadata?.end - track.metadata?.start))
         : ""}"
-                  year="${year}"></${typeName}-element>`;
+                  data-year="${year}"></${typeName}-element>`;
 }

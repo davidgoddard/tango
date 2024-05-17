@@ -1,7 +1,6 @@
 // Example usage in a component file
 import { eventBus } from "./events/event-bus";
 import "./components/tanda.element";
-import "./components/cortina.element";
 import "./components/search.element";
 import "./components/track.element";
 import { TabsContainer } from "./components/tabs.component";
@@ -138,7 +137,6 @@ async function scanFileSystem(config, dbManager, analyze) {
                     : {
                         start: 0,
                         end: -1,
-                        duration: undefined,
                         meanVolume: -20,
                         maxVolume: 0,
                         tags: { title: indexFileName, artist: "unknown" },
@@ -184,32 +182,39 @@ async function loadLibraryIntoDB(config, dbManager) {
     }
     async function setTrackDetails(library, table) {
         let n = 0;
-        let keys = Object.keys(library);
-        for (const trackName of keys) {
-            scanFilePath.textContent = trackName;
-            scanProgress.textContent = ++n + "/" + keys.length;
-            let tn = convert("/" + trackName);
-            const existing = (await dbManager.getDataByName(table, tn));
-            if (!existing) {
-                console.log("Missing file", tn, trackName);
+        let files = await getAllFiles(config.musicFolder);
+        for (const file of files) {
+            scanFilePath.textContent = file.relativeFileName;
+            scanProgress.textContent = ++n + "/" + files.length;
+            let tn = convert(file.relativeFileName);
+            const libTrack = library[tn.substring(1)];
+            if (libTrack) {
+                const newData = {
+                    type: table,
+                    name: tn,
+                    fileHandle: file.fileHandle,
+                    metadata: {
+                        tags: {
+                            title: libTrack.track.title,
+                            artist: libTrack.track.artist,
+                            notes: libTrack.classifiers?.notes,
+                            year: libTrack.track.date,
+                            bpm: libTrack.classifiers?.bpm,
+                        },
+                        start: libTrack.analysis.start,
+                        end: libTrack.analysis.silence,
+                        style: libTrack.classifiers?.style,
+                        meanVolume: libTrack.analysis.meanGain || -20,
+                        maxVolume: libTrack.analysis.gain || 0,
+                    },
+                    classifiers: {
+                        favourite: true,
+                    },
+                };
+                await dbManager.addData(table, newData);
             }
             else {
-                const libTrack = library[trackName];
-                const metadata = {
-                    tags: {
-                        title: libTrack.track.title,
-                        artist: libTrack.track.artist,
-                        year: libTrack.track.date || libTrack.track.notes,
-                    },
-                    start: libTrack.analysis.start,
-                    end: libTrack.analysis.silence,
-                    style: libTrack.classifiers?.style,
-                    duration: libTrack.analysis.duration,
-                    meanVolume: libTrack.analysis.meanGain || -20,
-                    maxVolume: libTrack.analysis.gain || 0,
-                };
-                existing.metadata = metadata;
-                await dbManager.updateData("track", existing.id, existing);
+                console.log("Not found in library", tn.substring(1));
             }
         }
     }
@@ -222,11 +227,13 @@ async function loadLibraryIntoDB(config, dbManager) {
         if (libraryFileHandles.library) {
             library = await getJSON(await libraryFileHandles.library.getFile());
             console.log(library);
+            await dbManager.clearAllData("track");
             await setTrackDetails(library, "track");
         }
         if (libraryFileHandles.cortinas) {
             cortinas = await getJSON(await libraryFileHandles.cortinas.getFile());
             console.log("cortinas", cortinas);
+            await dbManager.clearAllData("cortina");
             await setTrackDetails(cortinas, "cortina");
         }
         if (libraryFileHandles.tandas) {
@@ -324,12 +331,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
     const dbManager = await DatabaseManager();
     let config = await InitialiseConfig(dbManager);
-    eventBus.on("requestAccessToDisk", () => {
-        console.log("Requesting access to disk");
-        const modal = getDomElement("#permissionModal");
-        modal.classList.remove("hidden");
-    });
-    await openMusicFolder(dbManager, config);
     // test one file
     const testTrack = dbManager.getDataById("track", 0);
     // Setup the quick key click to function mappings
@@ -373,6 +374,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         },
         stopButton: () => {
             eventBus.emit("stopPlaying");
+        },
+        createTandaButton: () => {
+            const scratchPad = getDomElement("#scratchPad");
+            const newTanda = document.createElement("tanda-element");
+            newTanda.setAttribute("style", "undefined");
+            scratchPad.appendChild(newTanda);
         },
     };
     for (const key of Object.keys(quickClickHandlers)) {
@@ -451,7 +458,7 @@ async function runApplication(dbManager, config) {
     // Prepare the new music speakerOutputPlayer to play music adjusted to the given system gain
     // and fade songs using the given fade rate.
     const headerField = getDomElement("body > header > h1");
-    const stopButton = getDomElement('#stopButton');
+    const stopButton = getDomElement("#stopButton");
     const speakerPlayerConfig = {
         ctx: config.mainOutput,
         systemLowestGain,
@@ -536,10 +543,10 @@ async function runApplication(dbManager, config) {
             headphonesOutputPlayer.stop();
         }
         else {
-            const table = track.getAttribute("title").split(/\/|\\/g)[1] == "music"
+            const table = track.dataset.title.split(/\/|\\/g)[1] == "music"
                 ? "track"
                 : "cortina";
-            headphonePlaylist[0] = (await dbManager.getDataById(table, parseInt(track.getAttribute("trackid"))));
+            headphonePlaylist[0] = (await dbManager.getDataById(table, parseInt(track.dataset.trackId)));
             headphonesOutputPlayer.stop();
             await headphonesOutputPlayer.updatePosition(-1);
             console.log(headphonesOutputPlayer.next);

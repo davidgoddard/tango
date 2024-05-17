@@ -165,6 +165,23 @@ export class IndexedDBManager {
         });
     }
 
+    public async clearAllData(table: TableNames): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db?.transaction([table], 'readwrite');
+            const store = transaction?.objectStore(table);
+            const request = store?.clear();
+
+            request!.onsuccess = () => {
+                resolve();
+            };
+
+            request!.onerror = (event: Event) => {
+                console.error('Error fetching data: ', (event.target as IDBRequest).error);
+                reject((event.target as IDBRequest).error);
+            };
+        });
+    }
+
     public async getDataByName(table: TableNames, name: string): Promise<IndexedDBRecord | undefined> {
         return new Promise((resolve, reject) => {
             const transaction = this.db?.transaction([table]);

@@ -172,6 +172,7 @@ export class Player {
       const { track, silence } = await this.options.fetchNext(N);
       console.log("Result from fetch next", track, silence);
       if (track) {
+        track.metadata.end = 20;
         const { player, url } = await this.createPlayer(track);
         if (player) {
           const next: Status = {
@@ -193,7 +194,6 @@ export class Player {
             ending: false,
           };
           next.unload = () => {
-            console.log("Unloading player", JSON.stringify(track));
             if (next.player) {
               if (next.player!.playing()) next.player!.stop();
               next.player!.unload();
@@ -227,6 +227,7 @@ export class Player {
       const url = URL.createObjectURL(await track.fileHandle.getFile());
 
       console.log("Creating music player for context: ", this.options.ctx);
+      let N = this.playlistPos
       const howlerConfig = {
         src: [url],
         html5: true,
@@ -235,13 +236,25 @@ export class Player {
         ctx: this.options.ctx,
         onplay: () => {
           console.log("starting howler playing");
+          eventBus.emit('startingPlaying', {
+            player: this,
+            track,
+            N
+          })
         },
+        onstop: () => {
+          console.log("ending howler playing");
+          eventBus.emit('stoppedPlaying', {
+            player: this,
+            track,
+            N
+          })
+        }
       };
       console.log("New player config: ", howlerConfig);
       const player = new Howl(howlerConfig);
 
       player.once("load", async () => {
-        console.log("track loaded into howler", this.options.ctx);
 
         // Try to route the audio where required
         if (this.options.ctx) {

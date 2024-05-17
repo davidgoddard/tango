@@ -1,18 +1,18 @@
 import { eventBus } from "../events/event-bus";
 export type Action = {
-    id: string;
+  id: string;
   image: string;
   alt: string;
   sortOrder: number;
 };
 
 interface State {
-    isPlaying: boolean,
-    isPlayingOnHeadphones: boolean,
-    actions: Set<Action>
+  isPlaying: boolean;
+  isPlayingOnHeadphones: boolean;
+  actions: Set<Action>;
 }
 
-class TrackElement extends HTMLElement {
+class BaseTrackElement extends HTMLElement {
   private isPlaying = false;
   private isPlayingOnHeadphones = false;
   private actions = new Set();
@@ -20,6 +20,18 @@ class TrackElement extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
+    this.draggable = true;
+    this.addEventListener("dragstart", this.handleDragStart);
+    this.addEventListener("dragend", this.handleDragEnd);
+  }
+
+  handleDragStart(event: DragEvent) {
+    const trackId = this.dataset.trackId!;
+    event.dataTransfer!.setData("text/plain", trackId);
+  }
+
+  handleDragEnd() {
+    // Clean up after drag operation, if needed
   }
 
   connectedCallback() {
@@ -55,13 +67,23 @@ class TrackElement extends HTMLElement {
     event.preventDefault();
     console.log("Play on headphones", this);
     if (!this.isPlayingOnHeadphones) {
-        this.isPlayingOnHeadphones = true;
-        this.shadowRoot!.querySelector("#headphones")!.classList.add("playing");
+      this.isPlayingOnHeadphones = true;
+      this.shadowRoot!.querySelector("#headphones")!.classList.add("playing");
     } else {
-        this.isPlayingOnHeadphones = false;
-        this.shadowRoot!.querySelector("#headphones")!.classList.remove("playing");
+      this.isPlayingOnHeadphones = false;
+      this.shadowRoot!.querySelector("#headphones")!.classList.remove(
+        "playing"
+      );
     }
-    eventBus.emit('playOnHeadphones', { element: this, playing: this.isPlayingOnHeadphones })
+    eventBus.emit("playOnHeadphones", {
+      element: this,
+      playing: this.isPlayingOnHeadphones,
+    });
+  }
+
+  setPlaying(state: boolean){
+    this.isPlaying = state;
+    this.shadowRoot!.querySelector('article')?.classList.toggle('playing')
   }
 
   handleTargetButtonClick(event: Event) {
@@ -80,14 +102,14 @@ class TrackElement extends HTMLElement {
   }
 
   handleTrackClick() {
-    const trackId = this.getAttribute("trackid");
+    const trackId = this.dataset.trackId!;
     if (trackId) {
       const event = new CustomEvent("clickedTrack", {
         detail: this,
         bubbles: true,
       });
       this.dispatchEvent(event);
-      console.log('Sending event', event)
+      console.log("Sending event", event);
     }
   }
 
@@ -101,9 +123,19 @@ class TrackElement extends HTMLElement {
             padding: 0.4rem;
         }
         header {
-            display: flex;
-            flex-direction: row;
-            align-items: center;
+          display: grid;
+          grid-template-columns: auto 1fr auto;
+          align-items: center;
+        }
+        span {
+          font-size: 0.85rem;
+        }
+        span span {
+          margin-right: 1rem;
+        }
+
+        main span span {
+          font-size: 1rem;
         }
         h2 {
             margin: 0px;
@@ -114,18 +146,11 @@ class TrackElement extends HTMLElement {
             padding: 0px;
             margin: 0.2rem 0;
         }
-        :host-context(track-element:nth-child(1n).playing) article{
+        article.playing {
             border: solid 2px orange;
             display: block;
             border-radius: 5px;
-            background-color: #ffe000a6;
-        }
-        :host-context(track-element.selected) {
-            border: dashed 2px orange;
-            display: block;
-            border-radius: 5px;
-            background-color: #fffbdea6;
-            margin: 1rem;
+            background-color: #ffe000a6 !important;
         }
         :host-context(track-element:nth-child(2n)) article{
             background-color: #ffffffa6;
@@ -133,9 +158,7 @@ class TrackElement extends HTMLElement {
         :host-context(track-element:nth-child(2n+1)) article{
             background-color: #f9ede1a6;
         }
-        :host-context(track-element.target) button.target {
-            display: block;
-        }
+        
         button.target {
             display: none;
         }
@@ -159,8 +182,11 @@ class TrackElement extends HTMLElement {
             border: solid 2px red;
             border-radius: 100%;
         }
+        .notes {
+          color: lightgray;
+        }
     </style>
-    <article class="track">
+    <article class="track ${this.isPlaying ? 'playing' : ''}">
         <section class="actions">
         ${([...this.actions] as Action[])
           .sort((a: Action, b: Action) => {
@@ -171,27 +197,48 @@ class TrackElement extends HTMLElement {
           })}
         </section>
         <header>
-            <button id="headphones" class="${
-                this.isPlayingOnHeadphones ? "playing" : ""
-            }">
-                <img src="./icons/headphones-icon.png" alt="Listen on headphones">
-            </button><h2>${this.getAttribute("title")}</h2>
+        <button id="headphones" class="${
+          this.isPlayingOnHeadphones ? "playing" : ""
+        }">
+            <img src="./icons/headphones-icon.png" alt="Listen on headphones">
+        </button>
+        <h2>${this.dataset.title}</h2>
+            <div id="floated">
+              ${
+                !/undefined|null/.test(this.dataset.bpm!)
+                  ? `<span>BPM: <span>${this.dataset.bpm}</span></span>`
+                  : ""
+              }
+              ${
+                !/undefined|null/.test(this.dataset.year!)
+                  ? `<span>Year: ${this.dataset.year}</span></span>`
+                  : ""
+              }
+              <span>Duration: <span class='duration'>${
+                this.dataset.duration
+              }</span></span>                
+            </div>
         </header>
         <main>
             <p>                
-                <span class='style'>${this.getAttribute("style") == 'undefined' ?  'Style undefined' : this.getAttribute("style")}</span>
-                By <span class='artist'>${this.getAttribute("artist")}</span>
-                Year <span class='year'>${this.getAttribute("year")}</span>
-                Duration: <span class='duration'>${this.getAttribute(
-                  "duration"
-                )}</span>
-            </p>
+                ${! (this.dataset.style == "undefined") ? `<span><span class='style'>${
+                  this.dataset.style}</span></span>` : ''}
+                <span><span class='artist'>${this.dataset.artist}</span></span>
+                ${
+                  !/undefined|null/.test(this.dataset.notes!)
+                    ? `<span><span>${this.dataset.notes}</span></span>`
+                    : ""
+                }
+                </p>
         </main>
     </article>
         `;
   }
 }
 
+class TrackElement extends BaseTrackElement {};
+class CortinaElement extends BaseTrackElement {};
 customElements.define("track-element", TrackElement);
+customElements.define("cortina-element", CortinaElement);
 
-export { TrackElement };
+export { TrackElement, CortinaElement };

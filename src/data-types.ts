@@ -18,13 +18,14 @@ export interface Track extends BaseRecord {
         end: number; // milliseconds offset (duration = start - end when reporting)
         meanVolume: number;
         maxVolume: number;
+        style: string;
         tags: {
           title?: string;
           artist?: string;
-          style?: string;
           year?: string;
-          date?: string;
+          notes?: string;
           creation_time?: string;
+          bpm?: number;
         }
       },
       classifiers: Classifiers;

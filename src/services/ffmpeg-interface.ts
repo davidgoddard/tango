@@ -185,7 +185,6 @@ export const decodeFFmpegOutput = (outputLines: string[]) => {
     console.log('Derived silence at end starts @', silenceEndCommences);
 
     const metadata = {
-        duration,
         start: silenceStartFinishes,
         end: silenceEndCommences,
         meanVolume,

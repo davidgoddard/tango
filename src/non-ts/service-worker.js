@@ -7,7 +7,6 @@ const urlsToCache = [
   './components/tanda.element.js',
   './components/search.element.js',
   './components/tabs-element.js',
-  './components/cortina.element.js',
   './components/virtual-scroller.component.js',
   './components/search-element.js',
   './components/search.component.js',
