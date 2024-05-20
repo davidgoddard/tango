@@ -1,0 +1,102 @@
+
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Virtual Scrolling</title>
+      <style>
+        .viewport {
+          height: 400px; /* Example height */
+          overflow-y: auto;
+          position: relative;
+        }
+        .content {
+          position: relative;
+          width: 100%;
+        }
+        .list-item {
+          position: absolute;
+          width: 100%;
+          height: 50px; /* Example item height */
+        }
+      </style>
+    </head>
+    <body>
+      <div class="viewport" id="viewport">
+        <div class="content" id="content"></div>
+      </div>
+    
+      <script>
+        const viewport = document.getElementById('viewport');
+        const contentDiv = document.getElementById('content');
+        const itemHeight = 50; // Example item height
+        const totalItems = 1000; // Example total number of items
+        const buffer = 5; // Number of extra items to render above and below the viewport
+        let ticking = false; // Flag to prevent multiple rAF calls
+    
+        // Set the height of the content to make the scrollbar accurate
+        contentDiv.style.height = `${totalItems * itemHeight}px`;
+    
+        const renderItems = (startIndex, endIndex) => {
+          // Remove old items
+          contentDiv.innerHTML = '';
+    
+          for (let i = startIndex; i <= endIndex; i++) {
+            const item = document.createElement('div');
+            item.className = 'list-item';
+            item.style.transform = `translateY(${i * itemHeight}px)`;
+            item.textContent = `Item ${i + 1}`;
+            contentDiv.appendChild(item);
+          }
+        };
+    
+        const updateVisibleItems = () => {
+          const scrollTop = viewport.scrollTop;
+          const startIndex = Math.floor(scrollTop / itemHeight) - buffer;
+          const endIndex = Math.ceil((scrollTop + viewport.clientHeight) / itemHeight) + buffer;
+          renderItems(Math.max(0, startIndex), Math.min(totalItems - 1, endIndex));
+          ticking = false; // Reset the ticking flag
+        };
+    
+        const onScroll = () => {
+          if (!ticking) {
+            requestAnimationFrame(updateVisibleItems);
+            ticking = true;
+          }
+        };
+    
+        const onKeyDown = (event) => {
+          switch (event.key) {
+            case 'ArrowDown':
+              viewport.scrollTop += itemHeight;
+              break;
+            case 'ArrowUp':
+              viewport.scrollTop -= itemHeight;
+              break;
+            case 'PageDown':
+              viewport.scrollTop += viewport.clientHeight;
+              break;
+            case 'PageUp':
+              viewport.scrollTop -= viewport.clientHeight;
+              break;
+            case 'Home':
+              viewport.scrollTop = 0;
+              break;
+            case 'End':
+              viewport.scrollTop = viewport.scrollHeight;
+              break;
+            default:
+              break;
+          }
+        };
+    
+        viewport.addEventListener('scroll', onScroll);
+        window.addEventListener('keydown', onKeyDown);
+    
+        // Initial render
+        renderItems(0, Math.ceil(viewport.clientHeight / itemHeight) + buffer);
+      </script>
+    </body>
+    </html>
+    

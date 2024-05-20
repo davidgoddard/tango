@@ -1353,6 +1353,141 @@
     }
   };
 
+  // dist/components/large-list.js
+  var template = document.createElement("template");
+  template.innerHTML = `
+  <style>
+    .viewport {
+      height: 400px;
+      overflow-y: auto;
+      position: relative;
+    }
+    .content {
+      position: relative;
+      width: 100%;
+    }
+    .list-item {
+      position: absolute;
+      width: 100%;
+    }
+  </style>
+  <div class="viewport" id="viewport">
+    <div class="content" id="content"></div>
+  </div>
+`;
+  var LargeListElement = class extends HTMLElement {
+    viewport;
+    contentDiv;
+    itemHeight;
+    totalItems;
+    buffer;
+    ticking;
+    itemHeights;
+    renderItemFunction;
+    constructor() {
+      super();
+      const shadow = this.attachShadow({ mode: "open" });
+      shadow.appendChild(template.content.cloneNode(true));
+      this.viewport = shadow.getElementById("viewport");
+      this.contentDiv = shadow.getElementById("content");
+      this.itemHeight = 50;
+      this.totalItems = 1e3;
+      this.buffer = 5;
+      this.ticking = false;
+      this.itemHeights = new Array(this.totalItems).fill(this.itemHeight);
+      this.viewport.addEventListener("scroll", this.onScroll.bind(this));
+      window.addEventListener("keydown", this.onKeyDown.bind(this));
+    }
+    async connectedCallback() {
+      this.contentDiv.style.height = `${this.calculateContentHeight()}px`;
+      await this.renderItems(0, Math.ceil(this.viewport.clientHeight / this.itemHeight) + this.buffer);
+    }
+    setRenderItem(x) {
+      this.renderItemFunction = x;
+    }
+    measureItemHeight(item) {
+      return item.getBoundingClientRect().height;
+    }
+    calculateContentHeight() {
+      return this.itemHeights.reduce((a, b) => a + b, 0);
+    }
+    updateHeightsAndPositions() {
+      const children = Array.from(this.contentDiv.children);
+      children.forEach((item, index) => {
+        const height = this.measureItemHeight(item);
+        this.itemHeights[index] = height;
+        const previousHeights = this.itemHeights.slice(0, index).reduce((a, b) => a + b, 0);
+        item.style.transform = `translateY(${previousHeights}px)`;
+      });
+      this.contentDiv.style.height = `${this.calculateContentHeight()}px`;
+    }
+    async renderItems(startIndex, endIndex) {
+      this.contentDiv.replaceChildren();
+      for (let i = startIndex; i <= endIndex; i++) {
+        if (this.renderItemFunction) {
+          const item = await this.renderItemFunction(i);
+          item.className = "list-item";
+          this.contentDiv.appendChild(item);
+        }
+      }
+      this.updateHeightsAndPositions();
+    }
+    async updateVisibleItems() {
+      const scrollTop = this.viewport.scrollTop;
+      let accumulatedHeight = 0;
+      let startIndex = 0;
+      for (let i = 0; i < this.itemHeights.length; i++) {
+        if (accumulatedHeight + this.itemHeights[i] > scrollTop) {
+          startIndex = i;
+          break;
+        }
+        accumulatedHeight += this.itemHeights[i];
+      }
+      let endIndex = startIndex;
+      accumulatedHeight = this.itemHeights[startIndex];
+      for (let i = startIndex + 1; i < this.itemHeights.length; i++) {
+        if (accumulatedHeight > scrollTop + this.viewport.clientHeight) {
+          endIndex = i;
+          break;
+        }
+        accumulatedHeight += this.itemHeights[i];
+      }
+      await this.renderItems(Math.max(0, startIndex - this.buffer), Math.min(this.totalItems - 1, endIndex + this.buffer));
+      this.ticking = false;
+    }
+    onScroll() {
+      if (!this.ticking) {
+        requestAnimationFrame(this.updateVisibleItems.bind(this));
+        this.ticking = true;
+      }
+    }
+    onKeyDown(event) {
+      switch (event.key) {
+        case "ArrowDown":
+          this.viewport.scrollTop += this.itemHeight;
+          break;
+        case "ArrowUp":
+          this.viewport.scrollTop -= this.itemHeight;
+          break;
+        case "PageDown":
+          this.viewport.scrollTop += this.viewport.clientHeight;
+          break;
+        case "PageUp":
+          this.viewport.scrollTop -= this.viewport.clientHeight;
+          break;
+        case "Home":
+          this.viewport.scrollTop = 0;
+          break;
+        case "End":
+          this.viewport.scrollTop = this.contentDiv.scrollHeight;
+          break;
+        default:
+          break;
+      }
+    }
+  };
+  customElements.define("large-list-element", LargeListElement);
+
   // dist/services/player.js
   var import_howler_min = __toESM(require_howler_min());
   var Player = class _Player {
@@ -1711,21 +1846,35 @@
     async setTandas(tandaList) {
       this.tandaList = tandaList;
       await this.extractTracks();
-      eventBus.emit("new-playlist");
-      this.container.innerHTML = (await Promise.all(this.tandaList.map(async (tanda, idx) => {
-        const cortinaElement = tanda.cortina ? (async () => {
+      console.log("Tanda list", this.tandaList);
+      let largeList = document.createElement("large-list-element");
+      largeList.setRenderItem(async (N) => {
+        const tanda = this.tandaList[N];
+        tanda.id = N;
+        const tandaElement = document.createElement("tanda-element");
+        tandaElement.setAttribute("data-tanda-id", String(tanda.id));
+        tandaElement.setAttribute("data-style", "unknown");
+        let html = "";
+        if (tanda.cortina) {
           let track = await this.getDetail("cortina", tanda.cortina);
-          return renderTrackDetail(idx, track, "cortina");
-        })() : "";
+          html += renderTrackDetail(tanda.id, track, "cortina");
+        }
         const trackElements = await Promise.all(tanda.tracks.map(async (trackName) => {
           let track = await this.getDetail("track", trackName);
-          return renderTrackDetail(idx, track, "track");
+          return renderTrackDetail(tanda.id, track, "track");
         }));
-        return `<tanda-element data-tanda-id="${idx}" data-style='unknown'>
-                        ${await cortinaElement}
-                        ${trackElements.join("")}
-                    </tanda-element>`;
-      }))).join("");
+        html += trackElements.join("");
+        tandaElement.innerHTML = html;
+        return tandaElement;
+      });
+      const items = Array.from({ length: 1e3 }, (_, i) => ({
+        id: i,
+        text: `Item ${i + 1}`,
+        height: 50 + i % 5 * 20
+        // Variable height for demonstration
+      }));
+      this.container.innerHTML = "";
+      this.container.appendChild(largeList);
     }
     getTracks() {
       return this.trackList;

@@ -6,6 +6,7 @@ import "./components/track.element";
 import { TabsContainer } from "./components/tabs.component";
 import { TrackElement } from "./components/track.element";
 import { SearchResult } from "./components/search.element";
+import "./components/large-list";
 
 import { Track, Tanda, ConfigOptions, TableNames } from "./data-types";
 import { Player, PlayerOptions, ProgressData } from "./services/player";

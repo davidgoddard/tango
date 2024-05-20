@@ -4,6 +4,7 @@ import "./components/tanda.element";
 import "./components/search.element";
 import "./components/track.element";
 import { TabsContainer } from "./components/tabs.component";
+import "./components/large-list";
 import { Player } from "./services/player";
 import { PlaylistService } from "./services/playlist-service";
 import { DatabaseManager } from "./services/database";
