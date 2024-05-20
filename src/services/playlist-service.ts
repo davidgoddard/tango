@@ -56,95 +56,125 @@ export class PlaylistService {
       }
       return false;
     }
+    
 
-    // Track drag start event
-    playlist.addEventListener("dragstart", function (event) {
-      draggingElement = event.target as TrackElement; // or tanda!
-      draggingElementTagName = draggingElement.tagName;
-      if (hasPlayed(draggingElement)) return;
+  //   // Variables to store hovered elements
+  //  const hoveredElements: Set<HTMLElement> = new Set();
 
-      //@ts-ignore
-      event.dataTransfer.setData("text/plain", ""); // Required for Firefox
-    });
+  //  // Function to handle drag over event with caching
+  //  function handleDragOverThrottled(event: Event) {
+  //    event.preventDefault();
+  //    const targetElement = event.target! as HTMLElement;
 
-    // Track drag over event
-    playlist.addEventListener("dragover", function (event) {
-      event.preventDefault();
-      const targetElement = event.target! as HTMLElement;
+  //    // Add the target element to the set of hovered elements
+  //    hoveredElements.add(targetElement);
 
-      // Highlight valid drop targets
-      if (isValidDropTarget(targetElement)) {
-        targetElement.classList.add("valid-drop-zone");
-      }
-    });
+  //    // Request animation frame to update styling
+  //    requestAnimationFrame(() => {
+  //      // Highlight valid drop targets
+  //      hoveredElements.forEach((element) => {
+  //        if (isValidDropTarget(element)) {
+  //          element.classList.add("valid-drop-zone");
+  //        }
+  //      });
+  //    });
+  //  }
 
-    // Track drag leave event
-    playlist.addEventListener("dragleave", function (event) {
-      const targetElement = event.target! as HTMLElement;
+  //  // Function to handle drag leave event with caching
+  //  function handleDragLeaveThrottled(event: Event) {
+  //    const targetElement = event.target! as HTMLElement;
 
-      // Remove highlight from drop targets
-      if (isValidDropTarget(targetElement)) {
-        targetElement.classList.remove("valid-drop-zone");
-      }
-    });
+  //    // Remove the target element from the set of hovered elements
+  //    hoveredElements.delete(targetElement);
 
-    function swapElements(element1: HTMLElement, element2: HTMLElement) {
-      // Create a temporary placeholder element
-      const temp = document.createElement("div");
+  //    // Request animation frame to update styling
+  //    requestAnimationFrame(() =>
+  //      {
+  //      // Remove highlight from drop targets that are no longer hovered over
+  //      if (!hoveredElements.has(targetElement)) {
+  //        if (isValidDropTarget(targetElement)) {
+  //          targetElement.classList.remove("valid-drop-zone");
+  //        }
+  //      }
+  //    });
+  //  }
+    
+    //     // Add throttled event listeners
+    //     playlist.addEventListener("dragover", handleDragOverThrottled);
+    //     playlist.addEventListener("dragleave", handleDragLeaveThrottled);
+    
 
-      // Insert temp before element1
-      element1.parentNode!.insertBefore(temp, element1);
+    // // Track drag start event
+    // playlist.addEventListener("dragstart", function (event) {
+    //   draggingElement = event.target as TrackElement; // or tanda!
+    //   draggingElementTagName = draggingElement.tagName;
+    //   if (hasPlayed(draggingElement)) return;
 
-      // Move element1 to before element2
-      element2.parentNode!.insertBefore(element1, element2);
+    //   //@ts-ignore
+    //   event.dataTransfer.setData("text/plain", ""); // Required for Firefox
+    // });
 
-      // Move element2 to before temp (which is now where element1 used to be)
-      temp.parentNode!.insertBefore(element2, temp);
+    // function swapElements(element1: HTMLElement, element2: HTMLElement) {
+    //   // Create a temporary placeholder element
+    //   const temp = document.createElement("div");
 
-      // Remove temp
-      temp.parentNode!.removeChild(temp);
-    }
+    //   // Insert temp before element1
+    //   element1.parentNode!.insertBefore(temp, element1);
 
-    // Track drop event
-    playlist.addEventListener("drop", function (event) {
-      event.preventDefault();
-      const targetElement = (event.target! as HTMLElement).closest(
-        draggingElementTagName
-      ) as HTMLElement;
+    //   // Move element1 to before element2
+    //   element2.parentNode!.insertBefore(element1, element2);
 
-      // Check if the target tanda is a valid drop target
-      if (isValidDropTarget(targetElement)) {
-        // Swap tracks or tandas
-        console.log(
-          "Valid drop - Target:",
-          targetElement,
-          "Drop element",
-          draggingElement
-        );
-        swapElements(targetElement, draggingElement);
-        // ...
-      }
+    //   // Move element2 to before temp (which is now where element1 used to be)
+    //   temp.parentNode!.insertBefore(element2, temp);
 
-      // Remove highlight from drop targets
-      targetElement!.classList.remove("valid-drop-zone");
+    //   // Remove temp
+    //   temp.parentNode!.removeChild(temp);
+    // }
 
-      eventBus.emit("swapped-playlist");
-    });
+    // // Track drop event
+    // playlist.addEventListener("drop", function (event) {
+    //   event.preventDefault();
+    //   const targetElement = (event.target! as HTMLElement).closest(
+    //     draggingElementTagName
+    //   ) as HTMLElement;
 
-    // Function to check if the target tanda is a valid drop target
-    function isValidDropTarget(targetElement: HTMLElement) {
-      if (hasPlayed(targetElement)) return false;
+    //   // Check if the target tanda is a valid drop target
+    //   if (isValidDropTarget(targetElement)) {
+    //     // Swap tracks or tandas
+    //     console.log(
+    //       "Valid drop - Target:",
+    //       targetElement,
+    //       "Drop element",
+    //       draggingElement
+    //     );
+    //     swapElements(targetElement, draggingElement);
+    //     // ...
+    //   }
 
-      const draggingItem = draggingElement.closest(
-        draggingElementTagName
-      )! as HTMLElement;
-      const draggingStyle = draggingItem.dataset.style;
-      const targetStyle = targetElement.dataset.style;
-      return (
-        draggingStyle === targetStyle &&
-        draggingElement.tagName === targetElement.tagName
-      );
-    }
+    //   // Remove highlight from drop targets
+
+    //   hoveredElements.forEach((element) => {
+    //     element!.classList.remove("valid-drop-zone");
+    //   });
+    //   hoveredElements.clear();
+
+    //   eventBus.emit("swapped-playlist");
+    // });
+
+    // // Function to check if the target tanda is a valid drop target
+    // function isValidDropTarget(targetElement: HTMLElement) {
+    //   if (hasPlayed(targetElement)) return false;
+
+    //   const draggingItem = draggingElement.closest(
+    //     draggingElementTagName
+    //   )! as HTMLElement;
+    //   const draggingStyle = draggingItem.dataset.style;
+    //   const targetStyle = targetElement.dataset.style;
+    //   return (
+    //     draggingStyle === targetStyle &&
+    //     draggingElement.tagName === targetElement.tagName
+    //   );
+    // }
   }
 
   playingCortina(state: boolean) {
@@ -161,7 +191,6 @@ export class PlaylistService {
     const trackElement = Array.from(
       this.container.querySelectorAll("track-element,cortina-element")
     )[details.N] as TrackElement;
-    console.log("Found track to mark as playing", trackElement);
     trackElement.setPlaying(true);
     // Array.from(this.container.querySelectorAll('tanda-element')).forEach((tanda: any) => tanda.setPlaying(false));
     const tandaId = trackElement.dataset.tandaId;
@@ -179,7 +208,6 @@ export class PlaylistService {
     allTandas.map((tanda) => {
       tanda.setPlayed(false);
     });
-    console.log("All tandas", allTandas);
     for (let i = 0; i < allTandas.length; i++) {
       if (allTandas[i] === tandaElement) break;
       console.log("Prior tanda now played");
@@ -206,70 +234,66 @@ export class PlaylistService {
     await this.extractTracks();
     console.log('Tanda list', this.tandaList)
 
-    let largeList: LargeListElement = document.createElement('large-list-element') as LargeListElement;
-    largeList.setRenderItem(async (N:number)=>{
-      const tanda = this.tandaList[N];
-      tanda.id = N;
-      const tandaElement = document.createElement('tanda-element')
-      tandaElement.setAttribute('data-tanda-id', String(tanda.id));
-      tandaElement.setAttribute('data-style', 'unknown')
+    // let largeList: LargeListElement = document.createElement('large-list-element') as LargeListElement;
+    // this.container.innerHTML = '';
+    // this.container.appendChild(largeList)
+    // largeList.setRenderItem(async (N:number)=>{
+    //   const tanda = this.tandaList[N];
+    //   tanda.id = N;
+    //   const tandaElement = document.createElement('tanda-element')
+    //   tandaElement.setAttribute('data-tanda-id', String(tanda.id));
+    //   tandaElement.setAttribute('data-style', 'unknown')
 
-      let html = '';
-      if ( tanda.cortina ){        
-              let track = await this.getDetail("cortina", tanda.cortina);
-              html += renderTrackDetail(tanda.id!, track, "cortina");
-      }
-
-          const trackElements = await Promise.all(
-            tanda.tracks.map(async (trackName: string) => {
-              let track = await this.getDetail("track", trackName);
-              return renderTrackDetail(tanda.id!, track, "track");
-            })
-          );
-
-          html += trackElements.join('');
-
-
-        
-        tandaElement.innerHTML = html;
-        return tandaElement;
-
-    })
-
-    const items = Array.from({ length: 1000 }, (_, i) => ({
-      id: i,
-      text: `Item ${i + 1}`,
-      height: 50 + (i % 5) * 20 // Variable height for demonstration
-    }));
-    this.container.innerHTML = '';
-    this.container.appendChild(largeList)
-
-
-    // eventBus.emit("new-playlist");
-    // this.container.innerHTML = (
-    //   await Promise.all(
-    //     this.tandaList.map(async (tanda: Tanda, idx: number) => {
-    //       const cortinaElement = tanda.cortina
-    //         ? (async () => {
+    //   let html = '';
+    //   if ( tanda.cortina ){        
     //           let track = await this.getDetail("cortina", tanda.cortina);
-    //           return renderTrackDetail(idx, track, "cortina");
-    //         })()
-    //         : "";
+    //           html += renderTrackDetail(tanda.id!, track, "cortina");
+    //   }
 
     //       const trackElements = await Promise.all(
     //         tanda.tracks.map(async (trackName: string) => {
     //           let track = await this.getDetail("track", trackName);
-    //           return renderTrackDetail(idx, track, "track");
+    //           return renderTrackDetail(tanda.id!, track, "track");
     //         })
     //       );
 
-    //       return `<tanda-element data-tanda-id="${idx}" data-style='unknown'>
-    //                     ${await cortinaElement}
-    //                     ${trackElements.join("")}
-    //                 </tanda-element>`;
-    //     })
-    //   )
-    // ).join("");
+    //       html += trackElements.join('');
+
+
+        
+    //     tandaElement.innerHTML = html;
+    //     return tandaElement;
+
+    // })
+
+    // largeList.setListSize(this.tandaList.length);
+
+
+    eventBus.emit("new-playlist");
+    this.container.innerHTML = (
+      await Promise.all(
+        this.tandaList.map(async (tanda: Tanda, idx: number) => {
+          const cortinaElement = tanda.cortina
+            ? (async () => {
+              let track = await this.getDetail("cortina", tanda.cortina);
+              return renderTrackDetail(idx, track, "cortina");
+            })()
+            : "";
+
+          const trackElements = await Promise.all(
+            tanda.tracks.map(async (trackName: string) => {
+              let track = await this.getDetail("track", trackName);
+              return renderTrackDetail(idx, track, "track");
+            })
+          );
+
+          return `<tanda-element data-tanda-id="${idx}" data-style='unknown'>
+                        ${await cortinaElement}
+                        ${trackElements.join("")}
+                    </tanda-element>`;
+        })
+      )
+    ).join("");
   }
 
   getTracks() {

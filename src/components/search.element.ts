@@ -1,4 +1,5 @@
 import { eventBus } from "../events/event-bus";
+import { dragStartHandler } from "../services/drag-drop.service";
 import { renderTrackDetail } from "../services/utils";
 
 export interface SearchResult {
@@ -76,6 +77,12 @@ class SearchElement extends HTMLElement {
           <div class="scrollable">
             <div id="tracks-content" class="content">
               <!-- Content for tracks -->
+              <track-element data-track-id="100" data-title="Dummy track"></track-element>
+              <cortina-element data-track-id="100" data-title="Dummy track"></cortina-element>
+              <tanda-element data-tanda-id="8765" data-style="Milonga">
+                <cortina-element data-track-id="100" data-title="Dummy track"></cortina-element>
+                <track-element data-track-id="100" data-title="Dummy track"></track-element>
+              </tanda-element>
             </div>
             <div id="tandas-content" class="content hidden">
               <!-- Content for tandas -->
@@ -98,6 +105,7 @@ class SearchElement extends HTMLElement {
         this.filterSelect.addEventListener('change', this.handleFilter.bind(this));
         this.tracksTab.addEventListener('click', () => this.showContent('tracks'));
         this.tandasTab.addEventListener('click', () => this.showContent('tandas'));
+        this.shadowRoot?.addEventListener('dragstart', dragStartHandler)
 
         // Initialize counts
         this.tracksCount.textContent = '0';

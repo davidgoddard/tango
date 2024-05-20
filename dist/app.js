@@ -1,10 +1,10 @@
-// Example usage in a component file
 import { eventBus } from "./events/event-bus";
 import "./components/tanda.element";
 import "./components/search.element";
 import "./components/track.element";
-import { TabsContainer } from "./components/tabs.component";
 import "./components/large-list";
+import "./components/scrach-pad.element";
+import { TabsContainer } from "./components/tabs.component";
 import { Player } from "./services/player";
 import { PlaylistService } from "./services/playlist-service";
 import { DatabaseManager } from "./services/database";
@@ -12,15 +12,16 @@ import { openMusicFolder } from "./services/file-system";
 import { getDomElement } from "./services/utils";
 import { enumerateOutputDevices, requestAudioPermission } from "./services/permissions.service";
 import { loadLibraryIntoDB, scanFileSystem } from "./services/file-database.interface";
-if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-        navigator.serviceWorker
-            .register("service-worker.js")
-            .catch((error) => {
-            console.error("Service Worker registration failed:", error);
-        });
-    });
-}
+import { addDragDropHandlers } from "./services/drag-drop.service";
+// if ("serviceWorker" in navigator) {
+//   window.addEventListener("load", () => {
+//     navigator.serviceWorker
+//       .register("service-worker.js")
+//       .catch((error) => {
+//         console.error("Service Worker registration failed:", error);
+//       });
+//   });
+// }
 const SYSTEM = {
     defaultTandaStyleSequence: "4T 4T 3W 4T 3M",
     useSoundLevelling: true,
@@ -93,6 +94,7 @@ async function populateOutputDeviceOptions(config) {
 // Setup application layout and check file permissions and create database etc.
 //=====================================================================================================================
 document.addEventListener("DOMContentLoaded", async () => {
+    addDragDropHandlers();
     try {
         await navigator.mediaDevices.getUserMedia({ audio: true });
     }
@@ -355,10 +357,8 @@ async function runApplication(dbManager, config) {
         // Find current song and workout how moved.
         const allTracks = Array.from(playlistContainer.querySelectorAll('track-element,cortina-element'));
         const playing = playlistContainer.querySelector('track-element.playing, cortina-element.playing');
-        console.log('Swapped so update playing state', playing, allTracks);
         if (playing) {
             const N = allTracks.findIndex(track => track == playing);
-            console.log('Found N to be', N);
             speakerOutputPlayer.updatePosition(N);
         }
     });
@@ -386,9 +386,9 @@ async function runApplication(dbManager, config) {
         for (let i = 0; i < 4 && t < tracks.length; i++) {
             tanda.tracks.push(tracks[t++].name);
         }
-        allTandas.push(tanda);
-        allTandas.push(tanda);
-        allTandas.push(tanda);
+        for (let i = 0; i < 100; i++) {
+            allTandas.push(tanda);
+        }
     }
     // console.log(allTandas);
     await playlistService.setTandas(allTandas);

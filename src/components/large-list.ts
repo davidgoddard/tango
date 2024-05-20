@@ -2,7 +2,6 @@ const template = document.createElement('template');
 template.innerHTML = `
   <style>
     .viewport {
-      height: 400px;
       overflow-y: auto;
       position: relative;
     }
@@ -37,8 +36,8 @@ export class LargeListElement extends HTMLElement {
 
     this.viewport = shadow.getElementById('viewport') as HTMLElement;
     this.contentDiv = shadow.getElementById('content') as HTMLElement;
-    this.itemHeight = 50;
-    this.totalItems = 1000;
+    this.itemHeight = 50; // initial guess
+    this.totalItems = 0;
     this.buffer = 5;
     this.ticking = false;
     this.itemHeights = new Array(this.totalItems).fill(this.itemHeight);
@@ -48,6 +47,16 @@ export class LargeListElement extends HTMLElement {
   }
 
   async connectedCallback() {
+    this.contentDiv.style.height = `${this.calculateContentHeight()}px`;
+    await this.renderItems(
+      0,
+      Math.ceil(this.viewport.clientHeight / this.itemHeight) + this.buffer
+    );
+  }
+
+  public async setListSize(N: number){
+    this.totalItems = N;
+    this.itemHeights = new Array(this.totalItems).fill(this.itemHeight);
     this.contentDiv.style.height = `${this.calculateContentHeight()}px`;
     await this.renderItems(
       0,
@@ -82,8 +91,9 @@ export class LargeListElement extends HTMLElement {
 
   private async renderItems(startIndex: number, endIndex: number) {
     this.contentDiv.replaceChildren(); // Efficiently clear all child elements
-    for (let i = startIndex; i <= endIndex; i++) {
-      if (this.renderItemFunction) {
+    if (this.renderItemFunction) {
+      let minEnd = Math.min(endIndex, this.totalItems)
+      for (let i = startIndex; i <= minEnd; i++) {
         const item = await this.renderItemFunction(i);
         item.className = 'list-item';
         this.contentDiv.appendChild(item);

@@ -1,12 +1,13 @@
-// Example usage in a component file
 import { eventBus } from "./events/event-bus";
 import "./components/tanda.element";
 import "./components/search.element";
 import "./components/track.element";
+import "./components/large-list";
+import "./components/scrach-pad.element";
 import { TabsContainer } from "./components/tabs.component";
 import { TrackElement } from "./components/track.element";
 import { SearchResult } from "./components/search.element";
-import "./components/large-list";
+import { TandaElement } from "./components/tanda.element";
 
 import { Track, Tanda, ConfigOptions, TableNames } from "./data-types";
 import { Player, PlayerOptions, ProgressData } from "./services/player";
@@ -16,17 +17,17 @@ import { openMusicFolder } from "./services/file-system";
 import { getDomElement } from "./services/utils";
 import { enumerateOutputDevices, requestAudioPermission, verifyPermission } from "./services/permissions.service";
 import { loadLibraryIntoDB, scanFileSystem } from "./services/file-database.interface";
-import { TandaElement } from "./components/tanda.element";
+import { addDragDropHandlers } from "./services/drag-drop.service";
 
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker
-      .register("service-worker.js")
-      .catch((error) => {
-        console.error("Service Worker registration failed:", error);
-      });
-  });
-}
+// if ("serviceWorker" in navigator) {
+//   window.addEventListener("load", () => {
+//     navigator.serviceWorker
+//       .register("service-worker.js")
+//       .catch((error) => {
+//         console.error("Service Worker registration failed:", error);
+//       });
+//   });
+// }
 
 const SYSTEM: ConfigOptions = {
   defaultTandaStyleSequence: "4T 4T 3W 4T 3M",
@@ -128,6 +129,8 @@ async function populateOutputDeviceOptions(config: ConfigOptions) {
 // Setup application layout and check file permissions and create database etc.
 //=====================================================================================================================
 document.addEventListener("DOMContentLoaded", async () => {
+  addDragDropHandlers();
+  
   try {
     await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch (error) {
@@ -456,10 +459,8 @@ async function runApplication(
     // Find current song and workout how moved.
     const allTracks = Array.from(playlistContainer.querySelectorAll('track-element,cortina-element'))
     const playing = playlistContainer.querySelector('track-element.playing, cortina-element.playing') as TrackElement;
-    console.log('Swapped so update playing state', playing, allTracks)
     if ( playing ){
       const N = allTracks.findIndex(track => track == playing)
-      console.log('Found N to be', N)
       speakerOutputPlayer.updatePosition(N);
     }
   })
@@ -500,9 +501,10 @@ async function runApplication(
       tanda.tracks.push(tracks[t++].name);
     }
 
-    allTandas.push(tanda);
-    allTandas.push(tanda);
-    allTandas.push(tanda);
+    for (let i = 0; i < 100 ; i++ ){
+      allTandas.push(tanda);
+    }
+
   }
   // console.log(allTandas);
   await playlistService.setTandas(allTandas);

@@ -1,5 +1,7 @@
 import { formatTime, timeStringToSeconds } from "../services/utils";
 
+let nextId = 1;
+
 export type Action = {
   id: string;
   image: string;
@@ -15,11 +17,12 @@ class TandaElement extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
-    this.draggable = true;
+    this.dataset.id = "Tanda-" + String(nextId++);
   }
 
   connectedCallback() {
     this.render();
+    this.draggable = true;
   }
 
   private findMinMaxYears(years: (string | null)[]): string {
@@ -122,8 +125,7 @@ class TandaElement extends HTMLElement {
 
     const cortinaSummary =
       cortinaTitle.length > 0
-        ? `<button>${cortinaTitle}${cortinaArtist ? "<br/>" + cortinaArtist : ""
-        }</button>`
+        ? `<button class="cortinaName">${cortinaTitle}</button>`
         : "";
 
     this.shadowRoot!.innerHTML = `
@@ -226,10 +228,17 @@ class TandaElement extends HTMLElement {
                     width: 100%;
                     margin-bottom: 0.3rem;
                 }
+                button.cortinaName {
+                    // width: 100px; /* Set the desired width */
+                    // white-space: nowrap;
+                    // overflow: hidden;
+                    // text-overflow: ellipsis;
+                    // direction: rtl;
+                    // text-align: left; /* This makes sure that the text starts from the left when it's in RTL mode */
+                }
             </style>
             <div id="container" class="${this.hasPlayed ? 'played' : ''}">
                 <article>
-                <h1>${this.dataset.tandaId}</h1>
                     <div id="toggle" class="summary">
                         <header>
                             <span>${styles.size == 1

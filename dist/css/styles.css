@@ -367,10 +367,13 @@ label img {
   grid-template-rows: auto;
   overflow-y: auto;
 }
+tanda-element {
+  margin: 0 2px 0 2px; /* to allow outlines */
+}
 
-.valid-drop-zone {
-  margin: 1rem !important;
-  border: dashed 2px green !important;
+.drop-target {
+  outline: dashed 2px green;
+  z-index: 99;
 }
 
 .controlButtons {

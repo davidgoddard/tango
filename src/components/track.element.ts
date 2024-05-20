@@ -12,6 +12,8 @@ interface State {
   actions: Set<Action>;
 }
 
+let nextId = 0;
+
 class BaseTrackElement extends HTMLElement {
   private isPlaying = false;
   private isPlayingOnHeadphones = false;
@@ -21,18 +23,8 @@ class BaseTrackElement extends HTMLElement {
     super();
     this.attachShadow({ mode: "open" });
     this.draggable = true;
-    // this.addEventListener("dragstart", this.handleDragStart);
-    // this.addEventListener("dragend", this.handleDragEnd);
+    this.dataset.id = "T-" + String(nextId++);
   }
-
-  // handleDragStart(event: DragEvent) {
-  //   const trackId = this.dataset.trackId!;
-  //   event.dataTransfer!.setData("text/plain", JSON.stringify({type: 'track', id: trackId}));
-  // }
-
-  // handleDragEnd() {
-  //   // Clean up after drag operation, if needed
-  // }
 
   connectedCallback() {
     this.render();
@@ -150,6 +142,7 @@ class BaseTrackElement extends HTMLElement {
           border: solid 2px transparent;
           display: block;
           border-radius: 5px;
+          margin: 2px;
       }
         article.playing {
             border: solid 2px orange;
@@ -161,11 +154,13 @@ class BaseTrackElement extends HTMLElement {
         :host-context(track-element:nth-child(2n+1)) article{
             background-color: #f9ede1a6;
         }
-        :host-context(.valid-drop-zone) article {
-            margin: 1rem !important;
-            border: dashed 2px green !important;
-        }
-        
+        :host-context(track-element.dropzone) article {
+          outline: dashed 2px green !important;
+      }
+      :host-context(cortina-element.dropzone) article {
+        outline: dashed 2px green !important;
+    }
+  
         button.target {
             display: none;
         }
