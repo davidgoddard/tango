@@ -1,3 +1,6 @@
+import { TandaElement } from "../components/tanda.element";
+import { eventBus } from "../events/event-bus";
+
 let draggingElement: HTMLElement;
 
 export const addDragDropHandlers = (
@@ -52,6 +55,26 @@ function swapElements(element1: HTMLElement, element2: HTMLElement) {
 
   // Remove temp
   temp.parentNode!.removeChild(temp);
+
+  // Go up to the nearest tanda and re-render it
+  [element1, element2].forEach((element: HTMLElement) => {
+    let tanda = element;
+    if ( !(tanda.tagName === 'TANDA-ELEMENT')){
+      tanda = tanda.closest('tanda-element')!;
+    }
+    if ( tanda ) (tanda as TandaElement).render();
+  })
+
+  // Now find what if anything is playing and inform the controller of the change
+
+  let allTracks = Array.from(document.querySelectorAll('track-element,cortina-element'));
+  let playing = document.querySelector('track-element.playing,cortina-element.playing');
+  if (playing){
+    let n = allTracks.findIndex(t => t == playing)
+    if ( n !== undefined ){
+      eventBus.emit('new-playlist', n)
+    }
+  }
 }
 
 export function dragStartHandler(event: any) {
@@ -88,8 +111,8 @@ export function dragDropHandler(event: any) {
   if (!target) {
     console.log("No target yet - ", event.target);
     if ( event.target.tagName === 'SCRATCH-PAD-ELEMENT'){
-        console.log(draggingElement.parentElement)
-        if ( draggingElement.parentElement?.id === 'playlistContainer'){
+        console.log('Dragging', draggingElement)
+        if ( draggingElement.closest('#playlistContainer') ){
             // Create a dummy object to swap it with
             const swap = document.createElement(draggingElement.tagName);
             if ( draggingElement.tagName === 'TANDA-ELEMENT'){
@@ -98,19 +121,21 @@ export function dragDropHandler(event: any) {
                 console.log(draggingElement.children)
                 for ( let i = 0; i < draggingElement.children.length; i++ ){
                     let child = draggingElement.children[i];
-                    html += `<${child.tagName} data-title="place-holder" data-style="${swap.dataset.style}"></${child.tagName}>`
+                    html += `<${child.tagName} data-title="place holder" data-style="${swap.dataset.style}"></${child.tagName}>`
                 }
                 swap.innerHTML = html;
             } else {
-                swap.dataset.title = 'place-holder';
+                swap.dataset.title = 'place holder';
                 swap.dataset.style = draggingElement.dataset.style;
             }
             event.target.appendChild(swap)
             swapElements(draggingElement, swap)
         } else {
-            console.log('Nearest', draggingElement.parentElement)
-            if ( draggingElement.parentElement?.classList.contains('content')){
-                event.target.appendChild(draggingElement)
+            console.log('Nearest', draggingElement.closest('.content'))
+            if ( draggingElement.closest('.content')){
+              // let html = `<${draggingElement.tagName.toLowerCase} data-title="place holder" data-style="${draggingElement.dataset.style}"></${draggingElement.tagName.toLowerCase}>`
+              // swapElements(draggingElement, )
+              event.target.appendChild(draggingElement)
             }
         }
     }
@@ -131,7 +156,7 @@ export function dragDropHandler(event: any) {
       console.log("drop", target.id);
       // Handle the drop logic (e.g., swapping elements)
       swapElements(target as HTMLElement, draggingElement);
-    }
+}
   }
 }
 

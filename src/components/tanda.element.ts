@@ -13,16 +13,41 @@ class TandaElement extends HTMLElement {
   private expanded: boolean = false;
   private isPlaying: boolean = false;
   private hasPlayed: boolean = false;
+  
+  private handleExtendBound: EventListener;
+  private handleShrinkBound: EventListener;
+  private handleToggleBound: EventListener;
 
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
+    this.handleExtendBound = this.handleExtend.bind(this);
+    this.handleShrinkBound = this.handleShrink.bind(this);
+    this.handleToggleBound = this.toggleExpand.bind(this);
   }
 
   connectedCallback() {
     this.dataset.id = "Tanda-" + String(nextId++);
-    this.render();
+    this.render(true);
     this.draggable = true;
+  }
+
+  disconnectedCallback() {
+    this.removeEventListeners();
+  }
+
+  private handleExtend(event: any) {
+    const newTrack = document.createElement('track-element');
+    newTrack.dataset.style = this.dataset.style;
+    newTrack.dataset.title = 'place holder';
+    this.appendChild(newTrack);
+    this.render();
+  }
+
+  private handleShrink(event: any) {
+    let n = this.children.length;
+    if (n > 0) this.removeChild(this.children[n - 1]);
+    this.render();
   }
 
   private findMinMaxYears(years: (string | null)[]): string {
@@ -55,33 +80,47 @@ class TandaElement extends HTMLElement {
   public setPlaying(state: boolean) {
     this.isPlaying = state;
     if (this.isPlaying) {
-      this.classList.add('playing')
+      this.classList.add('playing');
       this.draggable = false;
-      this.shadowRoot!.querySelector('#container article')?.classList.add('playing')
+      this.shadowRoot!.querySelector('#container article')?.classList.add('playing');
     } else {
-      this.classList.remove('playing')
+      this.classList.remove('playing');
       this.draggable = true;
-      this.shadowRoot!.querySelector('#container article')?.classList.remove('playing')
+      this.shadowRoot!.querySelector('#container article')?.classList.remove('playing');
     }
   }
 
   public setPlayed(state: boolean) {
     this.hasPlayed = state;
     if (this.hasPlayed) {
-      this.classList.add('played')
+      this.classList.add('played');
       this.draggable = false;
-      this.shadowRoot!.querySelector('#container article')?.classList.add('played')
+      this.shadowRoot!.querySelector('#container article')?.classList.add('played');
     } else {
-      this.classList.remove('played')
+      this.classList.remove('played');
       this.draggable = true;
-      this.shadowRoot!.querySelector('#container article')?.classList.remove('played')
+      this.shadowRoot!.querySelector('#container article')?.classList.remove('played');
     }
   }
 
-  private render() {
+  private addEventListeners() {
+    this.shadowRoot!.querySelector('#extendTanda')!.addEventListener('click', this.handleExtendBound);
+    this.shadowRoot!.querySelector('#shrinkTanda')!.addEventListener('click', this.handleShrinkBound);
+    this.shadowRoot!.querySelector("#toggle main")!.addEventListener("click", this.handleToggleBound);
+  }
+
+  private removeEventListeners() {
+    this.shadowRoot!.querySelector('#extendTanda')!.removeEventListener('click', this.handleExtendBound);
+    this.shadowRoot!.querySelector('#shrinkTanda')!.removeEventListener('click', this.handleShrinkBound);
+    this.shadowRoot!.querySelector("#toggle main")!.removeEventListener("click", this.handleToggleBound);
+  }
+
+  public render(firstCall: boolean = false) {
+    if ( !firstCall ) this.removeEventListeners();
+    console.log('Rendering tanda', this);
     const tracks = Array.from(this.querySelectorAll("track-element")) as HTMLElement[];
     const cortina = Array.from(this.querySelectorAll("cortina-element")) as HTMLElement[];
-    const titles = tracks
+    const titles = [...tracks, ...cortina]
       .map((track) => track.dataset.title)
       .filter((x) => x);
     const titleSet = new Set(titles);
@@ -103,9 +142,9 @@ class TandaElement extends HTMLElement {
       (track) =>
         (duration += timeStringToSeconds(track.dataset.duration!) as number)
     );
-    const summary = `(${titles.length} Tracks; Duration: ${formatTime(
+    const summary = `(${tracks.length} Tracks; Duration: ${formatTime(
       duration
-    )}):  ${[...titleSet][0] == "place holder" ? "Place Holder" : ""
+    )}):  ${[...titleSet].find(title => title == "place holder") ? "Place Holder" : ""
       } ${this.findMinMaxYears(years)} ${[...artists].join(", ")}`;
 
     const track = cortina[0];
@@ -236,6 +275,32 @@ class TandaElement extends HTMLElement {
                     // direction: rtl;
                     // text-align: left; /* This makes sure that the text starts from the left when it's in RTL mode */
                 }
+                #extensions {
+                  display: flex;
+                  justify-content: end;
+                }
+                #extensions.hidden {
+                  display: none;
+                }
+                #extensions button {
+                  font-size: 1rem;
+                  border-radius: 50%;
+                  border: transparent;
+                  background-color: blue;
+                  color: white;
+                  font-weight: bolder;
+                  height: 20px;
+                  width: 20px;
+                  margin: 0.2rem;
+                }
+                #extendTanda {
+                  padding: 0px;
+                  line-height: 1.4rem;
+                }
+                #shrinkTanda {
+                  padding: 0px;
+                  line-height: 0.3rem;
+                }
             </style>
             <div id="container" class="${this.hasPlayed ? 'played' : ''}">
                 <article>
@@ -259,25 +324,29 @@ class TandaElement extends HTMLElement {
                     <div class="details ${this.expanded ? "expanded" : ""}">   
                         <slot></slot>                 
                     </div>
+                    <section id="extensions" class="${!this.expanded ? "hidden" : ""}">
+                      <button id="extendTanda">+</button>
+                      <button id="shrinkTanda">-</button>
+                    </section>
                 </article>
             </div>
         `;
 
-    this.shadowRoot!
-      .querySelector("#toggle main")!
-      .addEventListener("click", () => this.toggleExpand());
-
+    this.addEventListeners();
   }
 
   private toggleExpand() {
     this.expanded = !this.expanded;
     let details = this.shadowRoot!.querySelector(".details");
+    let extensions = this.shadowRoot!.querySelector("#extensions");
     let span = this.shadowRoot!.querySelector("main span");
     if (this.expanded) {
       details!.classList.add("expanded");
+      extensions!.classList.remove("hidden");
       span!.textContent = "►";
     } else {
       details!.classList.remove("expanded");
+      extensions!.classList.add("hidden");
       span!.textContent = "";
     }
   }

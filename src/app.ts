@@ -17,7 +17,6 @@ import { openMusicFolder } from "./services/file-system";
 import { getDomElement } from "./services/utils";
 import { enumerateOutputDevices, requestAudioPermission, verifyPermission } from "./services/permissions.service";
 import { loadLibraryIntoDB, scanFileSystem } from "./services/file-database.interface";
-import { addDragDropHandlers } from "./services/drag-drop.service";
 
 // if ("serviceWorker" in navigator) {
 //   window.addEventListener("load", () => {
@@ -62,7 +61,7 @@ async function getSystemLevel(
 ): Promise<{ meanVolume: number; maxVolume: number }> {
   let systemLowestGain = { meanVolume: -20, maxVolume: 0 };
 
-  const files = await dbManager.processEntriesInBatches("track", (record) => {
+  await dbManager.processEntriesInBatches("track", (record) => {
     let trackLevel = record.metadata.meanVolume - record.metadata.maxVolume;
     let systemLevel = systemLowestGain.meanVolume - systemLowestGain.maxVolume;
     if (trackLevel < systemLevel) systemLowestGain = record.metadata;
@@ -129,7 +128,7 @@ async function populateOutputDeviceOptions(config: ConfigOptions) {
 // Setup application layout and check file permissions and create database etc.
 //=====================================================================================================================
 document.addEventListener("DOMContentLoaded", async () => {
-  
+
   try {
     await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch (error) {
@@ -190,10 +189,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     stopButton: () => {
       eventBus.emit("stopPlaying");
     },
-    playAll: ()=>{
+    playAll: () => {
       eventBus.emit('playAll')
     },
-    stopPlayAll: ()=>{
+    stopPlayAll: () => {
       eventBus.emit('stopAll')
     },
     createTandaButton: () => {
@@ -207,13 +206,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       const sequence = '3T 3T 3W 3T 3T 3M'
 
-      const styleMap: {[key: string]: string} = {
+      const styleMap: { [key: string]: string } = {
         'T': 'Tango',
         'W': 'Waltz',
         'M': 'Milonga'
       }
 
-      for ( let t of sequence.split(' ')){
+      for (let t of sequence.split(' ')) {
         let n = parseInt(t);
         let s = t.substring(String(n).length)
         console.log(t, 'N', n, 'S', s)
@@ -222,11 +221,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         tanda.dataset.size = String(n);
         let html = '';
         let needCortina = true;
-        if ( needCortina ){
-          html += `<cortina-element data-title='place-holder'></cortina-element>`
+        if (needCortina) {
+          html += `<cortina-element data-title='place holder'></cortina-element>`
         }
-        for ( let i = 0; i < n; i++ ){
-          html += `<track-element data-style="${styleMap[s]}" data-title='place-holder'></track-element>`
+        for (let i = 0; i < n; i++) {
+          html += `<track-element data-style="${styleMap[s]}" data-title='place holder'></track-element>`
         }
         tanda.innerHTML = html;
         container.appendChild(tanda)
@@ -242,10 +241,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
 
-    await new Promise((resolve)=>{
-      eventBus.once('UserGrantedPermission', resolve)
-    }) 
-  
+  await new Promise((resolve) => {
+    eventBus.once('UserGrantedPermission', resolve)
+  })
+
 
   // Handle configuration changes
   const useSoundLevelling = getDomElement(
@@ -379,7 +378,7 @@ async function runApplication(
     progress: (data: ProgressData) => {
       if (data.state === "Playing") {
         stopButton.classList.add("active");
-        if ( data.track!.type == 'cortina' ){
+        if (data.track!.type == 'cortina') {
           playlistService.playingCortina(true)
         } else {
           playlistService.playingCortina(false)
@@ -427,22 +426,22 @@ async function runApplication(
     headphonesPlayerConfig.useSoundLevelling = config.useSoundLevelling;
     headphonesOutputPlayer.updateOptions(headphonesPlayerConfig);
   });
-  eventBus.on('playAll', ()=>{
+  eventBus.on('playAll', () => {
     speakerOutputPlayer.extendEndTime(-1)
   })
-  eventBus.on('stopAll', ()=>{
+  eventBus.on('stopAll', () => {
     speakerOutputPlayer.startNext();
   })
   eventBus.on("stopPlaying", () => {
-    speakerOutputPlayer.stop();    
+    speakerOutputPlayer.stop();
     (
       Array.from(
         document.querySelectorAll("tanda-element,track-element,cortina-element")
-      ) as (TrackElement|TandaElement)[]
+      ) as (TrackElement | TandaElement)[]
     ).forEach(x => {
       x.draggable = true;
       x.setPlaying(false);
-      if ( (x as TandaElement).setPlayed )
+      if ((x as TandaElement).setPlayed)
         (x as TandaElement).setPlayed(false);
     });
 
@@ -484,11 +483,11 @@ async function runApplication(
     speakerOutputPlayer.startNext();
   });
 
-  eventBus.on('swapped-playlist', ()=> {
+  eventBus.on('swapped-playlist', () => {
     // Find current song and workout how moved.
     const allTracks = Array.from(playlistContainer.querySelectorAll('track-element,cortina-element'))
     const playing = playlistContainer.querySelector('track-element.playing, cortina-element.playing') as TrackElement;
-    if ( playing ){
+    if (playing) {
       const N = allTracks.findIndex(track => track == playing)
       speakerOutputPlayer.updatePosition(N);
     }
@@ -514,28 +513,30 @@ async function runApplication(
   let c = 0;
 
   const allTandas: Tanda[] = [];
-  while (t < 60) {
-    if (c >= cortinas.length) {
-      c = 0;
+  if (tracks.length > 0 && cortinas.length > 0) {
+    while (t < Math.min(tracks.length, 60)) {
+      if (c >= cortinas.length) {
+        c = 0;
+      }
+      const tanda: Tanda = {
+        type: "tanda",
+        name: "Dummy",
+        style: "Unknown",
+        cortina: cortinas[c++].name,
+        tracks: [],
+      };
+
+      for (let i = 0; i < 4 && t < tracks.length; i++) {
+        tanda.tracks.push(tracks[t++].name);
+      }
+
+      // for (let i = 0; i < 100 ; i++ ){
+      allTandas.push(tanda);
+      // }
+
     }
-    const tanda: Tanda = {
-      type: "tanda",
-      name: "Dummy",
-      style: "Unknown",
-      cortina: cortinas[c++].name,
-      tracks: [],
-    };
-
-    for (let i = 0; i < 4 && t < tracks.length; i++) {
-      tanda.tracks.push(tracks[t++].name);
-    }
-
-    // for (let i = 0; i < 100 ; i++ ){
-    //   allTandas.push(tanda);
-    // }
-
   }
-  // console.log(allTandas);
+  console.log(allTandas);
   await playlistService.setTandas(allTandas);
 
   // eventBus.once("next-track-ready", async () => {

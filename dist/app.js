@@ -48,7 +48,7 @@ async function InitialiseConfig(dbManager) {
 }
 async function getSystemLevel(dbManager) {
     let systemLowestGain = { meanVolume: -20, maxVolume: 0 };
-    const files = await dbManager.processEntriesInBatches("track", (record) => {
+    await dbManager.processEntriesInBatches("track", (record) => {
         let trackLevel = record.metadata.meanVolume - record.metadata.maxVolume;
         let systemLevel = systemLowestGain.meanVolume - systemLowestGain.maxVolume;
         if (trackLevel < systemLevel)
@@ -178,10 +178,10 @@ document.addEventListener("DOMContentLoaded", async () => {
                 let html = '';
                 let needCortina = true;
                 if (needCortina) {
-                    html += `<cortina-element data-title='place-holder'></cortina-element>`;
+                    html += `<cortina-element data-title='place holder'></cortina-element>`;
                 }
                 for (let i = 0; i < n; i++) {
-                    html += `<track-element data-style="${styleMap[s]}" data-title='place-holder'></track-element>`;
+                    html += `<track-element data-style="${styleMap[s]}" data-title='place holder'></track-element>`;
                 }
                 tanda.innerHTML = html;
                 container.appendChild(tanda);
@@ -397,25 +397,27 @@ async function runApplication(dbManager, config) {
     let t = 0;
     let c = 0;
     const allTandas = [];
-    while (t < 60) {
-        if (c >= cortinas.length) {
-            c = 0;
+    if (tracks.length > 0 && cortinas.length > 0) {
+        while (t < Math.min(tracks.length, 60)) {
+            if (c >= cortinas.length) {
+                c = 0;
+            }
+            const tanda = {
+                type: "tanda",
+                name: "Dummy",
+                style: "Unknown",
+                cortina: cortinas[c++].name,
+                tracks: [],
+            };
+            for (let i = 0; i < 4 && t < tracks.length; i++) {
+                tanda.tracks.push(tracks[t++].name);
+            }
+            // for (let i = 0; i < 100 ; i++ ){
+            allTandas.push(tanda);
+            // }
         }
-        const tanda = {
-            type: "tanda",
-            name: "Dummy",
-            style: "Unknown",
-            cortina: cortinas[c++].name,
-            tracks: [],
-        };
-        for (let i = 0; i < 4 && t < tracks.length; i++) {
-            tanda.tracks.push(tracks[t++].name);
-        }
-        // for (let i = 0; i < 100 ; i++ ){
-        //   allTandas.push(tanda);
-        // }
     }
-    // console.log(allTandas);
+    console.log(allTandas);
     await playlistService.setTandas(allTandas);
     // eventBus.once("next-track-ready", async () => {
     //   console.log("Starting playing tracks");

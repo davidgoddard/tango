@@ -22,11 +22,11 @@ class BaseTrackElement extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
-    this.draggable = true;
-    this.dataset.id = "T-" + String(nextId++);
   }
 
   connectedCallback() {
+    this.draggable = true;
+    this.dataset.id = "T-" + String(nextId++);
     this.render();
 
     this.shadowRoot!.querySelector("#headphones")!.addEventListener(

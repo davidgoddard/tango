@@ -83,11 +83,12 @@ class SearchElement extends HTMLElement {
           <div class="scrollable">
             <div id="tracks-content" class="content">
               <!-- Content for tracks -->
-              <track-element data-track-id="100" data-title="Dummy track"></track-element>
+              <track-element data-track-id="100" data-title="Dummy track 6" data-style="Waltz"></track-element>
+              <track-element data-track-id="100" data-title="Dummy track 5" data-style="Tango"></track-element>
               <cortina-element data-track-id="100" data-title="Dummy track"></cortina-element>
               <track-element data-track-id="100" data-title="Dummy track 4" data-style="Milonga"></track-element>
               <cortina-element data-track-id="100" data-title="Dummy track"></cortina-element>
-              <tanda-element data-tanda-id="8765" data-style="Milonga">
+              <tanda-element data-tanda-id="8765" data-style="Waltz">
                 <cortina-element data-track-id="100" data-title="Dummy track"></cortina-element>
                 <track-element data-track-id="100" data-title="Dummy track 1" data-style="Waltz"></track-element>
                 <track-element data-track-id="100" data-title="Dummy track 2" data-style="Waltz"></track-element>
