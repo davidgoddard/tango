@@ -8,9 +8,9 @@ npm-debug.log
 yarn-error.log
 
 # Ignore build artifacts
-/dist
-/out
-/build
+dist/
+out/
+build/
 
 # Ignore environment-specific files
 .env

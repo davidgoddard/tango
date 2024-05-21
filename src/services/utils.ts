@@ -74,8 +74,16 @@ export function renderTrackDetail(idx: number, track: Track, typeName:string): s
                       ? formatTime((track.metadata?.end - track.metadata?.start))
                       : ""
                   }"
-                  data-year="${year}"></${typeName}-element>`;
+                  data-year="${year}"
+                  data-file="${track.name}"></${typeName}-element>`;
 
+  }
+
+  export function createPlaceHolder(typeName: string,style: string){
+    return `<${typeName}
+                  data-style="${style}" 
+                  data-title="place holder" 
+            ></${typeName}>`;
   }
 
   export function getDomElementAll(selector: string): NodeList {

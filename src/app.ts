@@ -14,7 +14,7 @@ import { Player, PlayerOptions, ProgressData } from "./services/player";
 import { PlaylistService } from "./services/playlist-service";
 import { DatabaseManager, IndexedDBManager } from "./services/database";
 import { openMusicFolder } from "./services/file-system";
-import { getDomElement } from "./services/utils";
+import { createPlaceHolder, getDomElement } from "./services/utils";
 import { enumerateOutputDevices, requestAudioPermission, verifyPermission } from "./services/permissions.service";
 import { loadLibraryIntoDB, scanFileSystem } from "./services/file-database.interface";
 
@@ -222,10 +222,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         let html = '';
         let needCortina = true;
         if (needCortina) {
-          html += `<cortina-element data-title='place holder'></cortina-element>`
+
+          html += createPlaceHolder('cortina-element', 'cortina' )
         }
         for (let i = 0; i < n; i++) {
-          html += `<track-element data-style="${styleMap[s]}" data-title='place holder'></track-element>`
+          html += createPlaceHolder('track-element', styleMap[s])
         }
         tanda.innerHTML = html;
         container.appendChild(tanda)
@@ -332,9 +333,9 @@ async function runApplication(
 
   playlistContainer.addEventListener("clickedTrack", async (event: Event) => {
     try {
-      const detail = (event as CustomEvent).detail;
+      const track = (event as CustomEvent).detail;
       if (!speakerOutputPlayer.isPlaying) {
-        let N = playlistService.getN(detail);
+        let N = playlistService.getN(track);
         await speakerOutputPlayer.updatePosition(N - 1);
         if (speakerOutputPlayer.next) {
           speakerOutputPlayer.next.silence = 0;

@@ -1,5 +1,6 @@
 import { TandaElement } from "../components/tanda.element";
 import { eventBus } from "../events/event-bus";
+import { createPlaceHolder } from "./utils";
 
 let draggingElement: HTMLElement;
 
@@ -106,22 +107,20 @@ export function dragDropHandler(event: any) {
   event.preventDefault();
   document.querySelector(".drop-target")?.classList.remove("drop-target");
 
-  let target;
-  target = (event.target as HTMLElement).closest(draggingElement.tagName);
+  let target: HTMLElement;
+  target = (event.target as HTMLElement).closest(draggingElement.tagName)!;
   if (!target) {
     console.log("No target yet - ", event.target);
     if ( event.target.tagName === 'SCRATCH-PAD-ELEMENT'){
-        console.log('Dragging', draggingElement)
         if ( draggingElement.closest('#playlistContainer') ){
             // Create a dummy object to swap it with
             const swap = document.createElement(draggingElement.tagName);
             if ( draggingElement.tagName === 'TANDA-ELEMENT'){
                 swap.dataset.style = draggingElement.dataset.style;
                 let html = '';
-                console.log(draggingElement.children)
                 for ( let i = 0; i < draggingElement.children.length; i++ ){
                     let child = draggingElement.children[i];
-                    html += `<${child.tagName} data-title="place holder" data-style="${swap.dataset.style}"></${child.tagName}>`
+                    html += createPlaceHolder(child.tagName, swap.dataset.style!)
                 }
                 swap.innerHTML = html;
             } else {
@@ -133,8 +132,6 @@ export function dragDropHandler(event: any) {
         } else {
             console.log('Nearest', draggingElement.closest('.content'))
             if ( draggingElement.closest('.content')){
-              // let html = `<${draggingElement.tagName.toLowerCase} data-title="place holder" data-style="${draggingElement.dataset.style}"></${draggingElement.tagName.toLowerCase}>`
-              // swapElements(draggingElement, )
               event.target.appendChild(draggingElement)
             }
         }
@@ -145,17 +142,17 @@ export function dragDropHandler(event: any) {
   console.log("Found drop zone", target, "dragging", draggingElement);
   console.log(
     "Valid?",
-    isValidDropTarget(draggingElement, target as HTMLElement)
+    isValidDropTarget(draggingElement, target)
   );
 
   if (target) {
     if (
       draggingElement &&
-      isValidDropTarget(draggingElement, target as HTMLElement)
+      isValidDropTarget(draggingElement, target)
     ) {
       console.log("drop", target.id);
       // Handle the drop logic (e.g., swapping elements)
-      swapElements(target as HTMLElement, draggingElement);
+      swapElements(draggingElement, target);
 }
   }
 }

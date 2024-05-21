@@ -1377,9 +1377,14 @@
     }
     setPlaying(state) {
       this.isPlaying = state;
-      this.draggable = !state && this.parentElement.draggable;
-      this.classList.toggle("playing");
-      this.shadowRoot.querySelector("article")?.classList.toggle("playing");
+      this.draggable = !this.isPlaying && this.parentElement.draggable;
+      if (this.isPlaying) {
+        this.classList.add("playing");
+        this.shadowRoot.querySelector("article")?.classList.add("playing");
+      } else {
+        this.classList.remove("playing");
+        this.shadowRoot.querySelector("article")?.classList.remove("playing");
+      }
     }
     handleTargetButtonClick(event) {
       const targetButton = event.target?.closest("button.target");

@@ -366,15 +366,15 @@ label img {
   display: grid;
   grid-template-rows: auto;
   overflow-y: auto;
-  padding: 2px;
+  padding: 3px;
 }
 tanda-element, cortina-element, track-element {
-  margin: 0 2px 0 2px; /* to allow outlines */
+  margin: 0 3px 0 3px; /* to allow outlines */
   display: block;
 }
 
 .drop-target {
-  outline: dashed 2px green;
+  outline: dashed 3px green;
   z-index: 99;
 }
 
