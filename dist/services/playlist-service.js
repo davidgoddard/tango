@@ -1,5 +1,6 @@
 import { eventBus } from "../events/event-bus";
 import { getDomElement, renderTrackDetail } from "./utils";
+import { addDragDropHandlers } from "./drag-drop.service";
 export class PlaylistService {
     container;
     getDetail;
@@ -13,10 +14,7 @@ export class PlaylistService {
         eventBus.on("track-request", this.requestTrack.bind(this));
         eventBus.on("startingPlaying", this.markPlaying.bind(this));
         eventBus.on("stoppedPlaying", this.unmarkPlaying.bind(this));
-        // Parent container where tracks can be dropped
-        const playlist = this.container;
-        let draggingElement;
-        let draggingElementTagName;
+        addDragDropHandlers(container);
         function hasPlayed(element) {
             if (element.classList.contains("playing") ||
                 element.classList.contains("played")) {

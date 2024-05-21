@@ -1,20 +1,22 @@
+import { addDragDropHandlers } from "../services/drag-drop.service";
+
 class ScratchPadElement extends HTMLElement {
-    private container: HTMLElement;
+    private container?: HTMLElement;
     private filterType: string = 'all';
     private filterStyle: string = '';
   
     constructor() {
       super();
-      this.container = document.createElement('div');
-      this.container.className = 'dropzone';
       this.attachShadow({ mode: 'open' });
-      this.shadowRoot?.appendChild(this.createStyles());
-      this.shadowRoot?.appendChild(this.createControls());
-      this.shadowRoot?.appendChild(this.container);
     }
   
     connectedCallback() {
+      this.container = document.createElement('slot');
+      this.shadowRoot?.appendChild(this.createStyles());
+      this.shadowRoot?.appendChild(this.createControls());
+      this.shadowRoot?.appendChild(this.container);
       this.render();
+      addDragDropHandlers(this)
     }
   
     createStyles(): HTMLStyleElement {
@@ -29,12 +31,11 @@ class ScratchPadElement extends HTMLElement {
         .controls {
           margin-bottom: 10px;
         }
-        .dropzone {
-          min-height: 50px;
-          border: 1px dashed #ccc;
-          padding: 10px;
+        .drop-target {
+          outline: dashed 2px green;
+          z-index: 99;
         }
-      `;
+        `;
       return style;
     }
   
@@ -43,14 +44,20 @@ class ScratchPadElement extends HTMLElement {
       controls.className = 'controls';
   
       // Radio buttons for filter type
-      ['all', 'tracks', 'tandas', 'cortinas'].forEach((type) => {
+      let typeMap:any = {
+        'all': 'all',
+        'tracks': 'track-element',
+        'cortinas': 'cortina-element',
+        'tandas': 'tanda-element',
+      }
+      Object.keys(typeMap).forEach((type) => {
         const label = document.createElement('label');
         const radio = document.createElement('input');
         radio.type = 'radio';
         radio.name = 'type';
-        radio.value = type;
+        radio.value = typeMap[type];
         radio.checked = type === 'all';
-        radio.addEventListener('change', () => this.setFilterType(type));
+        radio.addEventListener('change', () => this.setFilterType(typeMap[type]));
         label.appendChild(radio);
         label.appendChild(document.createTextNode(type));
         controls.appendChild(label);
@@ -66,7 +73,7 @@ class ScratchPadElement extends HTMLElement {
     }
   
     updateStyleOptions(selectElement: HTMLSelectElement) {
-      const styles = Array.from(this.container.children).map((el) => (el as HTMLElement).dataset.style);
+      const styles = Array.from(this.container!.children).map((el) => (el as HTMLElement).dataset.style);
       const uniqueStyles = Array.from(new Set(styles));
       selectElement.innerHTML = '<option value="">All styles</option>';
       uniqueStyles.forEach((style) => {
@@ -88,11 +95,12 @@ class ScratchPadElement extends HTMLElement {
     }
   
     render() {
-      const children = Array.from(this.container.children) as HTMLElement[];
+      const children = Array.from(this!.children) as HTMLElement[];
       children.forEach((child) => {
         const type = child.tagName.toLowerCase();
         const style = child.dataset.style;
-        const matchesType = this.filterType === 'all' || this.filterType === `${type}s`;
+        const matchesType = this.filterType === 'all' || this.filterType === type;
+        console.log(type, matchesType, this.filterType,type)
         const matchesStyle = !this.filterStyle || this.filterStyle === style;
         child.style.display = matchesType && matchesStyle ? '' : 'none';
       });

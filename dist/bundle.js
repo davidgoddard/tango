@@ -784,9 +784,9 @@
     constructor() {
       super();
       this.attachShadow({ mode: "open" });
-      this.dataset.id = "Tanda-" + String(nextId++);
     }
     connectedCallback() {
+      this.dataset.id = "Tanda-" + String(nextId++);
       this.render();
       this.draggable = true;
     }
@@ -852,9 +852,9 @@
       if (track) {
         cortinaTitle = track.dataset.title;
         cortinaArtist = track.dataset.artist;
-        if (cortinaTitle.length > 15)
+        if (cortinaTitle?.length > 15)
           cortinaTitle = cortinaTitle.substring(0, 15) + "...";
-        if (cortinaArtist.length > 15)
+        if (cortinaArtist?.length > 15)
           cortinaArtist = cortinaArtist.substring(0, 15) + "...";
       } else {
         cortinaTitle = "Unknown";
@@ -1011,63 +1011,24 @@
 
   // dist/services/drag-drop.service.js
   var draggingElement;
-  var addDragDropHandlers = () => {
-    document.addEventListener("dragstart", dragStartHandler);
-    document.addEventListener("dragend", (event) => {
-      const target = event.target;
-      if (target.matches("[draggable]")) {
-        console.log("dragend", target.dataset.id);
-      }
-    });
-    document.addEventListener("dragover", (event) => {
-      event.preventDefault();
-      const target = event.target;
-      if (isValidDropTarget(draggingElement, target))
-        target.classList.add("drop-target");
-      console.log("dragover", target.id);
-      event.dataTransfer.dropEffect = "move";
-    });
-    document.addEventListener("dragleave", (event) => {
-      event.preventDefault();
-      const target = event.target;
-      target.classList.remove("drop-target");
-    });
-    document.addEventListener("drop", (event) => {
-      event.preventDefault();
-      document.querySelector(".drop-target")?.classList.remove("drop-target");
-      let target;
-      switch (draggingElement.tagName) {
-        case "TANDA-ELEMENT": {
-          target = event.target.closest("tanda-element");
-          break;
-        }
-        case "TRACK-ELEMENT": {
-          target = event.target.closest("track-element");
-          break;
-        }
-        case "CORTINA-ELEMENT": {
-          target = event.target.closest("cortina-element");
-          break;
-        }
-        default: {
-          break;
-        }
-      }
-      if (!target) {
-        target = event.target.closest(".dropzone");
-      }
-      console.log("Found drop zone", target);
-      if (target) {
-        if (draggingElement && isValidDropTarget(draggingElement, target)) {
-          console.log("drop", target.id);
-          swapElements(target, draggingElement);
-        }
-      }
-    });
+  var addDragDropHandlers = (container) => {
+    container.addEventListener("dragstart", dragStartHandler);
+    container.addEventListener("dragend", dragEndHandler);
+    container.addEventListener("dragover", dragOverHandler);
+    container.addEventListener("dragleave", dragLeaveHandler);
+    container.addEventListener("drop", dragDropHandler);
   };
   function isValidDropTarget(source, target) {
-    console.log("Is valid", source, target);
-    return source !== target && source.tagName == target.tagName;
+    console.log("Is valid", source.tagName, target.tagName, source.dataset.style, target.dataset.style);
+    let valid = sameStyle(source.dataset?.style || "", target.dataset?.style || "");
+    return target.tagName == "SCRATCH-PAD-ELEMENT" || source !== target && source.tagName == target.tagName && valid;
+  }
+  function sameStyle(a, b) {
+    if (a == b)
+      return true;
+    if (a.charAt(0).toUpperCase() == "U" || b.charAt(0).toUpperCase() == "U")
+      return true;
+    return false;
   }
   function swapElements(element1, element2) {
     const temp = document.createElement("div");
@@ -1082,6 +1043,68 @@
       console.log("dragstart", target.dataset.id);
       event.dataTransfer?.setData("text/plain", target.dataset.id);
       draggingElement = target;
+    }
+  }
+  function dragOverHandler(event) {
+    event.preventDefault();
+    const target = event.target;
+    if (isValidDropTarget(draggingElement, target)) {
+      target.classList.add("drop-target");
+      event.dataTransfer.dropEffect = "move";
+    }
+  }
+  function dragLeaveHandler(event) {
+    event.preventDefault();
+    const target = event.target;
+    target.classList.remove("drop-target");
+  }
+  function dragDropHandler(event) {
+    event.preventDefault();
+    document.querySelector(".drop-target")?.classList.remove("drop-target");
+    let target;
+    target = event.target.closest(draggingElement.tagName);
+    if (!target) {
+      console.log("No target yet - ", event.target);
+      if (event.target.tagName === "SCRATCH-PAD-ELEMENT") {
+        console.log(draggingElement.parentElement);
+        if (draggingElement.parentElement?.id === "playlistContainer") {
+          const swap = document.createElement(draggingElement.tagName);
+          if (draggingElement.tagName === "TANDA-ELEMENT") {
+            swap.dataset.style = draggingElement.dataset.style;
+            let html = "";
+            console.log(draggingElement.children);
+            for (let i = 0; i < draggingElement.children.length; i++) {
+              let child = draggingElement.children[i];
+              html += `<${child.tagName} data-title="place-holder" data-style="${swap.dataset.style}"></${child.tagName}>`;
+            }
+            swap.innerHTML = html;
+          } else {
+            swap.dataset.title = "place-holder";
+            swap.dataset.style = draggingElement.dataset.style;
+          }
+          event.target.appendChild(swap);
+          swapElements(draggingElement, swap);
+        } else {
+          console.log("Nearest", draggingElement.parentElement);
+          if (draggingElement.parentElement?.classList.contains("content")) {
+            event.target.appendChild(draggingElement);
+          }
+        }
+      }
+      return;
+    }
+    console.log("Found drop zone", target, "dragging", draggingElement);
+    console.log("Valid?", isValidDropTarget(draggingElement, target));
+    if (target) {
+      if (draggingElement && isValidDropTarget(draggingElement, target)) {
+        console.log("drop", target.id);
+        swapElements(target, draggingElement);
+      }
+    }
+  }
+  function dragEndHandler(event) {
+    const target = event.target;
+    if (target.matches("[draggable]")) {
     }
   }
 
@@ -1100,7 +1123,6 @@
       this.attachShadow({ mode: "open" });
       this.shadowRoot.innerHTML = `
         <style>
-          /* Add CSS styles here */
           .tab-container {
             display: flex;
           }
@@ -1129,6 +1151,13 @@
           .scrollable {
             overflow-y: auto;
           }
+          track-element, cortina-element, tanda-element {
+            display: block;
+          }
+          .drop-target {
+            outline: dashed 2px green;
+            z-index: 99;
+          }
         </style>
         <section>
           <div>
@@ -1152,9 +1181,13 @@
               <!-- Content for tracks -->
               <track-element data-track-id="100" data-title="Dummy track"></track-element>
               <cortina-element data-track-id="100" data-title="Dummy track"></cortina-element>
+              <track-element data-track-id="100" data-title="Dummy track 4" data-style="Milonga"></track-element>
+              <cortina-element data-track-id="100" data-title="Dummy track"></cortina-element>
               <tanda-element data-tanda-id="8765" data-style="Milonga">
                 <cortina-element data-track-id="100" data-title="Dummy track"></cortina-element>
-                <track-element data-track-id="100" data-title="Dummy track"></track-element>
+                <track-element data-track-id="100" data-title="Dummy track 1" data-style="Waltz"></track-element>
+                <track-element data-track-id="100" data-title="Dummy track 2" data-style="Waltz"></track-element>
+                <track-element data-track-id="100" data-title="Dummy track 3" data-style="Waltz"></track-element>
               </tanda-element>
             </div>
             <div id="tandas-content" class="content hidden">
@@ -1174,7 +1207,8 @@
       this.filterSelect.addEventListener("change", this.handleFilter.bind(this));
       this.tracksTab.addEventListener("click", () => this.showContent("tracks"));
       this.tandasTab.addEventListener("click", () => this.showContent("tandas"));
-      this.shadowRoot?.addEventListener("dragstart", dragStartHandler);
+      addDragDropHandlers(this.tandasContent);
+      addDragDropHandlers(this.tracksContent);
       this.tracksCount.textContent = "0";
       this.tandasCount.textContent = "0";
       eventBus.on("queryResults", this.results.bind(this));
@@ -1333,12 +1367,12 @@
         :host-context(track-element:nth-child(2n+1)) article{
             background-color: #f9ede1a6;
         }
-        :host-context(track-element.dropzone) article {
-          outline: dashed 2px green !important;
-      }
-      :host-context(cortina-element.dropzone) article {
-        outline: dashed 2px green !important;
-    }
+    //     :host-context(track-element.drop-target) article {
+    //       outline: dashed 2px green !important;
+    //   }
+    //   :host-context(cortina-element.drop-target) article {
+    //     outline: dashed 2px green !important;
+    // }
   
         button.target {
             display: none;
@@ -1379,7 +1413,7 @@
         <button id="headphones" class="${this.isPlayingOnHeadphones ? "playing" : ""}">
             <img src="./icons/headphones.png" alt="Listen on headphones">
         </button>
-        <h2>${this.dataset.tandaId} ${this.dataset.title}</h2>
+        <h2>${this.dataset.tandaId ? this.dataset.tandaId : ""} ${this.tagName === "CORTINA-ELEMENT" ? "(Cortina) " : ""} ${this.dataset.title}</h2>
             <div id="floated">
               ${!/undefined|null/.test(this.dataset.bpm) ? `<span>BPM: <span>${this.dataset.bpm}</span></span>` : ""}
               ${!/undefined|null/.test(this.dataset.year) ? `<span>Year: ${this.dataset.year}</span></span>` : ""}
@@ -1545,22 +1579,22 @@
   };
   customElements.define("large-list-element", LargeListElement);
 
-  // dist/components/scrach-pad.element.js
+  // dist/components/scratch-pad.element.js
   var ScratchPadElement = class extends HTMLElement {
     container;
     filterType = "all";
     filterStyle = "";
     constructor() {
       super();
-      this.container = document.createElement("div");
-      this.container.className = "dropzone";
       this.attachShadow({ mode: "open" });
+    }
+    connectedCallback() {
+      this.container = document.createElement("slot");
       this.shadowRoot?.appendChild(this.createStyles());
       this.shadowRoot?.appendChild(this.createControls());
       this.shadowRoot?.appendChild(this.container);
-    }
-    connectedCallback() {
       this.render();
+      addDragDropHandlers(this);
     }
     createStyles() {
       const style = document.createElement("style");
@@ -1574,25 +1608,30 @@
         .controls {
           margin-bottom: 10px;
         }
-        .dropzone {
-          min-height: 50px;
-          border: 1px dashed #ccc;
-          padding: 10px;
+        .drop-target {
+          outline: dashed 2px green;
+          z-index: 99;
         }
-      `;
+        `;
       return style;
     }
     createControls() {
       const controls = document.createElement("div");
       controls.className = "controls";
-      ["all", "tracks", "tandas", "cortinas"].forEach((type) => {
+      let typeMap = {
+        "all": "all",
+        "tracks": "track-element",
+        "cortinas": "cortina-element",
+        "tandas": "tanda-element"
+      };
+      Object.keys(typeMap).forEach((type) => {
         const label = document.createElement("label");
         const radio = document.createElement("input");
         radio.type = "radio";
         radio.name = "type";
-        radio.value = type;
+        radio.value = typeMap[type];
         radio.checked = type === "all";
-        radio.addEventListener("change", () => this.setFilterType(type));
+        radio.addEventListener("change", () => this.setFilterType(typeMap[type]));
         label.appendChild(radio);
         label.appendChild(document.createTextNode(type));
         controls.appendChild(label);
@@ -1623,11 +1662,12 @@
       this.render();
     }
     render() {
-      const children = Array.from(this.container.children);
+      const children = Array.from(this.children);
       children.forEach((child) => {
         const type = child.tagName.toLowerCase();
         const style = child.dataset.style;
-        const matchesType = this.filterType === "all" || this.filterType === `${type}s`;
+        const matchesType = this.filterType === "all" || this.filterType === type;
+        console.log(type, matchesType, this.filterType, type);
         const matchesStyle = !this.filterStyle || this.filterStyle === style;
         child.style.display = matchesType && matchesStyle ? "" : "none";
       });
@@ -1929,9 +1969,7 @@
       eventBus.on("track-request", this.requestTrack.bind(this));
       eventBus.on("startingPlaying", this.markPlaying.bind(this));
       eventBus.on("stoppedPlaying", this.unmarkPlaying.bind(this));
-      const playlist = this.container;
-      let draggingElement2;
-      let draggingElementTagName;
+      addDragDropHandlers(container);
       function hasPlayed(element) {
         if (element.classList.contains("playing") || element.classList.contains("played")) {
           return true;
@@ -2623,7 +2661,6 @@
     fillOptions(config.headphoneOutput, getDomElement("#headphones-output-devices"));
   }
   document.addEventListener("DOMContentLoaded", async () => {
-    addDragDropHandlers();
     try {
       await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (error) {
@@ -2686,6 +2723,33 @@
         const newTanda = document.createElement("tanda-element");
         newTanda.setAttribute("style", "undefined");
         scratchPad.appendChild(newTanda);
+      },
+      extendPlaylist: () => {
+        const container = getDomElement("#playlistContainer");
+        const sequence = "3T 3T 3W 3T 3T 3M";
+        const styleMap = {
+          "T": "Tango",
+          "W": "Waltz",
+          "M": "Milonga"
+        };
+        for (let t of sequence.split(" ")) {
+          let n = parseInt(t);
+          let s = t.substring(String(n).length);
+          console.log(t, "N", n, "S", s);
+          let tanda = document.createElement("tanda-element");
+          tanda.dataset.style = styleMap[s];
+          tanda.dataset.size = String(n);
+          let html = "";
+          let needCortina = true;
+          if (needCortina) {
+            html += `<cortina-element data-title='place-holder'></cortina-element>`;
+          }
+          for (let i = 0; i < n; i++) {
+            html += `<track-element data-style="${styleMap[s]}" data-title='place-holder'></track-element>`;
+          }
+          tanda.innerHTML = html;
+          container.appendChild(tanda);
+        }
       }
     };
     for (const key of Object.keys(quickClickHandlers)) {
@@ -2865,7 +2929,7 @@
     let t = 0;
     let c = 0;
     const allTandas = [];
-    while (t < tracks.length) {
+    while (t < 60) {
       if (c >= cortinas.length) {
         c = 0;
       }
@@ -2878,9 +2942,6 @@
       };
       for (let i = 0; i < 4 && t < tracks.length; i++) {
         tanda.tracks.push(tracks[t++].name);
-      }
-      for (let i = 0; i < 100; i++) {
-        allTandas.push(tanda);
       }
     }
     await playlistService.setTandas(allTandas);

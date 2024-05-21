@@ -1,5 +1,5 @@
 import { eventBus } from "../events/event-bus";
-import { dragStartHandler } from "../services/drag-drop.service";
+import { addDragDropHandlers } from "../services/drag-drop.service";
 import { renderTrackDetail } from "../services/utils";
 
 export interface SearchResult {
@@ -27,7 +27,6 @@ class SearchElement extends HTMLElement {
         // Define the template
         this.shadowRoot!.innerHTML = `
         <style>
-          /* Add CSS styles here */
           .tab-container {
             display: flex;
           }
@@ -56,6 +55,13 @@ class SearchElement extends HTMLElement {
           .scrollable {
             overflow-y: auto;
           }
+          track-element, cortina-element, tanda-element {
+            display: block;
+          }
+          .drop-target {
+            outline: dashed 2px green;
+            z-index: 99;
+          }
         </style>
         <section>
           <div>
@@ -79,9 +85,13 @@ class SearchElement extends HTMLElement {
               <!-- Content for tracks -->
               <track-element data-track-id="100" data-title="Dummy track"></track-element>
               <cortina-element data-track-id="100" data-title="Dummy track"></cortina-element>
+              <track-element data-track-id="100" data-title="Dummy track 4" data-style="Milonga"></track-element>
+              <cortina-element data-track-id="100" data-title="Dummy track"></cortina-element>
               <tanda-element data-tanda-id="8765" data-style="Milonga">
                 <cortina-element data-track-id="100" data-title="Dummy track"></cortina-element>
-                <track-element data-track-id="100" data-title="Dummy track"></track-element>
+                <track-element data-track-id="100" data-title="Dummy track 1" data-style="Waltz"></track-element>
+                <track-element data-track-id="100" data-title="Dummy track 2" data-style="Waltz"></track-element>
+                <track-element data-track-id="100" data-title="Dummy track 3" data-style="Waltz"></track-element>
               </tanda-element>
             </div>
             <div id="tandas-content" class="content hidden">
@@ -105,7 +115,9 @@ class SearchElement extends HTMLElement {
         this.filterSelect.addEventListener('change', this.handleFilter.bind(this));
         this.tracksTab.addEventListener('click', () => this.showContent('tracks'));
         this.tandasTab.addEventListener('click', () => this.showContent('tandas'));
-        this.shadowRoot?.addEventListener('dragstart', dragStartHandler)
+
+        addDragDropHandlers(this.tandasContent);
+        addDragDropHandlers(this.tracksContent);
 
         // Initialize counts
         this.tracksCount.textContent = '0';

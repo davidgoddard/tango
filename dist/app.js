@@ -3,7 +3,7 @@ import "./components/tanda.element";
 import "./components/search.element";
 import "./components/track.element";
 import "./components/large-list";
-import "./components/scrach-pad.element";
+import "./components/scratch-pad.element";
 import { TabsContainer } from "./components/tabs.component";
 import { Player } from "./services/player";
 import { PlaylistService } from "./services/playlist-service";
@@ -12,7 +12,6 @@ import { openMusicFolder } from "./services/file-system";
 import { getDomElement } from "./services/utils";
 import { enumerateOutputDevices, requestAudioPermission } from "./services/permissions.service";
 import { loadLibraryIntoDB, scanFileSystem } from "./services/file-database.interface";
-import { addDragDropHandlers } from "./services/drag-drop.service";
 // if ("serviceWorker" in navigator) {
 //   window.addEventListener("load", () => {
 //     navigator.serviceWorker
@@ -94,7 +93,6 @@ async function populateOutputDeviceOptions(config) {
 // Setup application layout and check file permissions and create database etc.
 //=====================================================================================================================
 document.addEventListener("DOMContentLoaded", async () => {
-    addDragDropHandlers();
     try {
         await navigator.mediaDevices.getUserMedia({ audio: true });
     }
@@ -162,6 +160,33 @@ document.addEventListener("DOMContentLoaded", async () => {
             newTanda.setAttribute("style", "undefined");
             scratchPad.appendChild(newTanda);
         },
+        extendPlaylist: () => {
+            const container = getDomElement('#playlistContainer');
+            const sequence = '3T 3T 3W 3T 3T 3M';
+            const styleMap = {
+                'T': 'Tango',
+                'W': 'Waltz',
+                'M': 'Milonga'
+            };
+            for (let t of sequence.split(' ')) {
+                let n = parseInt(t);
+                let s = t.substring(String(n).length);
+                console.log(t, 'N', n, 'S', s);
+                let tanda = document.createElement('tanda-element');
+                tanda.dataset.style = styleMap[s];
+                tanda.dataset.size = String(n);
+                let html = '';
+                let needCortina = true;
+                if (needCortina) {
+                    html += `<cortina-element data-title='place-holder'></cortina-element>`;
+                }
+                for (let i = 0; i < n; i++) {
+                    html += `<track-element data-style="${styleMap[s]}" data-title='place-holder'></track-element>`;
+                }
+                tanda.innerHTML = html;
+                container.appendChild(tanda);
+            }
+        }
     };
     for (const key of Object.keys(quickClickHandlers)) {
         getDomElement((key.charAt(0) != "." ? "#" : "") + key).addEventListener("click", quickClickHandlers[key]);
@@ -372,7 +397,7 @@ async function runApplication(dbManager, config) {
     let t = 0;
     let c = 0;
     const allTandas = [];
-    while (t < tracks.length) {
+    while (t < 60) {
         if (c >= cortinas.length) {
             c = 0;
         }
@@ -386,9 +411,9 @@ async function runApplication(dbManager, config) {
         for (let i = 0; i < 4 && t < tracks.length; i++) {
             tanda.tracks.push(tracks[t++].name);
         }
-        for (let i = 0; i < 100; i++) {
-            allTandas.push(tanda);
-        }
+        // for (let i = 0; i < 100 ; i++ ){
+        //   allTandas.push(tanda);
+        // }
     }
     // console.log(allTandas);
     await playlistService.setTandas(allTandas);

@@ -154,12 +154,12 @@ class BaseTrackElement extends HTMLElement {
         :host-context(track-element:nth-child(2n+1)) article{
             background-color: #f9ede1a6;
         }
-        :host-context(track-element.dropzone) article {
-          outline: dashed 2px green !important;
-      }
-      :host-context(cortina-element.dropzone) article {
-        outline: dashed 2px green !important;
-    }
+    //     :host-context(track-element.drop-target) article {
+    //       outline: dashed 2px green !important;
+    //   }
+    //   :host-context(cortina-element.drop-target) article {
+    //     outline: dashed 2px green !important;
+    // }
   
         button.target {
             display: none;
@@ -204,7 +204,7 @@ class BaseTrackElement extends HTMLElement {
         }">
             <img src="./icons/headphones.png" alt="Listen on headphones">
         </button>
-        <h2>${this.dataset.tandaId} ${this.dataset.title}</h2>
+        <h2>${this.dataset.tandaId ? this.dataset.tandaId : ''} ${this.tagName === 'CORTINA-ELEMENT' ? '(Cortina) ' : ''} ${this.dataset.title}</h2>
             <div id="floated">
               ${
                 !/undefined|null/.test(this.dataset.bpm!)

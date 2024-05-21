@@ -17,10 +17,10 @@ class TandaElement extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
-    this.dataset.id = "Tanda-" + String(nextId++);
   }
 
   connectedCallback() {
+    this.dataset.id = "Tanda-" + String(nextId++);
     this.render();
     this.draggable = true;
   }
@@ -114,9 +114,9 @@ class TandaElement extends HTMLElement {
     if (track) {
       cortinaTitle = track.dataset.title!;
       cortinaArtist = track.dataset.artist!;
-      if (cortinaTitle.length > 15)
+      if (cortinaTitle?.length > 15)
         cortinaTitle = cortinaTitle.substring(0, 15) + "...";
-      if (cortinaArtist.length > 15)
+      if (cortinaArtist?.length > 15)
         cortinaArtist = cortinaArtist.substring(0, 15) + "...";
     } else {
       cortinaTitle = "Unknown";

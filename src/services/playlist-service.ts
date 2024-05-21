@@ -4,6 +4,7 @@ import { getDomElement, renderTrackDetail } from "./utils";
 import { TrackElement } from "../components/track.element";
 import { TandaElement } from "../components/tanda.element";
 import { LargeListElement } from "../components/large-list";
+import { addDragDropHandlers } from "./drag-drop.service";
 
 interface TandaTrack extends Track {
   tandaOffset: number;
@@ -34,12 +35,7 @@ export class PlaylistService {
 
     eventBus.on("startingPlaying", this.markPlaying.bind(this));
     eventBus.on("stoppedPlaying", this.unmarkPlaying.bind(this));
-
-    // Parent container where tracks can be dropped
-    const playlist = this.container;
-
-    let draggingElement: TandaElement | TrackElement;
-    let draggingElementTagName: string;
+    addDragDropHandlers(container)
 
     function hasPlayed(element: HTMLElement): boolean {
       if (

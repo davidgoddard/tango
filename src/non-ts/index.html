@@ -29,6 +29,9 @@
 
     <div id="iframeContainer"></div>
 
+    <!-- ===================================================================================================================== -->
+
+
     <div id="settingsPanel" class="slideable-panel content hiddenPanel">
         <header>
             <h2>Settings</h2>
@@ -84,12 +87,18 @@
         </section>
     </div>
 
+
+    <!-- ===================================================================================================================== -->
+
     <main class="all">
         <div id="searchColumn" class="column content">
 
             <div id="tabsContainer"></div>
         </div>
         <div class="handle" id="handle1"></div>
+
+        <!-- ===================================================================================================================== -->
+
         <div id="scratchpadColumn" class="column content">
             <header class="playlistHeading">
                 <h2>Scratch Pad</h2>
@@ -104,13 +113,17 @@
                 <li>All tandas can be added to playlist: at current location, to end</li>
                 <li>Content can be filtered by style or other tags</li>
             </ul>
-            <tanda-element data-style="style1">Tanda 1</tanda-element>
-<track-element data-style="style2">Track 1</tanda-element>
-<cortina-element data-style="style3">Cortina 1</cortina-element>
 
-            <scratch-pad-element id="scratchPad" playlistSelector="#playlist"></scratch-pad-element>
+                <scratch-pad-element id="scratchPad" playlistSelector="#playlist">
+                    <tanda-element data-style="style1">Tanda 1</tanda-element>
+                    <track-element data-style="style2">Track 1</tanda-element>
+                    <cortina-element data-style="style3">Cortina 1</cortina-element>        
+                </scratch-pad-element>
         </div>
         <div class="handle" id="handle2"></div>
+
+        <!-- ===================================================================================================================== -->
+
         <div id="playlistColumn" class="column content">
             <section class="fixedColumnContent">
                 <header class="playlistHeading">
@@ -123,6 +136,7 @@
                                 alt="Play whole cortina"></button>
                     </section>
                     <section>
+                        <button id="extendPlaylist" class="active">Extend</button>
                         <p>Show times:
                             <label>Relative: <input type="radio" name="timingBase" value="relative">
                                 Real: <input type="radio" name="timingBase" value="realtime" checked="checked"></label>
@@ -130,6 +144,11 @@
                         <div class="playlistSettingsPanelOpenButton">⚙️</div>
                     </section>
                 </header>
+
+
+                <!-- ===================================================================================================================== -->
+
+
                 <div class="playlist-settings-panel slideable-panel hiddenPanel">
                     <header>
                         <h2>Current Playlist Settings</h2>
@@ -162,8 +181,12 @@
                     <li>Filter by artist, song</li>
                 </ul>
             </section>
-            <div id="playlistContainer" class="dropzone"></div>
-            </playlist-element>
+
+
+            <!-- ===================================================================================================================== -->
+
+
+            <div id="playlistContainer"></div>
         </div>
     </main>
 
