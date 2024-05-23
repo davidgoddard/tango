@@ -9,7 +9,7 @@ import { Player } from "./services/player";
 import { PlaylistService } from "./services/playlist-service";
 import { DatabaseManager } from "./services/database";
 import { openMusicFolder } from "./services/file-system";
-import { getDomElement } from "./services/utils";
+import { allTracks, convert, createPlaceHolder, getDomElement } from "./services/utils";
 import { enumerateOutputDevices, requestAudioPermission } from "./services/permissions.service";
 import { loadLibraryIntoDB, scanFileSystem } from "./services/file-database.interface";
 // if ("serviceWorker" in navigator) {
@@ -68,10 +68,34 @@ async function deleteDatabase(dbManager) {
     return config;
 }
 async function processQuery(dbManager, query, selectedStyle) {
-    let tracks = (await dbManager.processEntriesInBatches("track", (track, idx) => {
-        return true;
-    }));
-    return { tracks, tandas: [] };
+    console.log('Search', query, selectedStyle);
+    let testResult = await dbManager.search(query);
+    let tracks = (await dbManager.processEntriesInBatches("track", (track, idx) => true));
+    let trackMap = new Map();
+    tracks.forEach(track => {
+        trackMap.set(convert(track.name).toLowerCase(), track);
+    });
+    console.log('Track map ', trackMap);
+    let maxScore = 0;
+    testResult.forEach((result) => {
+        maxScore = maxScore < result.score ? result.score : maxScore;
+    });
+    let minScore = maxScore * 0.6;
+    console.log('Score threshold', minScore);
+    let trackResults = [];
+    testResult.forEach((result) => {
+        if (result.score >= minScore) {
+            let prefix = result.id.split('-');
+            let key = convert(result.id.substring([prefix[0], prefix[1]].join('-').length + 1)).toLowerCase();
+            console.log('Fetching key', key, trackMap.get(key));
+            let track = trackMap.get(key);
+            if (track) {
+                if (selectedStyle == 'all' || track.metadata?.style?.toLowerCase() == selectedStyle)
+                    trackResults.push(track);
+            }
+        }
+    });
+    return { tracks: trackResults.filter(x => x), tandas: [] };
 }
 // Function to populate the select element with output device options
 async function populateOutputDeviceOptions(config) {
@@ -178,10 +202,10 @@ document.addEventListener("DOMContentLoaded", async () => {
                 let html = '';
                 let needCortina = true;
                 if (needCortina) {
-                    html += `<cortina-element data-title='place holder'></cortina-element>`;
+                    html += createPlaceHolder('cortina-element', 'cortina');
                 }
                 for (let i = 0; i < n; i++) {
-                    html += `<track-element data-style="${styleMap[s]}" data-title='place holder'></track-element>`;
+                    html += createPlaceHolder('track-element', styleMap[s]);
                 }
                 tanda.innerHTML = html;
                 container.appendChild(tanda);
@@ -205,9 +229,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     const tabs = ["Search", "Favourites", "Recent"];
     const tabsContainer = new TabsContainer(getDomElement("#tabsContainer"), tabs);
     // Handle searches
-    eventBus.on("query", async (searchData) => {
+    eventBus.on("query", async (payload) => {
         // Process the query (e.g., fetch data from a server)
-        const results = await processQuery(dbManager, searchData.query, searchData.selectedStyle);
+        const results = await processQuery(dbManager, payload.searchData, payload.selectedStyle);
         // Send the results back to the search component
         eventBus.emit("queryResults", results);
     });
@@ -246,9 +270,10 @@ async function runApplication(dbManager, config) {
     });
     playlistContainer.addEventListener("clickedTrack", async (event) => {
         try {
-            const detail = event.detail;
-            if (!speakerOutputPlayer.isPlaying) {
-                let N = playlistService.getN(detail);
+            const track = event.detail;
+            const playing = document.querySelector('track-element.playing, cortina-element.playing');
+            if (!playing) {
+                let N = playlistService.getN(track);
                 await speakerOutputPlayer.updatePosition(N - 1);
                 if (speakerOutputPlayer.next) {
                     speakerOutputPlayer.next.silence = 0;
@@ -272,16 +297,34 @@ async function runApplication(dbManager, config) {
         fadeRate,
         useSoundLevelling: config.useSoundLevelling,
         fetchNext: async (N) => {
+            let allTracks = playlistService.allTracks;
             let silence = 0;
-            let nextTrack = playlistService.fetch(N);
+            let nextTrack = undefined;
+            while (!nextTrack && N < allTracks.length) {
+                console.log('Getting next track', N);
+                nextTrack = await playlistService.fetch(N);
+                if (!nextTrack)
+                    N++;
+            }
+            if (!nextTrack) {
+                return { N, track: undefined, silence: 0 };
+            }
             if (N > 0) {
-                let previousTrack = playlistService.fetch(N - 1);
-                silence = 2;
-                if (nextTrack.type == "track" && previousTrack.type == "cortina") {
-                    silence = 4;
+                let pN = N;
+                let previousTrack = undefined;
+                while (!previousTrack && pN > 1) {
+                    previousTrack = await playlistService.fetch(pN - 1);
+                    if (!previousTrack)
+                        pN--;
                 }
-                if (nextTrack.type == "cortina" && previousTrack.type == "track") {
-                    silence = 4;
+                silence = 2;
+                if (previousTrack) {
+                    if (nextTrack.type == "track" && previousTrack.type == "cortina") {
+                        silence = 4;
+                    }
+                    if (nextTrack.type == "cortina" && previousTrack.type == "track") {
+                        silence = 4;
+                    }
                 }
             }
             else {
@@ -341,21 +384,21 @@ async function runApplication(dbManager, config) {
         speakerOutputPlayer.extendEndTime(-1);
     });
     eventBus.on('stopAll', () => {
+        speakerOutputPlayer.stop();
         speakerOutputPlayer.startNext();
     });
     eventBus.on("stopPlaying", () => {
         speakerOutputPlayer.stop();
-        Array.from(document.querySelectorAll("tanda-element,track-element,cortina-element")).forEach(x => {
-            x.draggable = true;
-            x.setPlaying(false);
-            if (x.setPlayed)
-                x.setPlayed(false);
+        playlistService.allTracks.forEach(track => track.setPlaying(false));
+        let tandas = Array.from(playlistContainer.querySelectorAll('tanda-element'));
+        tandas.forEach((tanda) => {
+            tanda.setPlaying(false);
         });
     });
     eventBus.on("playOnHeadphones", async (detail) => {
         const track = detail.element;
         // Clear all other tracks from playing
-        Array.from(document.querySelectorAll("track-element,cortina-element")).forEach((x) => {
+        allTracks(document).forEach((x) => {
             if (x !== track)
                 x.stopPlayingOnHeadphones();
         });
@@ -373,24 +416,13 @@ async function runApplication(dbManager, config) {
             headphonePlaylist = [];
         }
     });
-    eventBus.on("new-playlist", async (N = -1) => {
-        // make the next track the first in the playlist
+    // Called when drag/drop completes which might mess up where current song is in the list
+    eventBus.on("changed-playlist", async () => {
+        const N = playlistService.getNowPlayingN();
+        console.log('Changed playlist - now playing', N, speakerOutputPlayer);
         await speakerOutputPlayer.updatePosition(N);
-        speakerOutputPlayer.startNext();
+        await speakerOutputPlayer.loadNext();
     });
-    eventBus.on('swapped-playlist', () => {
-        // Find current song and workout how moved.
-        const allTracks = Array.from(playlistContainer.querySelectorAll('track-element,cortina-element'));
-        const playing = playlistContainer.querySelector('track-element.playing, cortina-element.playing');
-        if (playing) {
-            const N = allTracks.findIndex(track => track == playing);
-            speakerOutputPlayer.updatePosition(N);
-        }
-    });
-    // Simulate user request to start playing
-    // setTimeout(() => {
-    //   speakerOutputPlayer.startNext();
-    // }, 3000);
     // dummy code
     const tracks = (await dbManager.processEntriesInBatches("track", (record) => true));
     const cortinas = (await dbManager.processEntriesInBatches("cortina", (record) => true));
@@ -419,17 +451,5 @@ async function runApplication(dbManager, config) {
     }
     console.log(allTandas);
     await playlistService.setTandas(allTandas);
-    // eventBus.once("next-track-ready", async () => {
-    //   console.log("Starting playing tracks");
-    //   speakerOutputPlayer.startNext();
-    // });
-    // await speakerOutputPlayer.updatePosition(1)
-    // speakerOutputPlayer.stop();
-    // setTimeout(async () => {
-    //   console.log("Testing headphones");
-    //   headphonePlaylist[0] = playlistService.fetch(4);
-    //   await headphonesOutputPlayer.updatePosition(-1);
-    //   console.log(headphonesOutputPlayer.next)
-    //   headphonesOutputPlayer.startNext();
-    // }, 5000);
+    speakerOutputPlayer.startNext();
 }

@@ -49,6 +49,7 @@ export function renderTrackDetail(idx, track, typeName) {
         year = year.substring(0, 4);
     }
     return `<${typeName}-element
+                  data-type="${typeName.toLowerCase()}"
                   data-tanda-id="${idx}"
                   data-track-id="${String(track.id)}" 
                   data-style="${track.metadata?.style}" 
@@ -59,11 +60,22 @@ export function renderTrackDetail(idx, track, typeName) {
                   data-duration="${track.metadata?.end
         ? formatTime((track.metadata?.end - track.metadata?.start))
         : ""}"
-                  data-year="${year}"></${typeName}-element>`;
+                  data-year="${year}"
+                  data-file="${track.name}"></${typeName}-element>`;
+}
+export function createPlaceHolder(typeName, style) {
+    return `<${typeName}
+                  data-type="${typeName.split('-')[0].toLowerCase()}"
+                  data-style="${style}" 
+                  data-title="place holder" 
+            ></${typeName}>`;
 }
 export function getDomElementAll(selector) {
     return document.querySelectorAll(selector);
 }
 export function getDomElement(selector) {
     return document.querySelector(selector);
+}
+export function allTracks(container) {
+    return Array.from(container.querySelectorAll(`track-element:not([data-title="place holder"]), cortina-element:not([data-title="place holder"])`));
 }

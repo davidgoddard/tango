@@ -70,9 +70,11 @@ class SearchElement extends HTMLElement {
             <label for="filter-select">Style:</label>
             <select id="filter-select">
               <option value="all">All</option>
-              <option value="rock">Rock</option>
-              <option value="pop">Pop</option>
+              <option value="rock / pop">Rock / Pop</option>
               <option value="jazz">Jazz</option>
+              <option value="tango">Tango</option>
+              <option value="waltz">Waltz</option>
+              <option value="milonga">Milonga</option>
               <!-- Add more options as needed -->
             </select>
           </div>
@@ -83,17 +85,6 @@ class SearchElement extends HTMLElement {
           <div class="scrollable">
             <div id="tracks-content" class="content">
               <!-- Content for tracks -->
-              <track-element data-track-id="100" data-title="Dummy track 6" data-style="Waltz"></track-element>
-              <track-element data-track-id="100" data-title="Dummy track 5" data-style="Tango"></track-element>
-              <cortina-element data-track-id="100" data-title="Dummy track"></cortina-element>
-              <track-element data-track-id="100" data-title="Dummy track 4" data-style="Milonga"></track-element>
-              <cortina-element data-track-id="100" data-title="Dummy track"></cortina-element>
-              <tanda-element data-tanda-id="8765" data-style="Waltz">
-                <cortina-element data-track-id="100" data-title="Dummy track"></cortina-element>
-                <track-element data-track-id="100" data-title="Dummy track 1" data-style="Waltz"></track-element>
-                <track-element data-track-id="100" data-title="Dummy track 2" data-style="Waltz"></track-element>
-                <track-element data-track-id="100" data-title="Dummy track 3" data-style="Waltz"></track-element>
-              </tanda-element>
             </div>
             <div id="tandas-content" class="content hidden">
               <!-- Content for tandas -->

@@ -74,7 +74,7 @@ class BaseTrackElement extends HTMLElement {
 
   setPlaying(state: boolean){
     this.isPlaying = state;
-    this.draggable = !this.isPlaying && (this.parentElement!.draggable);
+    this.draggable = !this.isPlaying;
     if ( this.isPlaying ){
       this.classList.add('playing')
       this.shadowRoot!.querySelector('article')?.classList.add('playing')
@@ -204,11 +204,11 @@ class BaseTrackElement extends HTMLElement {
           })}
         </section>
         <header>
-        <button id="headphones" class="${
+        ${this.dataset.title !== 'place holder' ? `<button id="headphones" class="${
           this.isPlayingOnHeadphones ? "playing" : ""
         }">
             <img src="./icons/headphones.png" alt="Listen on headphones">
-        </button>
+        </button>` : '<span></span>'}
         <h2>${this.dataset.tandaId ? this.dataset.tandaId : ''} ${this.tagName === 'CORTINA-ELEMENT' ? '(Cortina) ' : ''} ${this.dataset.title}</h2>
             <div id="floated">
               ${

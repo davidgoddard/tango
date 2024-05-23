@@ -1,17 +1,12 @@
 import { eventBus } from "../events/event-bus";
-import { getDomElement, renderTrackDetail } from "./utils";
+import { allTracks, getDomElement, renderTrackDetail } from "./utils";
 import { addDragDropHandlers } from "./drag-drop.service";
 export class PlaylistService {
     container;
     getDetail;
-    tandaList;
-    trackList;
     constructor(container, getDetail) {
         this.container = container;
         this.getDetail = getDetail;
-        this.tandaList = [];
-        this.trackList = [];
-        eventBus.on("track-request", this.requestTrack.bind(this));
         eventBus.on("startingPlaying", this.markPlaying.bind(this));
         eventBus.on("stoppedPlaying", this.unmarkPlaying.bind(this));
         addDragDropHandlers(container);
@@ -39,42 +34,38 @@ export class PlaylistService {
             getDomElement("#stopPlayAll").classList.remove("active");
         }
     }
+    // Detail contains N - nth track in playlist
     markPlaying(details) {
-        const trackElement = Array.from(this.container.querySelectorAll("track-element,cortina-element"))[details.N];
+        // Get all tracks and pick Nth
+        let all = this.allTracks;
+        const trackElement = all[details.N];
+        // Set it to playing
+        all.forEach(track => track.setPlaying(false));
         trackElement.setPlaying(true);
-        // Array.from(this.container.querySelectorAll('tanda-element')).forEach((tanda: any) => tanda.setPlaying(false));
-        const tandaId = trackElement.dataset.tandaId;
-        const tandaElement = this.container.querySelector(`tanda-element[data-tanda-id="${tandaId}"]`);
+        // Find tanda and set it to playing too
+        const tandaElement = trackElement.closest('tanda-element');
+        tandaElement.setPlaying(true);
+        // Work out progress through tanda
         const total = Array.from(tandaElement.querySelectorAll("track-element"));
         const playing = 1 + total.findIndex((item) => item.classList.contains("playing"));
         console.log(`Playing ${playing}/${total.length}`);
-        tandaElement.setPlaying(true);
+        // Mark all prior tandas as played
         const allTandas = Array.from(this.container.querySelectorAll("tanda-element"));
-        allTandas.map((tanda) => {
-            tanda.setPlayed(false);
-        });
+        // Find N of the tanda being played
+        let tandaN = allTandas.findIndex(tanda => tanda == tandaElement);
         for (let i = 0; i < allTandas.length; i++) {
-            if (allTandas[i] === tandaElement)
-                break;
-            console.log("Prior tanda now played");
-            allTandas[i].setPlayed(true);
+            allTandas[i].setPlayed(i < tandaN);
+            allTandas[i].setPlaying(i == tandaN);
         }
     }
     unmarkPlaying(details) {
-        const trackElement = Array.from(this.container.querySelectorAll("track-element,cortina-element"))[details.N];
+        const trackElement = this.allTracks[details.N];
         console.log("Found track to unmark as playing", trackElement);
         trackElement.setPlaying(false);
-        // Array.from(this.container.querySelectorAll('tanda-element')).forEach((tanda: any) => tanda.setPlaying(false));
-        const tandaId = trackElement.dataset.tandaId;
-        const tandaElement = this.container.querySelector(`tanda-element[data-tanda-id="${tandaId}"]`);
-        tandaElement.setPlaying(false);
     }
     async setTandas(tandaList) {
-        this.tandaList = tandaList;
-        await this.extractTracks();
-        console.log('Tanda list', this.tandaList);
-        eventBus.emit("new-playlist");
-        this.container.innerHTML = (await Promise.all(this.tandaList.map(async (tanda, idx) => {
+        console.log('Tanda list', tandaList);
+        this.container.innerHTML = (await Promise.all(tandaList.map(async (tanda, idx) => {
             const cortinaElement = tanda.cortina
                 ? (async () => {
                     let track = await this.getDetail("cortina", tanda.cortina);
@@ -91,40 +82,21 @@ export class PlaylistService {
                     </tanda-element>`;
         }))).join("");
     }
-    getTracks() {
-        return this.trackList;
+    get allTracks() {
+        return allTracks(this.container);
     }
-    requestTrack(N) {
-        eventBus.emit("track-request-result", {
-            requested: this.trackList[N],
-            previous: N > 0 ? this.trackList[N - 1] : null,
-        });
-    }
-    async extractTracks() {
-        for (let idx = 0; idx < this.tandaList.length; idx++) {
-            let tanda = this.tandaList[idx];
-            if (tanda.cortina) {
-                this.trackList.push({
-                    ...(await this.getDetail("cortina", tanda.cortina)),
-                    tandaOffset: idx,
-                });
-            }
-            for (let track of tanda.tracks) {
-                this.trackList.push({
-                    ...(await this.getDetail("track", track)),
-                    tandaOffset: idx,
-                });
-            }
-        }
-        console.log("Extracted tracks", this.trackList);
-    }
-    fetch(N) {
-        return this.trackList[N];
+    async fetch(N) {
+        const trackElement = this.fetchElement(N);
+        return await this.getDetail(trackElement.dataset.type, trackElement.dataset.file);
     }
     fetchElement(N) {
-        return Array.from(this.container.querySelectorAll("track-element, cortina-element"))[N];
+        return this.allTracks[N];
     }
     getN(track) {
-        return Array.from(this.container.querySelectorAll("track-element, cortina-element")).findIndex((t) => t == track);
+        return this.allTracks.findIndex((t) => t == track);
+    }
+    getNowPlayingN() {
+        const playing = this.container.querySelector('track-element.playing, cortina-element.playing');
+        return this.getN(playing);
     }
 }

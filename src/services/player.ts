@@ -79,7 +79,9 @@ export class Player {
           if (timeNow >= timeEnd - 500 && !ending) {
             this.current.ending = true;
             player.fade(
-              (this.options.useSoundLevelling ? Player.dBtoLinear(gainReduction) : 1),
+              this.options.useSoundLevelling
+                ? Player.dBtoLinear(gainReduction)
+                : 1,
               0,
               this.options.fadeRate * 1000
             );
@@ -124,9 +126,7 @@ export class Player {
             )} / ? )`
           : `${state}: ${this.current.displayName}  ( ${formatTime(
               pos / 1000
-            )} / ${formatTime(
-              (track.metadata.end - track.metadata.start)
-            )} )`;
+            )} / ${formatTime(track.metadata.end - track.metadata.start)} )`;
       if (this.options.progress) {
         this.options.progress({
           track,
@@ -154,13 +154,11 @@ export class Player {
   }
 
   async updatePosition(newPos: number) {
-    if (newPos !== this.playlistPos) {
-      this.playlistPos = newPos;
-      if (typeof this.next?.unload == "function") {
-        this.next.unload!();
-      }
-      await this.loadNext();
+    this.playlistPos = newPos;
+    if (typeof this.next?.unload == "function") {
+      this.next.unload!();
     }
+    await this.loadNext();
   }
 
   // Called by event 'next-track'
@@ -233,24 +231,23 @@ export class Player {
         autoplay: false,
         ctx: this.options.ctx,
         onplay: () => {
-          eventBus.emit('startingPlaying', {
+          eventBus.emit("startingPlaying", {
             player: this,
             track,
-            N
-          })
+            N,
+          });
         },
         onstop: () => {
-          eventBus.emit('stoppedPlaying', {
+          eventBus.emit("stoppedPlaying", {
             player: this,
             track,
-            N
-          })
-        }
+            N,
+          });
+        },
       };
       const player = new Howl(howlerConfig);
 
       player.once("load", async () => {
-
         // Try to route the audio where required
         if (this.options.ctx) {
           try {
@@ -269,7 +266,7 @@ export class Player {
           track.metadata.end = Math.min(20, track.metadata.end);
         }
         if (
-          this.options.useSoundLevelling && 
+          this.options.useSoundLevelling &&
           track.metadata?.meanVolume !== null &&
           track.metadata?.meanVolume !== undefined
         ) {
@@ -323,7 +320,9 @@ export class Player {
     if (this.isPlaying) {
       this.current!.ending = true;
       this.current!.player.fade(
-        (this.options.useSoundLevelling ? Player.dBtoLinear(this.current!.gainReduction) : 1),
+        this.options.useSoundLevelling
+          ? Player.dBtoLinear(this.current!.gainReduction)
+          : 1,
         0,
         this.options.fadeRate * 1000
       );
@@ -346,7 +345,8 @@ export class Player {
 
   extendEndTime(period: number) {
     if (this.isPlaying) {
-      this.current!.track.metadata.end = period == -1 ? this.current!.track.metadata.originalEnd! : period;
+      this.current!.track.metadata.end =
+        period == -1 ? this.current!.track.metadata.originalEnd! : period;
       this.current!.ending = false;
     }
   }

@@ -1,3 +1,4 @@
+import { TrackElement } from "../components/track.element";
 import { Track } from "../data-types";
 
 export function convert(input: string): string {
@@ -62,6 +63,7 @@ export function renderTrackDetail(idx: number, track: Track, typeName:string): s
     year = year.substring(0, 4);
   }
   return `<${typeName}-element
+                  data-type="${typeName.toLowerCase()}"
                   data-tanda-id="${idx}"
                   data-track-id="${String(track.id)}" 
                   data-style="${track.metadata?.style!}" 
@@ -81,6 +83,7 @@ export function renderTrackDetail(idx: number, track: Track, typeName:string): s
 
   export function createPlaceHolder(typeName: string,style: string){
     return `<${typeName}
+                  data-type="${typeName.split('-')[0].toLowerCase()}"
                   data-style="${style}" 
                   data-title="place holder" 
             ></${typeName}>`;
@@ -91,4 +94,10 @@ export function renderTrackDetail(idx: number, track: Track, typeName:string): s
   }
   export function getDomElement(selector: string): HTMLElement {
     return document.querySelector(selector) as HTMLElement;
+  }
+
+  export function allTracks(container: HTMLElement | Document): TrackElement[]{
+    return Array.from(
+      container.querySelectorAll(`track-element:not([data-title="place holder"]), cortina-element:not([data-title="place holder"])`)
+    ) as TrackElement[];
   }

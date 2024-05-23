@@ -23,7 +23,13 @@ export const addDragDropHandlers = (
 };
 
 function isValidDropTarget(source: HTMLElement, target: HTMLElement): boolean {
-    console.log("Is valid", source.tagName, target.tagName, source.dataset.style, target.dataset.style);
+  console.log(
+    "Is valid",
+    source.tagName,
+    target.tagName,
+    source.dataset.style,
+    target.dataset.style
+  );
   let valid = sameStyle(
     source.dataset?.style || "",
     target.dataset?.style || ""
@@ -60,22 +66,15 @@ function swapElements(element1: HTMLElement, element2: HTMLElement) {
   // Go up to the nearest tanda and re-render it
   [element1, element2].forEach((element: HTMLElement) => {
     let tanda = element;
-    if ( !(tanda.tagName === 'TANDA-ELEMENT')){
-      tanda = tanda.closest('tanda-element')!;
+    if (!(tanda.tagName === "TANDA-ELEMENT")) {
+      tanda = tanda.closest("tanda-element")!;
     }
-    if ( tanda ) (tanda as TandaElement).render();
-  })
+    if (tanda) (tanda as TandaElement).render();
+  });
 
   // Now find what if anything is playing and inform the controller of the change
 
-  let allTracks = Array.from(document.querySelectorAll('track-element,cortina-element'));
-  let playing = document.querySelector('track-element.playing,cortina-element.playing');
-  if (playing){
-    let n = allTracks.findIndex(t => t == playing)
-    if ( n !== undefined ){
-      eventBus.emit('new-playlist', n)
-    }
-  }
+  eventBus.emit("changed-playlist");
 }
 
 export function dragStartHandler(event: any) {
@@ -111,49 +110,43 @@ export function dragDropHandler(event: any) {
   target = (event.target as HTMLElement).closest(draggingElement.tagName)!;
   if (!target) {
     console.log("No target yet - ", event.target);
-    if ( event.target.tagName === 'SCRATCH-PAD-ELEMENT'){
-        if ( draggingElement.closest('#playlistContainer') ){
-            // Create a dummy object to swap it with
-            const swap = document.createElement(draggingElement.tagName);
-            if ( draggingElement.tagName === 'TANDA-ELEMENT'){
-                swap.dataset.style = draggingElement.dataset.style;
-                let html = '';
-                for ( let i = 0; i < draggingElement.children.length; i++ ){
-                    let child = draggingElement.children[i];
-                    html += createPlaceHolder(child.tagName, swap.dataset.style!)
-                }
-                swap.innerHTML = html;
-            } else {
-                swap.dataset.title = 'place holder';
-                swap.dataset.style = draggingElement.dataset.style;
-            }
-            event.target.appendChild(swap)
-            swapElements(draggingElement, swap)
+    if (event.target.tagName === "SCRATCH-PAD-ELEMENT") {
+      if (draggingElement.closest("#playlistContainer")) {
+        // Create a dummy object to swap it with
+        const swap = document.createElement(draggingElement.tagName);
+        if (draggingElement.tagName === "TANDA-ELEMENT") {
+          swap.dataset.style = draggingElement.dataset.style;
+          let html = "";
+          for (let i = 0; i < draggingElement.children.length; i++) {
+            let child = draggingElement.children[i];
+            html += createPlaceHolder(child.tagName, swap.dataset.style!);
+          }
+          swap.innerHTML = html;
         } else {
-            console.log('Nearest', draggingElement.closest('.content'))
-            if ( draggingElement.closest('.content')){
-              event.target.appendChild(draggingElement)
-            }
+          swap.dataset.title = "place holder";
+          swap.dataset.style = draggingElement.dataset.style;
         }
+        event.target.appendChild(swap);
+        swapElements(draggingElement, swap);
+      } else {
+        console.log("Nearest", draggingElement.closest(".content"));
+        if (draggingElement.closest(".content")) {
+          event.target.appendChild(draggingElement);
+        }
+      }
     }
     return;
   }
 
   console.log("Found drop zone", target, "dragging", draggingElement);
-  console.log(
-    "Valid?",
-    isValidDropTarget(draggingElement, target)
-  );
+  console.log("Valid?", isValidDropTarget(draggingElement, target));
 
   if (target) {
-    if (
-      draggingElement &&
-      isValidDropTarget(draggingElement, target)
-    ) {
+    if (draggingElement && isValidDropTarget(draggingElement, target)) {
       console.log("drop", target.id);
       // Handle the drop logic (e.g., swapping elements)
       swapElements(draggingElement, target);
-}
+    }
   }
 }
 

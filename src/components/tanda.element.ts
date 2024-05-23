@@ -1,3 +1,4 @@
+import { eventBus } from "../events/event-bus";
 import { formatTime, timeStringToSeconds } from "../services/utils";
 
 let nextId = 1;
@@ -42,12 +43,14 @@ class TandaElement extends HTMLElement {
     newTrack.dataset.title = 'place holder';
     this.appendChild(newTrack);
     this.render();
+    eventBus.emit('changed-playlist')
   }
 
   private handleShrink(event: any) {
     let n = this.children.length;
     if (n > 0) this.removeChild(this.children[n - 1]);
     this.render();
+    eventBus.emit('changed-playlist')
   }
 
   private findMinMaxYears(years: (string | null)[]): string {
@@ -117,7 +120,6 @@ class TandaElement extends HTMLElement {
 
   public render(firstCall: boolean = false) {
     if ( !firstCall ) this.removeEventListeners();
-    console.log('Rendering tanda', this);
     const tracks = Array.from(this.querySelectorAll("track-element")) as HTMLElement[];
     const cortina = Array.from(this.querySelectorAll("cortina-element")) as HTMLElement[];
     const titles = [...tracks, ...cortina]
@@ -142,9 +144,10 @@ class TandaElement extends HTMLElement {
       (track) =>
         (duration += timeStringToSeconds(track.dataset.duration!) as number)
     );
+    let isPlaceHolder = [...titleSet].find(title => title == "place holder");
     const summary = `(${tracks.length} Tracks; Duration: ${formatTime(
       duration
-    )}):  ${[...titleSet].find(title => title == "place holder") ? "Place Holder" : ""
+    )}):  ${isPlaceHolder ? "Place Holder" : ""
       } ${this.findMinMaxYears(years)} ${[...artists].join(", ")}`;
 
     const track = cortina[0];
@@ -185,9 +188,14 @@ class TandaElement extends HTMLElement {
                 }
                 #container article.playing {
                   border: solid 2px orange;
+                  margin: 1rem;
                 }
                 #container article.played {
                   background-color: grey;
+                }
+                #container article.placeHolder {
+                  background-color: #d7d6d6;
+                  border: dashed 2px red;
                 }
                 #container article {
                     border: solid 2px #ccc;
@@ -303,7 +311,7 @@ class TandaElement extends HTMLElement {
                 }
             </style>
             <div id="container" class="${this.hasPlayed ? 'played' : ''}">
-                <article>
+                <article class="${isPlaceHolder ? 'placeHolder' : ''}">
                     <div id="toggle" class="summary">
                         <header>
                             <span>${styles.size == 1

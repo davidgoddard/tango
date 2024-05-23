@@ -761,6 +761,7 @@
       year = year.substring(0, 4);
     }
     return `<${typeName}-element
+                  data-type="${typeName.toLowerCase()}"
                   data-tanda-id="${idx}"
                   data-track-id="${String(track.id)}" 
                   data-style="${track.metadata?.style}" 
@@ -769,10 +770,21 @@
                   data-notes="${track.metadata?.tags?.notes}"
                   data-bpm="${track.metadata?.tags?.bpm}"
                   data-duration="${track.metadata?.end ? formatTime(track.metadata?.end - track.metadata?.start) : ""}"
-                  data-year="${year}"></${typeName}-element>`;
+                  data-year="${year}"
+                  data-file="${track.name}"></${typeName}-element>`;
+  }
+  function createPlaceHolder(typeName, style) {
+    return `<${typeName}
+                  data-type="${typeName.split("-")[0].toLowerCase()}"
+                  data-style="${style}" 
+                  data-title="place holder" 
+            ></${typeName}>`;
   }
   function getDomElement(selector) {
     return document.querySelector(selector);
+  }
+  function allTracks(container) {
+    return Array.from(container.querySelectorAll(`track-element:not([data-title="place holder"]), cortina-element:not([data-title="place holder"])`));
   }
 
   // dist/components/tanda.element.js
@@ -805,12 +817,14 @@
       newTrack.dataset.title = "place holder";
       this.appendChild(newTrack);
       this.render();
+      eventBus.emit("changed-playlist");
     }
     handleShrink(event) {
       let n = this.children.length;
       if (n > 0)
         this.removeChild(this.children[n - 1]);
       this.render();
+      eventBus.emit("changed-playlist");
     }
     findMinMaxYears(years) {
       const numericYears = years.map((year) => year ? Number(year) : NaN).filter((year) => !isNaN(year));
@@ -867,7 +881,6 @@
     render(firstCall = false) {
       if (!firstCall)
         this.removeEventListeners();
-      console.log("Rendering tanda", this);
       const tracks = Array.from(this.querySelectorAll("track-element"));
       const cortina = Array.from(this.querySelectorAll("cortina-element"));
       const titles = [...tracks, ...cortina].map((track2) => track2.dataset.title).filter((x) => x);
@@ -880,7 +893,8 @@
       }
       let duration = 0;
       tracks.forEach((track2) => duration += timeStringToSeconds(track2.dataset.duration));
-      const summary = `(${tracks.length} Tracks; Duration: ${formatTime(duration)}):  ${[...titleSet].find((title) => title == "place holder") ? "Place Holder" : ""} ${this.findMinMaxYears(years)} ${[...artists].join(", ")}`;
+      let isPlaceHolder = [...titleSet].find((title) => title == "place holder");
+      const summary = `(${tracks.length} Tracks; Duration: ${formatTime(duration)}):  ${isPlaceHolder ? "Place Holder" : ""} ${this.findMinMaxYears(years)} ${[...artists].join(", ")}`;
       const track = cortina[0];
       let cortinaArtist;
       let cortinaTitle;
@@ -914,9 +928,14 @@
                 }
                 #container article.playing {
                   border: solid 2px orange;
+                  margin: 1rem;
                 }
                 #container article.played {
                   background-color: grey;
+                }
+                #container article.placeHolder {
+                  background-color: #d7d6d6;
+                  border: dashed 2px red;
                 }
                 #container article {
                     border: solid 2px #ccc;
@@ -1032,7 +1051,7 @@
                 }
             </style>
             <div id="container" class="${this.hasPlayed ? "played" : ""}">
-                <article>
+                <article class="${isPlaceHolder ? "placeHolder" : ""}">
                     <div id="toggle" class="summary">
                         <header>
                             <span>${styles.size == 1 ? [...styles]?.[0]?.charAt(0)?.toUpperCase() : "?"}</span>
@@ -1112,14 +1131,7 @@
       if (tanda)
         tanda.render();
     });
-    let allTracks = Array.from(document.querySelectorAll("track-element,cortina-element"));
-    let playing = document.querySelector("track-element.playing,cortina-element.playing");
-    if (playing) {
-      let n = allTracks.findIndex((t) => t == playing);
-      if (n !== void 0) {
-        eventBus.emit("new-playlist", n);
-      }
-    }
+    eventBus.emit("changed-playlist");
   }
   function dragStartHandler(event) {
     const target = event.target;
@@ -1150,16 +1162,14 @@
     if (!target) {
       console.log("No target yet - ", event.target);
       if (event.target.tagName === "SCRATCH-PAD-ELEMENT") {
-        console.log("Dragging", draggingElement);
         if (draggingElement.closest("#playlistContainer")) {
           const swap = document.createElement(draggingElement.tagName);
           if (draggingElement.tagName === "TANDA-ELEMENT") {
             swap.dataset.style = draggingElement.dataset.style;
             let html = "";
-            console.log(draggingElement.children);
             for (let i = 0; i < draggingElement.children.length; i++) {
               let child = draggingElement.children[i];
-              html += `<${child.tagName} data-title="place holder" data-style="${swap.dataset.style}"></${child.tagName}>`;
+              html += createPlaceHolder(child.tagName, swap.dataset.style);
             }
             swap.innerHTML = html;
           } else {
@@ -1182,7 +1192,7 @@
     if (target) {
       if (draggingElement && isValidDropTarget(draggingElement, target)) {
         console.log("drop", target.id);
-        swapElements(target, draggingElement);
+        swapElements(draggingElement, target);
       }
     }
   }
@@ -1250,9 +1260,11 @@
             <label for="filter-select">Style:</label>
             <select id="filter-select">
               <option value="all">All</option>
-              <option value="rock">Rock</option>
-              <option value="pop">Pop</option>
+              <option value="rock / pop">Rock / Pop</option>
               <option value="jazz">Jazz</option>
+              <option value="tango">Tango</option>
+              <option value="waltz">Waltz</option>
+              <option value="milonga">Milonga</option>
               <!-- Add more options as needed -->
             </select>
           </div>
@@ -1263,17 +1275,6 @@
           <div class="scrollable">
             <div id="tracks-content" class="content">
               <!-- Content for tracks -->
-              <track-element data-track-id="100" data-title="Dummy track 6" data-style="Waltz"></track-element>
-              <track-element data-track-id="100" data-title="Dummy track 5" data-style="Tango"></track-element>
-              <cortina-element data-track-id="100" data-title="Dummy track"></cortina-element>
-              <track-element data-track-id="100" data-title="Dummy track 4" data-style="Milonga"></track-element>
-              <cortina-element data-track-id="100" data-title="Dummy track"></cortina-element>
-              <tanda-element data-tanda-id="8765" data-style="Waltz">
-                <cortina-element data-track-id="100" data-title="Dummy track"></cortina-element>
-                <track-element data-track-id="100" data-title="Dummy track 1" data-style="Waltz"></track-element>
-                <track-element data-track-id="100" data-title="Dummy track 2" data-style="Waltz"></track-element>
-                <track-element data-track-id="100" data-title="Dummy track 3" data-style="Waltz"></track-element>
-              </tanda-element>
             </div>
             <div id="tandas-content" class="content hidden">
               <!-- Content for tandas -->
@@ -1377,7 +1378,7 @@
     }
     setPlaying(state) {
       this.isPlaying = state;
-      this.draggable = !this.isPlaying && this.parentElement.draggable;
+      this.draggable = !this.isPlaying;
       if (this.isPlaying) {
         this.classList.add("playing");
         this.shadowRoot.querySelector("article")?.classList.add("playing");
@@ -1500,9 +1501,9 @@
       })}
         </section>
         <header>
-        <button id="headphones" class="${this.isPlayingOnHeadphones ? "playing" : ""}">
+        ${this.dataset.title !== "place holder" ? `<button id="headphones" class="${this.isPlayingOnHeadphones ? "playing" : ""}">
             <img src="./icons/headphones.png" alt="Listen on headphones">
-        </button>
+        </button>` : "<span></span>"}
         <h2>${this.dataset.tandaId ? this.dataset.tandaId : ""} ${this.tagName === "CORTINA-ELEMENT" ? "(Cortina) " : ""} ${this.dataset.title}</h2>
             <div id="floated">
               ${!/undefined|null/.test(this.dataset.bpm) ? `<span>BPM: <span>${this.dataset.bpm}</span></span>` : ""}
@@ -1882,13 +1883,11 @@
       return Math.pow(10, dB / 20);
     }
     async updatePosition(newPos) {
-      if (newPos !== this.playlistPos) {
-        this.playlistPos = newPos;
-        if (typeof this.next?.unload == "function") {
-          this.next.unload();
-        }
-        await this.loadNext();
+      this.playlistPos = newPos;
+      if (typeof this.next?.unload == "function") {
+        this.next.unload();
       }
+      await this.loadNext();
     }
     // Called by event 'next-track'
     async loadNext() {
@@ -2049,14 +2048,9 @@
   var PlaylistService = class {
     container;
     getDetail;
-    tandaList;
-    trackList;
     constructor(container, getDetail) {
       this.container = container;
       this.getDetail = getDetail;
-      this.tandaList = [];
-      this.trackList = [];
-      eventBus.on("track-request", this.requestTrack.bind(this));
       eventBus.on("startingPlaying", this.markPlaying.bind(this));
       eventBus.on("stoppedPlaying", this.unmarkPlaying.bind(this));
       addDragDropHandlers(container);
@@ -2082,40 +2076,32 @@
         getDomElement("#stopPlayAll").classList.remove("active");
       }
     }
+    // Detail contains N - nth track in playlist
     markPlaying(details) {
-      const trackElement = Array.from(this.container.querySelectorAll("track-element,cortina-element"))[details.N];
+      let all = this.allTracks;
+      const trackElement = all[details.N];
+      all.forEach((track) => track.setPlaying(false));
       trackElement.setPlaying(true);
-      const tandaId = trackElement.dataset.tandaId;
-      const tandaElement = this.container.querySelector(`tanda-element[data-tanda-id="${tandaId}"]`);
+      const tandaElement = trackElement.closest("tanda-element");
+      tandaElement.setPlaying(true);
       const total = Array.from(tandaElement.querySelectorAll("track-element"));
       const playing = 1 + total.findIndex((item) => item.classList.contains("playing"));
       console.log(`Playing ${playing}/${total.length}`);
-      tandaElement.setPlaying(true);
       const allTandas = Array.from(this.container.querySelectorAll("tanda-element"));
-      allTandas.map((tanda) => {
-        tanda.setPlayed(false);
-      });
+      let tandaN = allTandas.findIndex((tanda) => tanda == tandaElement);
       for (let i = 0; i < allTandas.length; i++) {
-        if (allTandas[i] === tandaElement)
-          break;
-        console.log("Prior tanda now played");
-        allTandas[i].setPlayed(true);
+        allTandas[i].setPlayed(i < tandaN);
+        allTandas[i].setPlaying(i == tandaN);
       }
     }
     unmarkPlaying(details) {
-      const trackElement = Array.from(this.container.querySelectorAll("track-element,cortina-element"))[details.N];
+      const trackElement = this.allTracks[details.N];
       console.log("Found track to unmark as playing", trackElement);
       trackElement.setPlaying(false);
-      const tandaId = trackElement.dataset.tandaId;
-      const tandaElement = this.container.querySelector(`tanda-element[data-tanda-id="${tandaId}"]`);
-      tandaElement.setPlaying(false);
     }
     async setTandas(tandaList) {
-      this.tandaList = tandaList;
-      await this.extractTracks();
-      console.log("Tanda list", this.tandaList);
-      eventBus.emit("new-playlist");
-      this.container.innerHTML = (await Promise.all(this.tandaList.map(async (tanda, idx) => {
+      console.log("Tanda list", tandaList);
+      this.container.innerHTML = (await Promise.all(tandaList.map(async (tanda, idx) => {
         const cortinaElement = tanda.cortina ? (async () => {
           let track = await this.getDetail("cortina", tanda.cortina);
           return renderTrackDetail(idx, track, "cortina");
@@ -2130,41 +2116,22 @@
                     </tanda-element>`;
       }))).join("");
     }
-    getTracks() {
-      return this.trackList;
+    get allTracks() {
+      return allTracks(this.container);
     }
-    requestTrack(N) {
-      eventBus.emit("track-request-result", {
-        requested: this.trackList[N],
-        previous: N > 0 ? this.trackList[N - 1] : null
-      });
-    }
-    async extractTracks() {
-      for (let idx = 0; idx < this.tandaList.length; idx++) {
-        let tanda = this.tandaList[idx];
-        if (tanda.cortina) {
-          this.trackList.push({
-            ...await this.getDetail("cortina", tanda.cortina),
-            tandaOffset: idx
-          });
-        }
-        for (let track of tanda.tracks) {
-          this.trackList.push({
-            ...await this.getDetail("track", track),
-            tandaOffset: idx
-          });
-        }
-      }
-      console.log("Extracted tracks", this.trackList);
-    }
-    fetch(N) {
-      return this.trackList[N];
+    async fetch(N) {
+      const trackElement = this.fetchElement(N);
+      return await this.getDetail(trackElement.dataset.type, trackElement.dataset.file);
     }
     fetchElement(N) {
-      return Array.from(this.container.querySelectorAll("track-element, cortina-element"))[N];
+      return this.allTracks[N];
     }
     getN(track) {
-      return Array.from(this.container.querySelectorAll("track-element, cortina-element")).findIndex((t) => t == track);
+      return this.allTracks.findIndex((t) => t == track);
+    }
+    getNowPlayingN() {
+      const playing = this.container.querySelector("track-element.playing, cortina-element.playing");
+      return this.getN(playing);
     }
   };
 
@@ -2207,31 +2174,149 @@
         request.onupgradeneeded = (event) => {
           console.log("Upgrade needed");
           const db = event.target.result;
-          const tables = ["system", "track", "cortina", "tanda", "scratchpad", "playlist"];
+          const tables = [
+            "system",
+            "track",
+            "cortina",
+            "tanda",
+            "scratchpad",
+            "playlist"
+          ];
           tables.forEach((table) => {
-            let objectStore;
+            let objectStore2;
             if (!db.objectStoreNames.contains(table)) {
-              objectStore = db.createObjectStore(table, { keyPath: "id", autoIncrement: true });
+              objectStore2 = db.createObjectStore(table, {
+                keyPath: "id",
+                autoIncrement: true
+              });
             } else {
-              objectStore = event.target.transaction?.objectStore(table);
+              objectStore2 = event.target.transaction?.objectStore(table);
             }
             if (table === "track" || table === "cortina") {
-              if (!objectStore.indexNames.contains("name")) {
-                objectStore.createIndex("name", "name", { unique: true });
+              if (!objectStore2.indexNames.contains("name")) {
+                objectStore2.createIndex("name", "name", { unique: true });
               }
             }
             if (table === "playlist") {
-              if (!objectStore.indexNames.contains("name")) {
-                objectStore.createIndex("name", "name", { unique: true });
+              if (!objectStore2.indexNames.contains("name")) {
+                objectStore2.createIndex("name", "name", { unique: true });
               }
             }
           });
+          let objectStore;
+          if (!db.objectStoreNames.contains("records")) {
+            objectStore = db.createObjectStore("records", {
+              keyPath: "id"
+            });
+          } else {
+            objectStore = event.target.transaction?.objectStore("records");
+          }
+          if (!db.objectStoreNames.contains("trigrams")) {
+            objectStore = db.createObjectStore("trigrams", {
+              keyPath: "trigram"
+            });
+          } else {
+            objectStore = event.target.transaction?.objectStore("trigrams");
+          }
         };
         request.onsuccess = (event) => {
           console.log("Success in opening database");
           this.db = event.target.result;
           resolve(this);
         };
+      });
+    }
+    index(data) {
+      const stringValues = [
+        data.id,
+        data.label,
+        data.name,
+        data.metadata?.tags?.artist,
+        data.metadata?.tags?.title,
+        data.metadata?.tags?.year,
+        data.metadata?.tags?.notes
+      ].filter((x) => x).join(" ").toLowerCase();
+      this.addToIndex(convert(`${data.type}-${data.id}-${data.name}`), convert(stringValues));
+    }
+    // Helper function to tokenize a string into words
+    tokenize(text) {
+      return text.split(/\s+/);
+    }
+    // Helper function to generate trigrams from a word
+    generateTrigrams(word) {
+      const trigrams = [];
+      for (let i = 0; i <= word.length - 3; i++) {
+        trigrams.push(word.substring(i, i + 3));
+      }
+      return trigrams;
+    }
+    async addToIndex(id, text) {
+      const tokens = this.tokenize(text);
+      const trigrams = /* @__PURE__ */ new Set();
+      tokens.forEach((token) => {
+        this.generateTrigrams("__" + token + "__").forEach((trigram) => {
+          trigrams.add(trigram);
+        });
+      });
+      const transaction = this.db?.transaction(["records", "trigrams"], "readwrite");
+      const recordsStore = transaction?.objectStore("records");
+      const trigramsStore = transaction?.objectStore("trigrams");
+      const recordRequest = recordsStore?.put({ id, content: text });
+      recordRequest.onsuccess = async () => {
+        for (const trigram of trigrams) {
+          const trigramRequest = trigramsStore?.get(trigram);
+          trigramRequest.onsuccess = () => {
+            let recordIds = trigramRequest.result?.recordIds || [];
+            if (!recordIds.includes(id)) {
+              recordIds.push(id);
+            }
+            trigramsStore?.put({ trigram, recordIds });
+          };
+        }
+      };
+      return new Promise((resolve, reject) => {
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = (event) => reject(event.target.error);
+      });
+    }
+    async search(query) {
+      const queryTokens = this.tokenize(convert(query.toLowerCase()));
+      const queryTrigrams = /* @__PURE__ */ new Set();
+      queryTokens.forEach((token) => {
+        this.generateTrigrams("__" + token + "__").forEach((trigram) => {
+          queryTrigrams.add(trigram);
+        });
+      });
+      const transaction = this.db?.transaction(["trigrams"], "readonly");
+      const trigramsStore = transaction?.objectStore("trigrams");
+      const candidateScores = /* @__PURE__ */ new Map();
+      return new Promise((resolve, reject) => {
+        let remainingTrigrams = queryTrigrams.size;
+        queryTrigrams.forEach((trigram) => {
+          const request = trigramsStore?.get(trigram);
+          request.onsuccess = () => {
+            const recordIds = request.result?.recordIds || [];
+            recordIds.forEach((id) => {
+              if (!candidateScores.has(id)) {
+                candidateScores.set(id, 0);
+              }
+              candidateScores.set(id, candidateScores.get(id) + 1);
+            });
+            remainingTrigrams -= 1;
+            if (remainingTrigrams === 0) {
+              const results = [];
+              candidateScores.forEach((score, id) => {
+                results.push({ id, score });
+              });
+              results.sort((a, b) => b.score - a.score);
+              resolve(results);
+            }
+          };
+          request.onerror = (event) => {
+            console.error("Error fetching trigram data: ", event.target.error);
+            reject(event.target.error);
+          };
+        });
       });
     }
     async updateData(table, id, updates) {
@@ -2245,6 +2330,9 @@
             Object.assign(data, updates);
             const putRequest = store.put(data);
             putRequest.onsuccess = () => {
+              if (["track", "cortina", "tanda"].includes(table)) {
+                this.index(data);
+              }
               resolve(putRequest.result);
             };
             putRequest.onerror = (event) => {
@@ -2267,6 +2355,9 @@
         const store = transaction?.objectStore(table);
         const request = store?.add(data);
         request.onsuccess = () => {
+          if (["track", "cortina", "tanda"].includes(table)) {
+            this.index(data);
+          }
           resolve(request.result);
         };
         request.onerror = (event) => {
@@ -2730,10 +2821,34 @@
     return config;
   }
   async function processQuery(dbManager, query, selectedStyle) {
-    let tracks = await dbManager.processEntriesInBatches("track", (track, idx) => {
-      return true;
+    console.log("Search", query, selectedStyle);
+    let testResult = await dbManager.search(query);
+    let tracks = await dbManager.processEntriesInBatches("track", (track, idx) => true);
+    let trackMap = /* @__PURE__ */ new Map();
+    tracks.forEach((track) => {
+      trackMap.set(convert(track.name).toLowerCase(), track);
     });
-    return { tracks, tandas: [] };
+    console.log("Track map ", trackMap);
+    let maxScore = 0;
+    testResult.forEach((result) => {
+      maxScore = maxScore < result.score ? result.score : maxScore;
+    });
+    let minScore = maxScore * 0.6;
+    console.log("Score threshold", minScore);
+    let trackResults = [];
+    testResult.forEach((result) => {
+      if (result.score >= minScore) {
+        let prefix = result.id.split("-");
+        let key = convert(result.id.substring([prefix[0], prefix[1]].join("-").length + 1)).toLowerCase();
+        console.log("Fetching key", key, trackMap.get(key));
+        let track = trackMap.get(key);
+        if (track) {
+          if (selectedStyle == "all" || track.metadata?.style?.toLowerCase() == selectedStyle)
+            trackResults.push(track);
+        }
+      }
+    });
+    return { tracks: trackResults.filter((x) => x), tandas: [] };
   }
   async function populateOutputDeviceOptions(config) {
     const outputDevices = await enumerateOutputDevices();
@@ -2832,10 +2947,10 @@
           let html = "";
           let needCortina = true;
           if (needCortina) {
-            html += `<cortina-element data-title='place holder'></cortina-element>`;
+            html += createPlaceHolder("cortina-element", "cortina");
           }
           for (let i = 0; i < n; i++) {
-            html += `<track-element data-style="${styleMap[s]}" data-title='place holder'></track-element>`;
+            html += createPlaceHolder("track-element", styleMap[s]);
           }
           tanda.innerHTML = html;
           container.appendChild(tanda);
@@ -2855,8 +2970,8 @@
     });
     const tabs = ["Search", "Favourites", "Recent"];
     const tabsContainer = new TabsContainer(getDomElement("#tabsContainer"), tabs);
-    eventBus.on("query", async (searchData) => {
-      const results = await processQuery(dbManager, searchData.query, searchData.selectedStyle);
+    eventBus.on("query", async (payload) => {
+      const results = await processQuery(dbManager, payload.searchData, payload.selectedStyle);
       eventBus.emit("queryResults", results);
     });
     await requestAudioPermission();
@@ -2886,9 +3001,10 @@
     });
     playlistContainer.addEventListener("clickedTrack", async (event) => {
       try {
-        const detail = event.detail;
-        if (!speakerOutputPlayer.isPlaying) {
-          let N = playlistService.getN(detail);
+        const track = event.detail;
+        const playing = document.querySelector("track-element.playing, cortina-element.playing");
+        if (!playing) {
+          let N = playlistService.getN(track);
           await speakerOutputPlayer.updatePosition(N - 1);
           if (speakerOutputPlayer.next) {
             speakerOutputPlayer.next.silence = 0;
@@ -2909,16 +3025,34 @@
       fadeRate,
       useSoundLevelling: config.useSoundLevelling,
       fetchNext: async (N) => {
+        let allTracks2 = playlistService.allTracks;
         let silence = 0;
-        let nextTrack = playlistService.fetch(N);
+        let nextTrack = void 0;
+        while (!nextTrack && N < allTracks2.length) {
+          console.log("Getting next track", N);
+          nextTrack = await playlistService.fetch(N);
+          if (!nextTrack)
+            N++;
+        }
+        if (!nextTrack) {
+          return { N, track: void 0, silence: 0 };
+        }
         if (N > 0) {
-          let previousTrack = playlistService.fetch(N - 1);
-          silence = 2;
-          if (nextTrack.type == "track" && previousTrack.type == "cortina") {
-            silence = 4;
+          let pN = N;
+          let previousTrack = void 0;
+          while (!previousTrack && pN > 1) {
+            previousTrack = await playlistService.fetch(pN - 1);
+            if (!previousTrack)
+              pN--;
           }
-          if (nextTrack.type == "cortina" && previousTrack.type == "track") {
-            silence = 4;
+          silence = 2;
+          if (previousTrack) {
+            if (nextTrack.type == "track" && previousTrack.type == "cortina") {
+              silence = 4;
+            }
+            if (nextTrack.type == "cortina" && previousTrack.type == "track") {
+              silence = 4;
+            }
           }
         } else {
           silence = 0;
@@ -2974,20 +3108,20 @@
       speakerOutputPlayer.extendEndTime(-1);
     });
     eventBus.on("stopAll", () => {
+      speakerOutputPlayer.stop();
       speakerOutputPlayer.startNext();
     });
     eventBus.on("stopPlaying", () => {
       speakerOutputPlayer.stop();
-      Array.from(document.querySelectorAll("tanda-element,track-element,cortina-element")).forEach((x) => {
-        x.draggable = true;
-        x.setPlaying(false);
-        if (x.setPlayed)
-          x.setPlayed(false);
+      playlistService.allTracks.forEach((track) => track.setPlaying(false));
+      let tandas = Array.from(playlistContainer.querySelectorAll("tanda-element"));
+      tandas.forEach((tanda) => {
+        tanda.setPlaying(false);
       });
     });
     eventBus.on("playOnHeadphones", async (detail) => {
       const track = detail.element;
-      Array.from(document.querySelectorAll("track-element,cortina-element")).forEach((x) => {
+      allTracks(document).forEach((x) => {
         if (x !== track)
           x.stopPlayingOnHeadphones();
       });
@@ -3002,17 +3136,11 @@
         headphonePlaylist = [];
       }
     });
-    eventBus.on("new-playlist", async (N = -1) => {
+    eventBus.on("changed-playlist", async () => {
+      const N = playlistService.getNowPlayingN();
+      console.log("Changed playlist - now playing", N, speakerOutputPlayer);
       await speakerOutputPlayer.updatePosition(N);
-      speakerOutputPlayer.startNext();
-    });
-    eventBus.on("swapped-playlist", () => {
-      const allTracks = Array.from(playlistContainer.querySelectorAll("track-element,cortina-element"));
-      const playing = playlistContainer.querySelector("track-element.playing, cortina-element.playing");
-      if (playing) {
-        const N = allTracks.findIndex((track) => track == playing);
-        speakerOutputPlayer.updatePosition(N);
-      }
+      await speakerOutputPlayer.loadNext();
     });
     const tracks = await dbManager.processEntriesInBatches("track", (record) => true);
     const cortinas = await dbManager.processEntriesInBatches("cortina", (record) => true);
@@ -3039,6 +3167,7 @@
     }
     console.log(allTandas);
     await playlistService.setTandas(allTandas);
+    speakerOutputPlayer.startNext();
   }
 })();
 /*! howler.js v2.2.4 | (c) 2013-2020, James Simpson of GoldFire Studios | MIT License | howlerjs.com */

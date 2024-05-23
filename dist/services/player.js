@@ -39,7 +39,9 @@ export class Player {
                     let timeEnd = 1000 * track.metadata.end + Math.min(0, silence ?? 0);
                     if (timeNow >= timeEnd - 500 && !ending) {
                         this.current.ending = true;
-                        player.fade((this.options.useSoundLevelling ? Player.dBtoLinear(gainReduction) : 1), 0, this.options.fadeRate * 1000);
+                        player.fade(this.options.useSoundLevelling
+                            ? Player.dBtoLinear(gainReduction)
+                            : 1, 0, this.options.fadeRate * 1000);
                         this.reportProgress("Fading");
                         let obj = this.current;
                         setTimeout(() => {
@@ -75,7 +77,7 @@ export class Player {
                     : Math.min(player.seek() * 1000 - track.metadata?.start, 1000 * (track.metadata.end - track.metadata.start));
             const displayName = track.metadata?.end < 0
                 ? `${state}:  ${this.current.displayName} ( ${formatTime(player.seek())} / ? )`
-                : `${state}: ${this.current.displayName}  ( ${formatTime(pos / 1000)} / ${formatTime((track.metadata.end - track.metadata.start))} )`;
+                : `${state}: ${this.current.displayName}  ( ${formatTime(pos / 1000)} / ${formatTime(track.metadata.end - track.metadata.start)} )`;
             if (this.options.progress) {
                 this.options.progress({
                     track,
@@ -102,13 +104,11 @@ export class Player {
         return Math.pow(10, dB / 20);
     }
     async updatePosition(newPos) {
-        if (newPos !== this.playlistPos) {
-            this.playlistPos = newPos;
-            if (typeof this.next?.unload == "function") {
-                this.next.unload();
-            }
-            await this.loadNext();
+        this.playlistPos = newPos;
+        if (typeof this.next?.unload == "function") {
+            this.next.unload();
         }
+        await this.loadNext();
     }
     // Called by event 'next-track'
     async loadNext() {
@@ -174,19 +174,19 @@ export class Player {
                 autoplay: false,
                 ctx: this.options.ctx,
                 onplay: () => {
-                    eventBus.emit('startingPlaying', {
+                    eventBus.emit("startingPlaying", {
                         player: this,
                         track,
-                        N
+                        N,
                     });
                 },
                 onstop: () => {
-                    eventBus.emit('stoppedPlaying', {
+                    eventBus.emit("stoppedPlaying", {
                         player: this,
                         track,
-                        N
+                        N,
                     });
-                }
+                },
             };
             const player = new Howl(howlerConfig);
             player.once("load", async () => {
@@ -257,7 +257,9 @@ export class Player {
     stop() {
         if (this.isPlaying) {
             this.current.ending = true;
-            this.current.player.fade((this.options.useSoundLevelling ? Player.dBtoLinear(this.current.gainReduction) : 1), 0, this.options.fadeRate * 1000);
+            this.current.player.fade(this.options.useSoundLevelling
+                ? Player.dBtoLinear(this.current.gainReduction)
+                : 1, 0, this.options.fadeRate * 1000);
             this.reportProgress("Fading");
             let obj = this.current;
             setTimeout(() => {
@@ -275,7 +277,8 @@ export class Player {
     }
     extendEndTime(period) {
         if (this.isPlaying) {
-            this.current.track.metadata.end = period == -1 ? this.current.track.metadata.originalEnd : period;
+            this.current.track.metadata.end =
+                period == -1 ? this.current.track.metadata.originalEnd : period;
             this.current.ending = false;
         }
     }
