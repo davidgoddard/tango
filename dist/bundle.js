@@ -1002,6 +1002,7 @@
                 }
                 .details.expanded {
                     height: auto;
+                    padding: 0.5rem;
                 }
                 #container.moving article {
                     border: dashed 2px red;
