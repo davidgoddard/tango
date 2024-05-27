@@ -30,6 +30,9 @@ function isValidDropTarget(source: HTMLElement, target: HTMLElement): boolean {
     source.dataset.style,
     target.dataset.style
   );
+  if (target.closest(".results")) {
+    return false;
+  }
   let valid = sameStyle(
     source.dataset?.style || "",
     target.dataset?.style || ""
@@ -71,10 +74,6 @@ function swapElements(element1: HTMLElement, element2: HTMLElement) {
     }
     if (tanda) (tanda as TandaElement).render();
   });
-
-  // Now find what if anything is playing and inform the controller of the change
-
-  eventBus.emit("changed-playlist");
 }
 
 export function dragStartHandler(event: any) {
@@ -129,13 +128,15 @@ export function dragDropHandler(event: any) {
         event.target.appendChild(swap);
         swapElements(draggingElement, swap);
       } else {
-        console.log("Nearest", draggingElement.closest(".content"));
-        if (draggingElement.closest(".content")) {
-          event.target.appendChild(draggingElement);
+        console.log("Nearest", draggingElement.closest(".results"));
+        if (draggingElement.closest(".results")) {
+          event.target.appendChild(draggingElement.cloneNode(true));
         }
       }
     }
-    return;
+
+    eventBus.emit("changed-playlist");
+    return; // early
   }
 
   console.log("Found drop zone", target, "dragging", draggingElement);
@@ -144,10 +145,23 @@ export function dragDropHandler(event: any) {
   if (target) {
     if (draggingElement && isValidDropTarget(draggingElement, target)) {
       console.log("drop", target.id);
-      // Handle the drop logic (e.g., swapping elements)
-      swapElements(draggingElement, target);
+      // is this a drop from the search results straight into the playlist
+      if (
+        target.closest("#playlistContainer") &&
+        draggingElement.closest(".results")
+      ) {
+        // Yes - therefore put the target into the scratchpad and leave the source alone
+        let targetParent = target.parentElement!;
+        targetParent.insertBefore(draggingElement.cloneNode(true), target);
+        const scratchpad = document.querySelector("#scratchPad");
+        scratchpad?.appendChild(target);
+      } else {
+        swapElements(draggingElement, target);
+      }
     }
   }
+  eventBus.emit("changed-playlist");
+  
 }
 
 export function dragEndHandler(event: any) {

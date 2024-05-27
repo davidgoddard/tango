@@ -9,14 +9,30 @@ import { TrackElement } from "./components/track.element";
 import { SearchResult } from "./components/search.element";
 import { TandaElement } from "./components/tanda.element";
 
+import "./services/themes";
+
 import { Track, Tanda, ConfigOptions, TableNames } from "./data-types";
 import { Player, PlayerOptions, ProgressData } from "./services/player";
 import { PlaylistService } from "./services/playlist-service";
 import { DatabaseManager, IndexedDBManager } from "./services/database";
 import { openMusicFolder } from "./services/file-system";
-import { allTracks, convert, createPlaceHolder, getDomElement } from "./services/utils";
-import { enumerateOutputDevices, requestAudioPermission, verifyPermission } from "./services/permissions.service";
-import { loadLibraryIntoDB, scanFileSystem } from "./services/file-database.interface";
+import {
+  allTracks,
+  convert,
+  createPlaceHolder,
+  getDomElement,
+  scheduleEventEvery,
+  timeStringToSeconds,
+} from "./services/utils";
+import {
+  enumerateOutputDevices,
+  requestAudioPermission,
+} from "./services/permissions.service";
+import {
+  loadLibraryIntoDB,
+  scanFileSystem,
+} from "./services/file-database.interface";
+import { CortinaPicker } from "./services/cortina-service";
 
 // if ("serviceWorker" in navigator) {
 //   window.addEventListener("load", () => {
@@ -91,48 +107,75 @@ async function processQuery(
   query: string,
   selectedStyle: string
 ): Promise<SearchResult> {
+  console.log("Search", query, selectedStyle);
 
-  console.log('Search', query, selectedStyle)
-  let testResult = await dbManager.search(query)
+  let testResult = await dbManager.search(query);
+
+  console.log("Raw results", testResult);
+  if (testResult.length == 0) {
+    return { queryNo: 0, tracks: [], tandas: [] };
+  }
 
   let tracks = (await dbManager.processEntriesInBatches(
     "track",
     (track, idx) => true
   )) as Track[];
 
-  let trackMap = new Map()
-  tracks.forEach(track=>
-    {
-      trackMap.set(convert(track.name).toLowerCase(), track)
-    }
-  )
-  console.log('Track map ', trackMap)
+  let trackMap = new Map();
+  tracks.forEach((track) => {
+    trackMap.set(convert(track.name).toLowerCase(), track);
+  });
 
   let maxScore = 0;
-  testResult.forEach((result:{id:string, score:number}) => {
+  testResult.forEach((result: { id: string; score: number }) => {
     maxScore = maxScore < result.score ? result.score : maxScore;
-  })
+  });
 
-  let minScore = maxScore * 0.6
+  let minScore = maxScore * 0.6;
 
-  console.log('Score threshold', minScore)
-
-  let trackResults: any[] = []
-  testResult.forEach((result:{id:string, score:number}) => {
-    if ( result.score >= minScore ){
-      let prefix = result.id.split('-');
-      let key = convert(result.id.substring([prefix[0], prefix[1]].join('-').length+1)).toLowerCase()
-      console.log('Fetching key', key, trackMap.get(key))
-      let track = trackMap.get(key)
-      if ( track ){
-        if ( selectedStyle == 'all' || track.metadata?.style?.toLowerCase() == selectedStyle )
-          trackResults.push(track)  
+  let trackResults: any[] = [];
+  testResult.forEach((result: { id: string; score: number }) => {
+    if (result.score >= minScore) {
+      let prefix = result.id.split("-");
+      let key = convert(
+        result.id.substring([prefix[0], prefix[1]].join("-").length + 1)
+      ).toLowerCase();
+      let track = trackMap.get(key);
+      if (track) {
+        if (
+          selectedStyle == "all" ||
+          track.metadata?.style?.toLowerCase() == selectedStyle
+        )
+          trackResults.push(track);
       }
     }
-  })
-  return { tracks: trackResults.filter(x => x), tandas: [] };
-}
+  });
 
+  let tandaResults: Set<any> = new Set();
+  let allTandas = (await dbManager.processEntriesInBatches("tanda", (tanda) => {
+    return true;
+  })) as Tanda[];
+  let tandaMap: Map<string, Tanda[]> = new Map();
+  allTandas.forEach((tanda) => {
+    tanda.tracks.forEach((track) => {
+      let key = convert(track).toLowerCase();
+      if (!tandaMap.has(key)) {
+        tandaMap.set(key, [tanda]);
+      } else {
+        let list = tandaMap.get(key)!;
+        list.push(tanda);
+      }
+      // tandaMap.set(key, tanda)
+    });
+  });
+  trackResults.forEach((track: Track) => {
+    let key = convert(track.name).toLowerCase();
+    if (tandaMap.has(key)) {
+      [...tandaMap.get(key)!].map((item) => tandaResults.add(item));
+    }
+  });
+  return { queryNo: 0, tracks: trackResults.filter((x) => x), tandas: [...tandaResults] };
+}
 
 // Function to populate the select element with output device options
 async function populateOutputDeviceOptions(config: ConfigOptions) {
@@ -160,7 +203,6 @@ async function populateOutputDeviceOptions(config: ConfigOptions) {
 // Setup application layout and check file permissions and create database etc.
 //=====================================================================================================================
 document.addEventListener("DOMContentLoaded", async () => {
-
   try {
     await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch (error) {
@@ -171,11 +213,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   eventBus.on("error", (error) => {
-    console.error(error);
+    alert(error);
   });
 
   const dbManager = await DatabaseManager();
   let config = await InitialiseConfig(dbManager);
+
+  const cortinaPicker = new CortinaPicker(dbManager);
+  await cortinaPicker.load();
 
   // Setup the quick key click to function mappings
 
@@ -185,17 +230,19 @@ document.addEventListener("DOMContentLoaded", async () => {
         .then(() => {
           const modal = getDomElement("#permissionModal");
           modal.classList.add("hidden");
-          eventBus.emit('UserGrantedPermission');
+          eventBus.emit("UserGrantedPermission");
         })
         .catch((error) => {
           alert(error);
         });
     },
-    rescanButton: () => {
-      scanFileSystem(config, dbManager, false);
+    rescanButton: async () => {
+      await scanFileSystem(config, dbManager, false);
+      await cortinaPicker.load();
     },
-    rescanAnalyzeButton: () => {
-      scanFileSystem(config, dbManager, true);
+    rescanAnalyzeButton: async () => {
+      await scanFileSystem(config, dbManager, true);
+      await cortinaPicker.load();
     },
     settingsPanelButton: () => {
       getDomElement("#settingsPanel").classList.remove("hiddenPanel");
@@ -214,6 +261,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     },
     loadLibraryButton: async () => {
       await loadLibraryIntoDB(config, dbManager);
+      await cortinaPicker.load();
     },
     refreshAudioLists: () => {
       populateOutputDeviceOptions(config);
@@ -222,48 +270,58 @@ document.addEventListener("DOMContentLoaded", async () => {
       eventBus.emit("stopPlaying");
     },
     playAll: () => {
-      eventBus.emit('playAll')
+      eventBus.emit("playAll");
     },
     stopPlayAll: () => {
-      eventBus.emit('stopAll')
+      eventBus.emit("stopAll");
+    },
+    cortinaPickerButtonClose: () => {
+      getDomElement('#cortinaPicker').classList.add('hidden')
     },
     createTandaButton: () => {
       const scratchPad = getDomElement("#scratchPad");
       const newTanda = document.createElement("tanda-element");
-      newTanda.setAttribute("style", "undefined");
+      newTanda.dataset.style = "undefined";
       scratchPad.appendChild(newTanda);
     },
+    collapsePlaylist: () => {
+      const allTandas = Array.from(
+        document.querySelectorAll("tanda-element")
+      ) as TandaElement[];
+      allTandas.forEach((tanda: TandaElement) => {
+        tanda.collapse();
+      });
+    },
     extendPlaylist: () => {
-      const container = getDomElement('#playlistContainer')
+      const container = getDomElement("#playlistContainer");
 
-      const sequence = '3T 3T 3W 3T 3T 3M'
+      const sequence = "3T 3T 3W 3T 3T 3M";
 
       const styleMap: { [key: string]: string } = {
-        'T': 'Tango',
-        'W': 'Waltz',
-        'M': 'Milonga'
-      }
+        T: "Tango",
+        W: "Waltz",
+        M: "Milonga",
+      };
 
-      for (let t of sequence.split(' ')) {
+      for (let t of sequence.split(" ")) {
         let n = parseInt(t);
-        let s = t.substring(String(n).length)
-        console.log(t, 'N', n, 'S', s)
-        let tanda = document.createElement('tanda-element');
+        let s = t.substring(String(n).length);
+        console.log(t, "N", n, "S", s);
+        let tanda = document.createElement("tanda-element");
         tanda.dataset.style = styleMap[s];
         tanda.dataset.size = String(n);
-        let html = '';
+        let html = "";
         let needCortina = true;
         if (needCortina) {
-
-          html += createPlaceHolder('cortina-element', 'cortina' )
+          html += createPlaceHolder("cortina-element", "cortina");
         }
         for (let i = 0; i < n; i++) {
-          html += createPlaceHolder('track-element', styleMap[s])
+          html += createPlaceHolder("track-element", styleMap[s]);
         }
         tanda.innerHTML = html;
-        container.appendChild(tanda)
+        container.appendChild(tanda);
       }
-    }
+    },
   };
 
   for (const key of Object.keys(quickClickHandlers)) {
@@ -273,11 +331,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     );
   }
 
-
   await new Promise((resolve) => {
-    eventBus.once('UserGrantedPermission', resolve)
-  })
-
+    eventBus.once("UserGrantedPermission", resolve);
+  });
 
   // Handle configuration changes
   const useSoundLevelling = getDomElement(
@@ -295,14 +351,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const tabsContainer = new TabsContainer(
     getDomElement("#tabsContainer"),
-    tabs
+    tabs,
+    dbManager
   );
 
   // Handle searches
 
   eventBus.on(
     "query",
-    async (payload: {searchData: string, selectedStyle: string}) => {
+    async (payload: {
+      queryNo: number;
+      search: HTMLElement;
+      searchData: string;
+      selectedStyle: string;
+    }) => {
       // Process the query (e.g., fetch data from a server)
       const results: SearchResult = await processQuery(
         dbManager,
@@ -311,7 +373,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       );
 
       // Send the results back to the search component
-      eventBus.emit("queryResults", results);
+      eventBus.emit("queryResults", { ...results, search: payload.search, queryNo: payload.queryNo });
     }
   );
 
@@ -349,7 +411,6 @@ async function runApplication(
   dbManager: IndexedDBManager,
   config: ConfigOptions
 ) {
-
   // Scan all files in database to find system's lowest gain for normalisation purposes
 
   let systemLowestGain = await getSystemLevel(dbManager);
@@ -363,10 +424,72 @@ async function runApplication(
     }
   );
 
+  scheduleEventEvery(1, () => {
+    const tandas = Array.from(
+      playlistContainer.querySelectorAll("tanda-element")
+    ) as TandaElement[];
+    const playingTanda = playlistContainer.querySelector(
+      "tanda-element.playing"
+    ) as TandaElement;
+    if (!playingTanda) {
+      tandas.forEach((tanda) => {
+        tanda.scheduledPlayingTime("");
+      });
+    }
+    let startTime = new Date();
+    const timings = {
+      preCortina: 3,
+      postCortina: 3,
+      interTrack: 2,
+    };
+
+    let donePlayingTanda = false;
+    let foundPlayingTrack = false;
+    tandas.forEach((tanda) => {
+      donePlayingTanda ||= tanda == playingTanda;
+      if (donePlayingTanda) {
+        tanda.scheduledPlayingTime(
+          startTime.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        );
+        const hasCortina = tanda.querySelector("cortina-element");
+        const tracks = Array.from(
+          tanda.querySelectorAll("track-element")
+        ) as HTMLElement[];
+        let duration = 0;
+        if (hasCortina) {
+          duration += timings.preCortina + timings.postCortina;
+        } else {
+          duration += timings.interTrack;
+        }
+        duration += tracks.length * timings.interTrack;
+        duration += tracks.reduce((total, track) => {
+          foundPlayingTrack ||= track.classList.contains("playing") || (hasCortina?.classList.contains('playing') || false);
+          if (foundPlayingTrack) {
+            const duration = timeStringToSeconds(
+              track.dataset.duration || "0:0"
+            );
+            return total + (typeof duration == "number" ? duration : 0);
+          } else {
+            return total;
+          }
+        }, 0); // 0 is the initial value for the total
+        startTime.setSeconds(startTime.getSeconds() + duration);
+      } else {
+        tanda.scheduledPlayingTime("");
+      }
+    });
+  });
+
+
   playlistContainer.addEventListener("clickedTrack", async (event: Event) => {
     try {
       const track = (event as CustomEvent).detail;
-      const playing = document.querySelector('track-element.playing, cortina-element.playing')
+      const playing = document.querySelector(
+        "track-element.playing, cortina-element.playing"
+      );
       if (!playing) {
         let N = playlistService.getN(track);
         await speakerOutputPlayer.updatePosition(N - 1);
@@ -396,24 +519,24 @@ async function runApplication(
       let allTracks = playlistService.allTracks;
       let silence = 0;
       let nextTrack: Track | undefined = undefined;
-      while ( !nextTrack && N < allTracks.length ){
-        console.log('Getting next track', N)
+      while (!nextTrack && N < allTracks.length) {
+        console.log("Getting next track", N);
         nextTrack = await playlistService.fetch(N);
-        if (!nextTrack) N++
+        if (!nextTrack) N++;
       }
-      if ( !nextTrack ){
-        return {N, track: undefined, silence: 0}
+      if (!nextTrack) {
+        return { N, track: undefined, silence: 0 };
       }
 
       if (N > 0) {
-        let pN = N
+        let pN = N;
         let previousTrack: Track | undefined = undefined;
-        while ( !previousTrack && pN > 1 ){
+        while (!previousTrack && pN > 1) {
           previousTrack = await playlistService.fetch(pN - 1);
-          if ( !previousTrack ) pN--;
+          if (!previousTrack) pN--;
         }
         silence = 2;
-        if ( previousTrack ){
+        if (previousTrack) {
           if (nextTrack.type == "track" && previousTrack.type == "cortina") {
             silence = 4;
           }
@@ -429,20 +552,19 @@ async function runApplication(
     progress: (data: ProgressData) => {
       if (data.state === "Playing") {
         stopButton.classList.add("active");
-        if (data.track!.type == 'cortina') {
-          playlistService.playingCortina(true)
+        if (data.track!.type == "cortina") {
+          playlistService.playingCortina(true);
         } else {
-          playlistService.playingCortina(false)
+          playlistService.playingCortina(false);
         }
       } else {
         stopButton.classList.remove("active");
-        playlistService.playingCortina(false)
+        playlistService.playingCortina(false);
       }
       headerField.textContent = data.display;
     },
+    notify: eventBus.emit.bind(eventBus),
   };
-
-
 
   let headphonePlaylist: Track[] = [];
 
@@ -477,20 +599,22 @@ async function runApplication(
     headphonesPlayerConfig.useSoundLevelling = config.useSoundLevelling;
     headphonesOutputPlayer.updateOptions(headphonesPlayerConfig);
   });
-  eventBus.on('playAll', () => {
-    speakerOutputPlayer.extendEndTime(-1)
-  })
-  eventBus.on('stopAll', () => {
+  eventBus.on("playAll", () => {
+    speakerOutputPlayer.extendEndTime(-1);
+  });
+  eventBus.on("stopAll", () => {
     speakerOutputPlayer.stop();
     speakerOutputPlayer.startNext();
-  })
+  });
   eventBus.on("stopPlaying", () => {
     speakerOutputPlayer.stop();
-    playlistService.allTracks.forEach(track => track.setPlaying(false))
-    let tandas = Array.from(playlistContainer.querySelectorAll('tanda-element')) as TandaElement[];
-    tandas.forEach((tanda)=>{
-      tanda.setPlaying(false)
-    })
+    playlistService.allTracks.forEach((track) => track.setPlaying(false));
+    let tandas = Array.from(
+      playlistContainer.querySelectorAll("tanda-element")
+    ) as TandaElement[];
+    tandas.forEach((tanda) => {
+      tanda.setPlaying(false);
+    });
   });
 
   eventBus.on("playOnHeadphones", async (detail: any) => {
@@ -504,10 +628,7 @@ async function runApplication(
     if (!detail.playing) {
       headphonesOutputPlayer.stop();
     } else {
-      const table =
-        track.dataset.title.split(/\/|\\/g)[1] == "music"
-          ? "track"
-          : "cortina";
+      const table = track.dataset.type;
       headphonePlaylist[0] = (await dbManager.getDataById(
         table,
         parseInt(track.dataset.trackId)
@@ -522,9 +643,8 @@ async function runApplication(
   // Called when drag/drop completes which might mess up where current song is in the list
   eventBus.on("changed-playlist", async () => {
     const N = playlistService.getNowPlayingN();
-    console.log('Changed playlist - now playing', N, speakerOutputPlayer)
+    console.log("Changed playlist - now playing", N, speakerOutputPlayer);
     await speakerOutputPlayer.updatePosition(N);
-    await speakerOutputPlayer.loadNext();
   });
 
   // dummy code
@@ -562,7 +682,6 @@ async function runApplication(
       // for (let i = 0; i < 100 ; i++ ){
       allTandas.push(tanda);
       // }
-
     }
   }
   console.log(allTandas);

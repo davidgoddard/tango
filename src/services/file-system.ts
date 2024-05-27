@@ -149,9 +149,43 @@ export async function getAllFiles(
   }
 }
 
-interface FileSystemHandlePermissionDescriptor {
-  mode?: "read" | "readwrite";
+export async function checkFileHandleAccess(fileHandle: FileSystemFileHandle): Promise<boolean> {
+  if (!fileHandle) {
+      console.log('No file handle stored.');
+      return false;
+  }
+  try{
+    await fileHandle.getFile();
+    return true;
+  }
+  catch(error){
+    return false;
+  }
 }
+
+// Function to check if we still have access to the directory handle
+async function checkDirectoryHandleAccess(directoryHandle: FileSystemDirectoryHandle): Promise<boolean> {
+  if (!directoryHandle) {
+      console.log('No directory handle stored.');
+      return false;
+  }
+
+  try {
+      // Check for read access by trying to access an entry in the directory
+      const entries = directoryHandle.entries();
+      for await (const [name, handle] of entries) {
+          console.log(`Read access verified for entry: ${name}`);
+          break; // Just checking if we can read one entry
+      }
+
+      return true;
+  } catch (error) {
+      console.log('Access verification failed.', error);
+      return false;
+  }
+}
+
+
 
 export async function openMusicFolder(
   dbManager: any,
@@ -163,7 +197,8 @@ export async function openMusicFolder(
       console.log(
         `Retrieved directory handle "${directoryHandleOrUndefined.name}" from IndexedDB.`
       );
-      return;
+      if ( await checkDirectoryHandleAccess(directoryHandleOrUndefined) )
+        return;
     }
     const directoryHandle = await selectFolder();
     config.musicFolder = directoryHandle;

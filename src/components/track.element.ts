@@ -29,24 +29,16 @@ class BaseTrackElement extends HTMLElement {
     this.dataset.id = "T-" + String(nextId++);
     this.render();
 
-    this.shadowRoot!.querySelector("#headphones")!.addEventListener(
-      "click",
-      this.playOnHeadphones.bind(this)
-    );
-
-    this.shadowRoot!.querySelector(".actions")!.addEventListener(
-      "click",
-      this.handleTargetButtonClick.bind(this)
-    );
-
-    this.shadowRoot!.querySelector(".track")!.addEventListener(
-      "click",
-      this.handleTrackClick.bind(this)
-    );
-  }
-
-  addAction(action: Action) {
-    this.actions.add(action);
+    if (this.dataset.title !== "place holder") {
+      this.shadowRoot!.querySelector("#headphones")!.addEventListener(
+        "click",
+        this.playOnHeadphones.bind(this)
+      );
+      this.shadowRoot!.querySelector(".track")!.addEventListener(
+        "click",
+        this.handleTrackClick.bind(this)
+      );
+    }
   }
 
   stopPlayingOnHeadphones() {
@@ -72,30 +64,15 @@ class BaseTrackElement extends HTMLElement {
     });
   }
 
-  setPlaying(state: boolean){
+  setPlaying(state: boolean) {
     this.isPlaying = state;
     this.draggable = !this.isPlaying;
-    if ( this.isPlaying ){
-      this.classList.add('playing')
-      this.shadowRoot!.querySelector('article')?.classList.add('playing')
+    if (this.isPlaying) {
+      this.classList.add("playing");
+      this.shadowRoot!.querySelector("article")?.classList.add("playing");
     } else {
-      this.classList.remove('playing')
-      this.shadowRoot!.querySelector('article')?.classList.remove('playing')
-    }
-  }
-
-  handleTargetButtonClick(event: Event) {
-    const targetButton = (event.target as HTMLElement)?.closest(
-      "button.target"
-    );
-    if (targetButton) {
-      event.stopPropagation();
-      event.preventDefault();
-      const emitEvent = new CustomEvent("clickedTargetTrack", {
-        detail: { actionId: targetButton.id, element: this },
-        bubbles: true,
-      });
-      this.dispatchEvent(emitEvent);
+      this.classList.remove("playing");
+      this.shadowRoot!.querySelector("article")?.classList.remove("playing");
     }
   }
 
@@ -115,6 +92,7 @@ class BaseTrackElement extends HTMLElement {
         <style>
         * {
             background-color:transparent;
+            color: var(--track-text-color);
         }
         .track {
             padding: 0 0 0 0.4rem;
@@ -145,9 +123,7 @@ class BaseTrackElement extends HTMLElement {
         }
         article {
           border: solid 2px transparent;
-          display: block;
           border-radius: 5px;
-          margin: 2px;
       }
         article.playing {
             border: solid 2px orange;
@@ -193,7 +169,7 @@ class BaseTrackElement extends HTMLElement {
           color: lightgray;
         }
     </style>
-    <article class="track ${this.isPlaying ? 'playing' : ''}">
+    <article class="track ${this.isPlaying ? "playing" : ""}">
         <section class="actions">
         ${([...this.actions] as Action[])
           .sort((a: Action, b: Action) => {
@@ -204,12 +180,18 @@ class BaseTrackElement extends HTMLElement {
           })}
         </section>
         <header>
-        ${this.dataset.title !== 'place holder' ? `<button id="headphones" class="${
-          this.isPlayingOnHeadphones ? "playing" : ""
-        }">
+        ${
+          this.dataset.title !== "place holder"
+            ? `<button id="headphones" class="${
+                this.isPlayingOnHeadphones ? "playing" : ""
+              }">
             <img src="./icons/headphones.png" alt="Listen on headphones">
-        </button>` : '<span></span>'}
-        <h2>${this.dataset.tandaId ? this.dataset.tandaId : ''} ${this.tagName === 'CORTINA-ELEMENT' ? '(Cortina) ' : ''} ${this.dataset.title}</h2>
+        </button>`
+            : "<span></span>"
+        }
+        <h2>${this.dataset.tandaId ? this.dataset.tandaId : ""} ${
+      this.tagName === "CORTINA-ELEMENT" ? "(Cortina) " : ""
+    } ${this.dataset.title}</h2>
             <div id="floated">
               ${
                 !/undefined|null/.test(this.dataset.bpm!)
@@ -228,8 +210,11 @@ class BaseTrackElement extends HTMLElement {
         </header>
         <main>
             <p>                
-                ${! (this.dataset.style == "undefined") ? `<span><span class='style'>${
-                  this.dataset.style}</span></span>` : ''}
+                ${
+                  !(this.dataset.style == "undefined")
+                    ? `<span><span class='style'>${this.dataset.style}</span></span>`
+                    : ""
+                }
                 <span><span class='artist'>${this.dataset.artist}</span></span>
                 ${
                   !/undefined|null/.test(this.dataset.notes!)
@@ -243,8 +228,8 @@ class BaseTrackElement extends HTMLElement {
   }
 }
 
-class TrackElement extends BaseTrackElement {};
-class CortinaElement extends BaseTrackElement {};
+class TrackElement extends BaseTrackElement {}
+class CortinaElement extends BaseTrackElement {}
 customElements.define("track-element", TrackElement);
 customElements.define("cortina-element", CortinaElement);
 

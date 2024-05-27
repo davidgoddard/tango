@@ -147,7 +147,8 @@ export class Player {
                         next.unload = null;
                     };
                     this.next = next;
-                    eventBus.emit("next-track-ready");
+                    if (this.options.notify)
+                        this.options.notify("next-track-ready");
                 }
             }
             else {
@@ -155,6 +156,7 @@ export class Player {
             }
         }
         catch (error) {
+            eventBus.emit('error', error);
             this.next = null;
         }
     }
@@ -174,18 +176,20 @@ export class Player {
                 autoplay: false,
                 ctx: this.options.ctx,
                 onplay: () => {
-                    eventBus.emit("startingPlaying", {
-                        player: this,
-                        track,
-                        N,
-                    });
+                    if (this.options.notify)
+                        this.options.notify("startingPlaying", {
+                            player: this,
+                            track,
+                            N,
+                        });
                 },
                 onstop: () => {
-                    eventBus.emit("stoppedPlaying", {
-                        player: this,
-                        track,
-                        N,
-                    });
+                    if (this.options.notify)
+                        this.options.notify("stoppedPlaying", {
+                            player: this,
+                            track,
+                            N,
+                        });
                 },
             };
             const player = new Howl(howlerConfig);
@@ -229,13 +233,15 @@ export class Player {
         if (!this.next)
             return this.reportProgress("Stopped");
         if (this.current?.track.type == "cortina") {
-            eventBus.emit("tanda");
+            if (this.options.notify)
+                this.options.notify("tanda");
         }
         this.current = this.next;
         this.next = null;
         this.playlistPos = this.current.position;
         if (this.current.track.type == "cortina") {
-            eventBus.emit("cortina");
+            if (this.options.notify)
+                this.options.notify("cortina");
         }
         if (this.current.silence > 0) {
             this.reportProgress("Waiting");

@@ -14,10 +14,12 @@ class TandaElement extends HTMLElement {
   private expanded: boolean = false;
   private isPlaying: boolean = false;
   private hasPlayed: boolean = false;
+  private playingTime: string = '';
   
   private handleExtendBound: EventListener;
   private handleShrinkBound: EventListener;
   private handleToggleBound: EventListener;
+  private handleChangeCortinaBound: EventListener;
 
   constructor() {
     super();
@@ -25,6 +27,13 @@ class TandaElement extends HTMLElement {
     this.handleExtendBound = this.handleExtend.bind(this);
     this.handleShrinkBound = this.handleShrink.bind(this);
     this.handleToggleBound = this.toggleExpand.bind(this);
+    this.handleChangeCortinaBound = this.handleChangeCortina.bind(this);
+  }
+
+  public scheduledPlayingTime(time: string){
+    this.playingTime = time;
+    let timeField = this.shadowRoot?.querySelector('#play-time')!;
+    if ( timeField ) timeField.textContent = this.playingTime;
   }
 
   connectedCallback() {
@@ -51,6 +60,17 @@ class TandaElement extends HTMLElement {
     if (n > 0) this.removeChild(this.children[n - 1]);
     this.render();
     eventBus.emit('changed-playlist')
+  }
+
+  private handleChangeCortina(event: any){
+    event.preventDefault(); // Necessary to allow a drop
+    event.stopPropagation();
+    console.log('Change cortina')
+    const newEvent = new CustomEvent("changeCortina", {
+      detail: this,
+      bubbles: true,
+    });
+    this.dispatchEvent(newEvent);    
   }
 
   private findMinMaxYears(years: (string | null)[]): string {
@@ -110,14 +130,20 @@ class TandaElement extends HTMLElement {
     this.shadowRoot!.querySelector('#extendTanda')!.addEventListener('click', this.handleExtendBound);
     this.shadowRoot!.querySelector('#shrinkTanda')!.addEventListener('click', this.handleShrinkBound);
     this.shadowRoot!.querySelector("#toggle main")!.addEventListener("click", this.handleToggleBound);
+    this.shadowRoot!.querySelector('#changeCortinaButton')!.addEventListener('click', this.handleChangeCortinaBound);
   }
 
   private removeEventListeners() {
     this.shadowRoot!.querySelector('#extendTanda')!.removeEventListener('click', this.handleExtendBound);
     this.shadowRoot!.querySelector('#shrinkTanda')!.removeEventListener('click', this.handleShrinkBound);
     this.shadowRoot!.querySelector("#toggle main")!.removeEventListener("click", this.handleToggleBound);
+    this.shadowRoot!.querySelector('#changeCortinaButton')!.removeEventListener('click', this.handleChangeCortinaBound);
   }
 
+  public collapse(){
+    this.expanded = false;
+    this.render();
+  }
   public render(firstCall: boolean = false) {
     if ( !firstCall ) this.removeEventListeners();
     const tracks = Array.from(this.querySelectorAll("track-element")) as HTMLElement[];
@@ -167,11 +193,15 @@ class TandaElement extends HTMLElement {
 
     const cortinaSummary =
       cortinaTitle.length > 0
-        ? `<button class="cortinaName">${cortinaTitle}</button>`
+        ? `<button id="changeCortinaButton" class="cortinaName">${cortinaTitle}</button>`
         : "";
 
     this.shadowRoot!.innerHTML = `
             <style>
+                * {
+                  color: var(--track-text-color)
+                  
+                }
                 .summary { cursor: pointer; display: grid; grid-template-columns: 40px auto;}
                 .summary header { display: flex; justify-content: center }
                 .summary header span {
@@ -187,7 +217,7 @@ class TandaElement extends HTMLElement {
                   width: 100%;
                 }
                 #container article.playing {
-                  border: solid 2px orange;
+                  outline: solid 2px orange;
                   margin: 1rem;
                 }
                 #container article.played {
@@ -195,13 +225,15 @@ class TandaElement extends HTMLElement {
                 }
                 #container article.placeHolder {
                   background-color: #d7d6d6;
-                  border: dashed 2px red;
+                  outline: dashed 1px red;
+                  z-index: 99;
+                  position: relative;
                 }
                 #container article {
                     border: solid 2px #ccc;
                     border-radius: 7px;
                     margin-top: 0rem;
-                    margin-bottom: 0rem;
+                    margin-bottom: 1px;
                     padding: 0.2rem;
                 }
                 #actions {
@@ -230,9 +262,6 @@ class TandaElement extends HTMLElement {
                     border: dashed 2px green;
                     margin: 1rem;
                 }
-                // :host-context(tanda-element.target) #actions button {
-                //     display: block;
-                // }
                 #actions button.target {
                     display: none;
                 }
@@ -240,17 +269,6 @@ class TandaElement extends HTMLElement {
                     height: 20px;
                     width: 20px;
                 }
-                // #container article {
-                //     border: dashed 2px #cf8805;
-                //     display: block;
-                //     border-radius: 10px;
-                //     margin: 1rem!important;
-                // }
-                // :host-context(.played) {
-                //     display: block;
-                //     background-color: #777;
-                //     border-radius: 10px;
-                // }
                 .cortinaControls {
                     display: none;
                 }
@@ -274,14 +292,7 @@ class TandaElement extends HTMLElement {
                 main > section > button {
                     width: 100%;
                     margin-bottom: 0.3rem;
-                }
-                button.cortinaName {
-                    // width: 100px; /* Set the desired width */
-                    // white-space: nowrap;
-                    // overflow: hidden;
-                    // text-overflow: ellipsis;
-                    // direction: rtl;
-                    // text-align: left; /* This makes sure that the text starts from the left when it's in RTL mode */
+                    color: black;
                 }
                 #extensions {
                   display: flex;
@@ -303,7 +314,7 @@ class TandaElement extends HTMLElement {
                 }
                 #extendTanda {
                   padding: 0px;
-                  line-height: 1.4rem;
+                  line-height: 1.3rem;
                 }
                 #shrinkTanda {
                   padding: 0px;
@@ -311,6 +322,7 @@ class TandaElement extends HTMLElement {
                 }
             </style>
             <div id="container" class="${this.hasPlayed ? 'played' : ''}">
+                <span id="play-time">${this.playingTime ? `${this.playingTime}` : ''}</span>
                 <article class="${isPlaceHolder ? 'placeHolder' : ''}">
                     <div id="toggle" class="summary">
                         <header>

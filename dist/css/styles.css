@@ -1,5 +1,25 @@
 /* style.css */
 
+:root {
+  --background-color: #e9ecef;
+  --text-color: #000000;
+  --button-background-color: #f0f0f0;
+  --button-text-color: #000000;
+
+  --border-color: #ffb30e;
+
+  --header-background-color: #353536;
+  --header-text-color: white;
+
+  --header-select-background: white;
+  --header-select-text: black;
+
+  --side-panel-background: #d3cec8;
+  --side-panel-text: #710404;
+
+  --track-text-color: black;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -14,15 +34,61 @@ body {
   grid-template-rows: auto 1fr; /* Auto for header and 1fr for the container to take up the rest */
 }
 
+body.light-theme {
+  --background-color: #e9ecef;
+  --text-color: #000000;
+  --button-background-color: #f0f0f0;
+  --button-text-color: #000000;
+
+  --border-color: #ffb30e;
+
+  --header-background-color: #353536;
+  --header-text-color: white;
+
+  --header-select-background: white;
+  --header-select-text: black;
+
+  --side-panel-background: #d3cec8;
+  --side-panel-text: #710404;
+}
+
+body.dark-theme {
+  --background-color: #000000;
+  --text-color: #ffffff;
+  --button-background-color: #333333;
+  --button-text-color: #ffffff;
+  --track-text-color: white;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background-color: #000000;
+    --text-color: #ffffff;
+    --button-background-color: #333333;
+    --button-text-color: #ffffff;
+    --track-text-color: white;
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --background-color: #ffffff;
+    --text-color: #000000;
+    --button-background-color: #f0f0f0;
+    --button-text-color: #000000;
+    --track-text-color: black;
+  }
+}
+
 img {
   height: 20px;
   width: 20px;
 }
 
 header {
-  background: #353536;
-  border-bottom: 5px solid #ffb30e;
-  color: white;
+  background: var(--header-background-color);
+  border-bottom: 5px solid var(--border-color);
+  color: var(--header-text-color);
   display: flex;
   justify-content: space-between;
   padding: 0.5rem 1rem 0.5rem 1rem;
@@ -37,10 +103,9 @@ main {
   overflow: hidden;
 }
 main.all {
-  grid-template-columns: minmax(200px, 1fr) minmax(5px, 5px) minmax(100px, 1fr) minmax(
-      5px,
-      5px
-    ) minmax(200px, 1fr);
+  grid-template-columns:
+    minmax(200px, 1fr) minmax(5px, 5px) minmax(100px, 1fr) minmax(5px, 5px)
+    minmax(200px, 1fr);
 }
 
 main.searchOnly {
@@ -52,7 +117,7 @@ main.playlistOnly {
 
 .column {
   overflow-y: auto;
-  background-color: #e9ecef;
+  background-color: var(--background-color);
   padding: 10px;
   display: grid;
   grid-template-rows: auto 1fr; /* Header size auto, rest is for body */
@@ -62,18 +127,19 @@ header > label {
   display: flex;
   align-items: center;
   justify-content: end;
+  color: var(--header-text-color);
 }
 
 header button {
   background: none;
   border: none;
-  color: white;
+  color: var(--header-text-color);
   font-size: 30px;
   cursor: pointer;
   justify-self: flex-start;
   display: none;
   flex-grow: 0;
-  margin-right: 1rem 
+  margin-right: 1rem;
 }
 
 header button.active {
@@ -87,9 +153,9 @@ header button img {
 
 header select {
   flex-grow: 0;
-  background: white;
+  background: var(--header-select-background);
   border: none;
-  color: black;
+  color: var(--header-select-text);
   font-size: 1.2rem;
   cursor: pointer;
   margin: 0.2rem;
@@ -103,10 +169,10 @@ header select {
   top: 0;
   transform: translateX(0px);
   left: 0px; /* Start off-screen */
-  background-color: #d3cec8;
+  background-color: var(--side-panel-background);
   overflow-x: hidden;
   transition: transform 0.5s ease;
-  color: #710404;
+  color: var(--side-panel-text);
   padding: 20px;
 }
 
@@ -149,7 +215,7 @@ header select {
 }
 
 .handle {
-  background-color: orange;
+  background-color: var(--border-color);
   cursor: ew-resize;
   width: 10px;
 }
@@ -220,7 +286,7 @@ main.searchOnly > *:nth-child(5) {
 }
 
 .tab-header.active {
-  background-color: orange;
+  background-color: var(--border-color);
   border-bottom: 2px solid #353536;
 }
 
@@ -309,13 +375,12 @@ h2 {
   flex-direction: row;
 }
 
-
 /* Reset default list styles */
 .tab-list {
   list-style-type: none;
   padding: 0;
   margin: 0;
-  border-bottom: solid 2px orange;
+  border-bottom: solid 2px var(--border-color);
 }
 
 /* Style for each tab item */
@@ -337,16 +402,17 @@ h2 {
 
 /* Hover effect for tab */
 ul.tab-list li.tab:hover {
-  background-color: #fbcd78
+  background-color: #fbcd78;
 }
 
 /* Styling for tab panels */
 .tab-panel {
   display: grid;
   padding: 20px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--border-color);
   border-top: none;
-  background-color: #fff;
+  background-color: var(--background-color);
+  color: var(--text-color);
 }
 
 label img {
@@ -368,9 +434,16 @@ label img {
   overflow-y: auto;
   padding: 3px;
 }
-tanda-element, cortina-element, track-element {
-  margin: 0 3px 0 3px; /* to allow outlines */
+tanda-element,
+cortina-element,
+track-element {
+  margin: 1px 3px 0 3px;
   display: block;
+}
+cortina-element,
+track-element {
+  outline: solid 1px tan;
+  border-radius: 5px;
 }
 
 .drop-target {
@@ -384,7 +457,31 @@ tanda-element, cortina-element, track-element {
   align-items: center;
 }
 
-/* #scratchpadColumn {
+#scratchpadColumn {
+  color: var(--button-text-color);
+}
+
+#cortinaPicker {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  margin: 0px;
   display: flex;
-  flex-direction: column;
-} */
+}
+
+#cortinaPicker .cortina-content {
+  margin: auto;
+  padding: 20px;
+  border: 1px solid #979084;
+  background-color: #979084;
+  border-radius: 10px;
+  outline: solid 3px aliceblue;
+}
+
+#cortinaList {
+  margin-top: 1rem;
+  background-color: grey;
+  height: 60vh;
+  overflow-y: auto;
+  width: 800px;
+}

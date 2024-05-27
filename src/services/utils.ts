@@ -101,3 +101,25 @@ export function renderTrackDetail(idx: number, track: Track, typeName:string): s
       container.querySelectorAll(`track-element:not([data-title="place holder"]), cortina-element:not([data-title="place holder"])`)
     ) as TrackElement[];
   }
+
+  export function scheduleEventEvery(N: number, eventFunction: Function) {
+    eventFunction();
+
+    // Get the current time
+    const now = new Date();
+    
+    // Calculate the milliseconds till the next minute
+    const millisecondsTillNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
+
+    // Function to run the event and set an interval for future executions
+    function startInterval() {
+        // Run the event function
+        eventFunction();
+
+        // Set an interval to run the event function every minute
+        setInterval(eventFunction, N * 1000);
+    }
+
+    // Set a timeout to start the interval at the beginning of the next minute
+    setTimeout(startInterval, millisecondsTillNextMinute);
+}

@@ -786,6 +786,16 @@
   function allTracks(container) {
     return Array.from(container.querySelectorAll(`track-element:not([data-title="place holder"]), cortina-element:not([data-title="place holder"])`));
   }
+  function scheduleEventEvery(N, eventFunction) {
+    eventFunction();
+    const now = /* @__PURE__ */ new Date();
+    const millisecondsTillNextMinute = (60 - now.getSeconds()) * 1e3 - now.getMilliseconds();
+    function startInterval() {
+      eventFunction();
+      setInterval(eventFunction, N * 1e3);
+    }
+    setTimeout(startInterval, millisecondsTillNextMinute);
+  }
 
   // dist/components/tanda.element.js
   var nextId = 1;
@@ -793,15 +803,24 @@
     expanded = false;
     isPlaying = false;
     hasPlayed = false;
+    playingTime = "";
     handleExtendBound;
     handleShrinkBound;
     handleToggleBound;
+    handleChangeCortinaBound;
     constructor() {
       super();
       this.attachShadow({ mode: "open" });
       this.handleExtendBound = this.handleExtend.bind(this);
       this.handleShrinkBound = this.handleShrink.bind(this);
       this.handleToggleBound = this.toggleExpand.bind(this);
+      this.handleChangeCortinaBound = this.handleChangeCortina.bind(this);
+    }
+    scheduledPlayingTime(time) {
+      this.playingTime = time;
+      let timeField = this.shadowRoot?.querySelector("#play-time");
+      if (timeField)
+        timeField.textContent = this.playingTime;
     }
     connectedCallback() {
       this.dataset.id = "Tanda-" + String(nextId++);
@@ -825,6 +844,16 @@
         this.removeChild(this.children[n - 1]);
       this.render();
       eventBus.emit("changed-playlist");
+    }
+    handleChangeCortina(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      console.log("Change cortina");
+      const newEvent = new CustomEvent("changeCortina", {
+        detail: this,
+        bubbles: true
+      });
+      this.dispatchEvent(newEvent);
     }
     findMinMaxYears(years) {
       const numericYears = years.map((year) => year ? Number(year) : NaN).filter((year) => !isNaN(year));
@@ -872,11 +901,17 @@
       this.shadowRoot.querySelector("#extendTanda").addEventListener("click", this.handleExtendBound);
       this.shadowRoot.querySelector("#shrinkTanda").addEventListener("click", this.handleShrinkBound);
       this.shadowRoot.querySelector("#toggle main").addEventListener("click", this.handleToggleBound);
+      this.shadowRoot.querySelector("#changeCortinaButton").addEventListener("click", this.handleChangeCortinaBound);
     }
     removeEventListeners() {
       this.shadowRoot.querySelector("#extendTanda").removeEventListener("click", this.handleExtendBound);
       this.shadowRoot.querySelector("#shrinkTanda").removeEventListener("click", this.handleShrinkBound);
       this.shadowRoot.querySelector("#toggle main").removeEventListener("click", this.handleToggleBound);
+      this.shadowRoot.querySelector("#changeCortinaButton").removeEventListener("click", this.handleChangeCortinaBound);
+    }
+    collapse() {
+      this.expanded = false;
+      this.render();
     }
     render(firstCall = false) {
       if (!firstCall)
@@ -909,9 +944,13 @@
         cortinaTitle = "Unknown";
         cortinaArtist = "";
       }
-      const cortinaSummary = cortinaTitle.length > 0 ? `<button class="cortinaName">${cortinaTitle}</button>` : "";
+      const cortinaSummary = cortinaTitle.length > 0 ? `<button id="changeCortinaButton" class="cortinaName">${cortinaTitle}</button>` : "";
       this.shadowRoot.innerHTML = `
             <style>
+                * {
+                  color: var(--track-text-color)
+                  
+                }
                 .summary { cursor: pointer; display: grid; grid-template-columns: 40px auto;}
                 .summary header { display: flex; justify-content: center }
                 .summary header span {
@@ -927,7 +966,7 @@
                   width: 100%;
                 }
                 #container article.playing {
-                  border: solid 2px orange;
+                  outline: solid 2px orange;
                   margin: 1rem;
                 }
                 #container article.played {
@@ -935,13 +974,15 @@
                 }
                 #container article.placeHolder {
                   background-color: #d7d6d6;
-                  border: dashed 2px red;
+                  outline: dashed 1px red;
+                  z-index: 99;
+                  position: relative;
                 }
                 #container article {
                     border: solid 2px #ccc;
                     border-radius: 7px;
                     margin-top: 0rem;
-                    margin-bottom: 0rem;
+                    margin-bottom: 1px;
                     padding: 0.2rem;
                 }
                 #actions {
@@ -970,9 +1011,6 @@
                     border: dashed 2px green;
                     margin: 1rem;
                 }
-                // :host-context(tanda-element.target) #actions button {
-                //     display: block;
-                // }
                 #actions button.target {
                     display: none;
                 }
@@ -980,17 +1018,6 @@
                     height: 20px;
                     width: 20px;
                 }
-                // #container article {
-                //     border: dashed 2px #cf8805;
-                //     display: block;
-                //     border-radius: 10px;
-                //     margin: 1rem!important;
-                // }
-                // :host-context(.played) {
-                //     display: block;
-                //     background-color: #777;
-                //     border-radius: 10px;
-                // }
                 .cortinaControls {
                     display: none;
                 }
@@ -1014,14 +1041,7 @@
                 main > section > button {
                     width: 100%;
                     margin-bottom: 0.3rem;
-                }
-                button.cortinaName {
-                    // width: 100px; /* Set the desired width */
-                    // white-space: nowrap;
-                    // overflow: hidden;
-                    // text-overflow: ellipsis;
-                    // direction: rtl;
-                    // text-align: left; /* This makes sure that the text starts from the left when it's in RTL mode */
+                    color: black;
                 }
                 #extensions {
                   display: flex;
@@ -1043,7 +1063,7 @@
                 }
                 #extendTanda {
                   padding: 0px;
-                  line-height: 1.4rem;
+                  line-height: 1.3rem;
                 }
                 #shrinkTanda {
                   padding: 0px;
@@ -1051,6 +1071,7 @@
                 }
             </style>
             <div id="container" class="${this.hasPlayed ? "played" : ""}">
+                <span id="play-time">${this.playingTime ? `${this.playingTime}` : ""}</span>
                 <article class="${isPlaceHolder ? "placeHolder" : ""}">
                     <div id="toggle" class="summary">
                         <header>
@@ -1107,6 +1128,9 @@
   };
   function isValidDropTarget(source, target) {
     console.log("Is valid", source.tagName, target.tagName, source.dataset.style, target.dataset.style);
+    if (target.closest(".results")) {
+      return false;
+    }
     let valid = sameStyle(source.dataset?.style || "", target.dataset?.style || "");
     return target.tagName == "SCRATCH-PAD-ELEMENT" || source !== target && source.tagName == target.tagName && valid;
   }
@@ -1131,7 +1155,6 @@
       if (tanda)
         tanda.render();
     });
-    eventBus.emit("changed-playlist");
   }
   function dragStartHandler(event) {
     const target = event.target;
@@ -1179,12 +1202,13 @@
           event.target.appendChild(swap);
           swapElements(draggingElement, swap);
         } else {
-          console.log("Nearest", draggingElement.closest(".content"));
-          if (draggingElement.closest(".content")) {
-            event.target.appendChild(draggingElement);
+          console.log("Nearest", draggingElement.closest(".results"));
+          if (draggingElement.closest(".results")) {
+            event.target.appendChild(draggingElement.cloneNode(true));
           }
         }
       }
+      eventBus.emit("changed-playlist");
       return;
     }
     console.log("Found drop zone", target, "dragging", draggingElement);
@@ -1192,9 +1216,17 @@
     if (target) {
       if (draggingElement && isValidDropTarget(draggingElement, target)) {
         console.log("drop", target.id);
-        swapElements(draggingElement, target);
+        if (target.closest("#playlistContainer") && draggingElement.closest(".results")) {
+          let targetParent = target.parentElement;
+          targetParent.insertBefore(draggingElement.cloneNode(true), target);
+          const scratchpad = document.querySelector("#scratchPad");
+          scratchpad?.appendChild(target);
+        } else {
+          swapElements(draggingElement, target);
+        }
       }
     }
+    eventBus.emit("changed-playlist");
   }
   function dragEndHandler(event) {
     const target = event.target;
@@ -1212,11 +1244,16 @@
     tandasContent;
     tracksCount;
     tandasCount;
+    dbManager;
+    queryCount = 0;
     constructor() {
       super();
       this.attachShadow({ mode: "open" });
       this.shadowRoot.innerHTML = `
         <style>
+          section {
+            background-color: var(--background-color);
+          }
           .tab-container {
             display: flex;
           }
@@ -1231,7 +1268,7 @@
           .tab.active {
             background-color: orange;
           }
-          .content {
+          .results {
             border: 1px solid #ccc;
             padding: 16px;
           }
@@ -1252,6 +1289,7 @@
             outline: dashed 2px green;
             z-index: 99;
           }
+          
         </style>
         <section>
           <div>
@@ -1273,10 +1311,10 @@
             <div id="tandas-tab" class="tab">Tandas (<span id="tandas-count">0</span>)</div>
           </div>
           <div class="scrollable">
-            <div id="tracks-content" class="content">
+            <div id="tracks-content" class="results ">
               <!-- Content for tracks -->
             </div>
-            <div id="tandas-content" class="content hidden">
+            <div id="tandas-content" class="results hidden">
               <!-- Content for tandas -->
             </div>
           </div>
@@ -1299,6 +1337,9 @@
       this.tandasCount.textContent = "0";
       eventBus.on("queryResults", this.results.bind(this));
     }
+    setDB(dbManager) {
+      this.dbManager = dbManager;
+    }
     focus() {
       this.searchInput.focus();
     }
@@ -1306,18 +1347,44 @@
     handleSearch() {
       const searchData = this.searchInput.value.trim();
       const selectedStyle = this.filterSelect.value;
-      eventBus.emit("query", { searchData, selectedStyle });
+      eventBus.emit("query", { queryNo: ++this.queryCount, search: this, searchData, selectedStyle });
     }
     // Method to handle filter selection
     handleFilter() {
       this.handleSearch();
     }
     // Method to update search results
-    results(resultset) {
+    async results(resultset) {
+      if (resultset.search !== this)
+        return;
+      if (resultset.queryNo !== this.queryCount)
+        return;
       this.tracksCount.textContent = resultset.tracks.length.toString();
       this.tandasCount.textContent = resultset.tandas.length.toString();
       this.tracksContent.innerHTML = resultset.tracks.map((track) => renderTrackDetail(0, track, "track")).join("");
-      this.tandasContent.innerHTML = JSON.stringify(resultset.tandas);
+      let tandasHTML = "";
+      for (let idx = 0; idx < resultset.tandas.length; idx++) {
+        const tanda = resultset.tandas[idx];
+        let html = "";
+        if (tanda.cortina) {
+          let track = await this.dbManager.getDataByName("cortina", tanda.cortina);
+          if (track) {
+            html += renderTrackDetail(idx, track, "cortina");
+          }
+        }
+        const styles = /* @__PURE__ */ new Set();
+        if (tanda.tracks) {
+          for (let trackName of tanda.tracks) {
+            let track = await this.dbManager.getDataByName("track", trackName);
+            styles.add(track.metadata.style);
+            html += renderTrackDetail(idx, track, "track");
+          }
+        }
+        tandasHTML += `<tanda-element data-tanda-id="${idx}" data-style='${styles.size !== 1 ? "unknown" : [...styles][0]}'>
+                          ${html}
+                      </tanda-element>`;
+      }
+      this.tandasContent.innerHTML = tandasHTML;
     }
     // Method to show content based on tab clicked
     showContent(tab) {
@@ -1350,12 +1417,10 @@
       this.draggable = true;
       this.dataset.id = "T-" + String(nextId2++);
       this.render();
-      this.shadowRoot.querySelector("#headphones").addEventListener("click", this.playOnHeadphones.bind(this));
-      this.shadowRoot.querySelector(".actions").addEventListener("click", this.handleTargetButtonClick.bind(this));
-      this.shadowRoot.querySelector(".track").addEventListener("click", this.handleTrackClick.bind(this));
-    }
-    addAction(action) {
-      this.actions.add(action);
+      if (this.dataset.title !== "place holder") {
+        this.shadowRoot.querySelector("#headphones").addEventListener("click", this.playOnHeadphones.bind(this));
+        this.shadowRoot.querySelector(".track").addEventListener("click", this.handleTrackClick.bind(this));
+      }
     }
     stopPlayingOnHeadphones() {
       this.isPlayingOnHeadphones = false;
@@ -1387,18 +1452,6 @@
         this.shadowRoot.querySelector("article")?.classList.remove("playing");
       }
     }
-    handleTargetButtonClick(event) {
-      const targetButton = event.target?.closest("button.target");
-      if (targetButton) {
-        event.stopPropagation();
-        event.preventDefault();
-        const emitEvent = new CustomEvent("clickedTargetTrack", {
-          detail: { actionId: targetButton.id, element: this },
-          bubbles: true
-        });
-        this.dispatchEvent(emitEvent);
-      }
-    }
     handleTrackClick() {
       const trackId = this.dataset.trackId;
       if (trackId) {
@@ -1414,6 +1467,7 @@
         <style>
         * {
             background-color:transparent;
+            color: var(--track-text-color);
         }
         .track {
             padding: 0 0 0 0.4rem;
@@ -1444,9 +1498,7 @@
         }
         article {
           border: solid 2px transparent;
-          display: block;
           border-radius: 5px;
-          margin: 2px;
       }
         article.playing {
             border: solid 2px orange;
@@ -1686,6 +1738,13 @@
       this.shadowRoot?.appendChild(this.container);
       this.render();
       addDragDropHandlers(this);
+      this.addEventListener("drop", () => {
+        console.log("debug drop");
+        const styleSelect = this.shadowRoot.querySelector("select");
+        console.log(styleSelect);
+        if (styleSelect)
+          this.updateStyleOptions(styleSelect);
+      });
     }
     createStyles() {
       const style = document.createElement("style");
@@ -1697,11 +1756,27 @@
           margin: 10px;
         }
         .controls {
-          margin-bottom: 10px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin: 0.2rem 0.2rem 60px 0.2rem;
         }
         .drop-target {
           outline: dashed 2px green;
           z-index: 99;
+        }
+        .controls button img {
+          height: 30px;
+          transition: height 2s ease-in-out;
+        }
+        .bin-target {
+          outline: dashed 3px red;
+          z-index: 99;
+          height: 35px;
+        }
+        button.bin {
+          background-color: transparent;
+          border: none;
         }
         `;
       return style;
@@ -1709,34 +1784,76 @@
     createControls() {
       const controls = document.createElement("div");
       controls.className = "controls";
+      const types = document.createElement("div");
+      controls.appendChild(types);
       let typeMap = {
-        "all": "all",
-        "tracks": "track-element",
-        "cortinas": "cortina-element",
-        "tandas": "tanda-element"
+        All: "all",
+        Tracks: "track-element",
+        Cortinas: "cortina-element",
+        Tandas: "tanda-element"
       };
-      Object.keys(typeMap).forEach((type) => {
+      Object.keys(typeMap).forEach((type, idx) => {
         const label = document.createElement("label");
+        label.appendChild(document.createTextNode(type));
         const radio = document.createElement("input");
+        radio.id = `style-select-radio-${idx}`;
         radio.type = "radio";
         radio.name = "type";
         radio.value = typeMap[type];
         radio.checked = type === "all";
         radio.addEventListener("change", () => this.setFilterType(typeMap[type]));
         label.appendChild(radio);
-        label.appendChild(document.createTextNode(type));
-        controls.appendChild(label);
+        types.appendChild(label);
       });
       const styleSelect = document.createElement("select");
+      styleSelect.name = "style-filter";
       styleSelect.addEventListener("change", () => this.setFilterStyle(styleSelect.value));
       controls.appendChild(styleSelect);
       this.updateStyleOptions(styleSelect);
+      const bin = document.createElement("button");
+      bin.classList.add("bin");
+      const binImage = document.createElement("img");
+      binImage.src = "./icons/bin.png";
+      bin.appendChild(binImage);
+      controls.appendChild(bin);
+      function handleDragOver(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        bin.classList.add("bin-target");
+      }
+      function handleDragLeave(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        bin.classList.remove("bin-target");
+      }
+      function handleDrop(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        console.log("Bin handling drop");
+        const id = event.dataTransfer.getData("text/plain");
+        console.log("ID", id);
+        const element = document.querySelector(`[data-id="${id}"]`);
+        console.log(element);
+        if (element) {
+          element.remove();
+        }
+        bin.classList.remove("bin-target");
+        document.querySelector(".drop-target")?.classList.remove("drop-target");
+        eventBus.emit("changed-playlist");
+      }
+      bin.addEventListener("dragleave", handleDragLeave);
+      bin.addEventListener("dragover", handleDragOver);
+      bin.addEventListener("drop", handleDrop);
+      bin.addEventListener("click", () => {
+        this.innerHTML = "";
+      });
       return controls;
     }
     updateStyleOptions(selectElement) {
-      const styles = Array.from(this.container.children).map((el) => el.dataset.style);
+      const styles = Array.from(this.querySelectorAll("tanda-element, track-element, cortina-element")).map((el) => el.dataset.style);
       const uniqueStyles = Array.from(new Set(styles));
-      selectElement.innerHTML = '<option value="">All styles</option>';
+      console.log("debug styles", styles, uniqueStyles);
+      selectElement.innerHTML = '<option name="all-styles" value="">All styles</option>';
       uniqueStyles.forEach((style) => {
         const option = document.createElement("option");
         option.value = style;
@@ -1770,9 +1887,11 @@
   var TabsContainer = class {
     container;
     tabs;
-    constructor(container, tabs) {
+    dbManager;
+    constructor(container, tabs, dbManager) {
       this.container = container;
       this.tabs = tabs;
+      this.dbManager = dbManager;
       this.render();
     }
     render() {
@@ -1792,6 +1911,8 @@
       }).join("")}
   </div>
 `;
+      const searchComponents = Array.from(document.querySelectorAll("search-element"));
+      searchComponents.forEach((search) => search.setDB(this.dbManager));
       const tabs = Array.from(this.container.querySelectorAll(".tab"));
       const panels = Array.from(this.container.querySelectorAll(".tab-panel"));
       tabs.map((tab, idx) => tab.addEventListener("click", () => {
@@ -1804,6 +1925,30 @@
       }));
     }
   };
+
+  // dist/services/themes.js
+  function switchTheme(theme) {
+    const body = document.body;
+    body.classList.remove("light-theme", "dark-theme");
+    body.classList.add(theme);
+    localStorage.setItem("theme", theme);
+  }
+  function loadTheme() {
+    const savedTheme = localStorage.getItem("theme");
+    if (savedTheme) {
+      switchTheme(savedTheme);
+    } else {
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      if (prefersDark) {
+        switchTheme("dark-theme");
+      } else {
+        switchTheme("light-theme");
+      }
+    }
+  }
+  document.getElementById("light-theme-btn").addEventListener("click", () => switchTheme("light-theme"));
+  document.getElementById("dark-theme-btn").addEventListener("click", () => switchTheme("dark-theme"));
+  window.addEventListener("load", loadTheme);
 
   // dist/services/player.js
   var import_howler_min = __toESM(require_howler_min());
@@ -1921,12 +2066,14 @@
               next.unload = null;
             };
             this.next = next;
-            eventBus.emit("next-track-ready");
+            if (this.options.notify)
+              this.options.notify("next-track-ready");
           }
         } else {
           this.next = null;
         }
       } catch (error) {
+        eventBus.emit("error", error);
         this.next = null;
       }
     }
@@ -1946,18 +2093,20 @@
           autoplay: false,
           ctx: this.options.ctx,
           onplay: () => {
-            eventBus.emit("startingPlaying", {
-              player: this,
-              track,
-              N
-            });
+            if (this.options.notify)
+              this.options.notify("startingPlaying", {
+                player: this,
+                track,
+                N
+              });
           },
           onstop: () => {
-            eventBus.emit("stoppedPlaying", {
-              player: this,
-              track,
-              N
-            });
+            if (this.options.notify)
+              this.options.notify("stoppedPlaying", {
+                player: this,
+                track,
+                N
+              });
           }
         };
         const player = new import_howler_min.Howl(howlerConfig);
@@ -1995,13 +2144,15 @@
       if (!this.next)
         return this.reportProgress("Stopped");
       if (this.current?.track.type == "cortina") {
-        eventBus.emit("tanda");
+        if (this.options.notify)
+          this.options.notify("tanda");
       }
       this.current = this.next;
       this.next = null;
       this.playlistPos = this.current.position;
       if (this.current.track.type == "cortina") {
-        eventBus.emit("cortina");
+        if (this.options.notify)
+          this.options.notify("cortina");
       }
       if (this.current.silence > 0) {
         this.reportProgress("Waiting");
@@ -2043,6 +2194,51 @@
       }
     }
   };
+
+  // dist/components/schedule.element.js
+  var ScheduleElement = class extends HTMLElement {
+    constructor() {
+      super();
+      this.attachShadow({ mode: "open" });
+      const style = document.createElement("style");
+      style.textContent = `
+            .tanda {
+                display: flex;
+                align-items: center;
+                margin-bottom: 10px;
+            }
+            .time {
+                margin-right: 10px;
+                font-weight: bold;
+            }
+        `;
+      this.shadowRoot.appendChild(style);
+    }
+    connectedCallback() {
+      this.render();
+    }
+    render() {
+      const container = document.createElement("div");
+      let currentTime = /* @__PURE__ */ new Date();
+      Array.from(this.children).forEach((tanda, index) => {
+        const tandaWrapper = document.createElement("div");
+        tandaWrapper.classList.add("tanda");
+        const timeElement = document.createElement("div");
+        timeElement.classList.add("time");
+        timeElement.textContent = currentTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        tandaWrapper.appendChild(timeElement);
+        tandaWrapper.appendChild(tanda.cloneNode(true));
+        container.appendChild(tandaWrapper);
+        const clone = tandaWrapper.querySelector("tanda-element");
+        const duration = parseInt(clone.dataset.duration || "0", 10);
+        console.log(JSON.stringify(clone), duration);
+        currentTime.setMinutes(currentTime.getMinutes() + duration);
+      });
+      this.shadowRoot.innerHTML = "";
+      this.shadowRoot.appendChild(container);
+    }
+  };
+  customElements.define("schedule-element", ScheduleElement);
 
   // dist/services/playlist-service.js
   var PlaylistService = class {
@@ -2106,11 +2302,13 @@
           let track = await this.getDetail("cortina", tanda.cortina);
           return renderTrackDetail(idx, track, "cortina");
         })() : "";
+        const styles = /* @__PURE__ */ new Set();
         const trackElements = await Promise.all(tanda.tracks.map(async (trackName) => {
           let track = await this.getDetail("track", trackName);
+          styles.add(track.metadata.style);
           return renderTrackDetail(idx, track, "track");
         }));
-        return `<tanda-element data-tanda-id="${idx}" data-style='unknown'>
+        return `<tanda-element data-tanda-id="${idx}" data-style='${styles.size != 1 ? "unknown" : [...styles][0]}'>
                         ${await cortinaElement}
                         ${trackElements.join("")}
                     </tanda-element>`;
@@ -2280,7 +2478,10 @@
       });
     }
     async search(query) {
-      const queryTokens = this.tokenize(convert(query.toLowerCase()));
+      const queryTokens = this.tokenize(convert(query.toLowerCase())).filter((x) => x);
+      console.log("Search tokens", queryTokens);
+      if (!queryTokens.length)
+        return [];
       const queryTrigrams = /* @__PURE__ */ new Set();
       queryTokens.forEach((token) => {
         this.generateTrigrams("__" + token + "__").forEach((trigram) => {
@@ -2573,12 +2774,30 @@
       throw error;
     }
   }
+  async function checkDirectoryHandleAccess(directoryHandle) {
+    if (!directoryHandle) {
+      console.log("No directory handle stored.");
+      return false;
+    }
+    try {
+      const entries = directoryHandle.entries();
+      for await (const [name, handle] of entries) {
+        console.log(`Read access verified for entry: ${name}`);
+        break;
+      }
+      return true;
+    } catch (error) {
+      console.log("Access verification failed.", error);
+      return false;
+    }
+  }
   async function openMusicFolder(dbManager, config) {
     try {
       const directoryHandleOrUndefined = config.musicFolder;
       if (directoryHandleOrUndefined) {
         console.log(`Retrieved directory handle "${directoryHandleOrUndefined.name}" from IndexedDB.`);
-        return;
+        if (await checkDirectoryHandleAccess(directoryHandleOrUndefined))
+          return;
       }
       const directoryHandle = await selectFolder();
       config.musicFolder = directoryHandle;
@@ -2759,7 +2978,7 @@
       for (let tanda of tandas) {
         tanda.tracks = tanda.tracks.map((track) => "/" + track);
         if (tanda.cortina && tanda.cortina[0]) {
-          tanda.cortina = await dbManager.getDataByName("cortina", tanda.cortina.map((cortina) => "/" + cortina.track)[0]);
+          tanda.cortina = tanda.cortina.map((cortina) => "/" + cortina.track)[0];
         } else {
           tanda.cortina = void 0;
         }
@@ -2777,6 +2996,84 @@
       }
     }
   }
+
+  // dist/services/cortina-service.js
+  var CortinaPicker = class {
+    dbManager;
+    cortinaWindow = document.querySelector("#cortinaPicker");
+    cortinaList = document.querySelector("#cortinaList");
+    folderSelect = document.querySelector("#folderSelect");
+    cortinas = [];
+    folders;
+    lastSelection;
+    targetTanda;
+    constructor(dbManager) {
+      this.dbManager = dbManager;
+      this.lastSelection = this.loadPreviousSelection();
+      this.cortinaList.addEventListener("click", (event) => {
+        console.log("selected cortina", event.target);
+        this.cortinaWindow?.classList.add("hidden");
+        const tanda = this.targetTanda;
+        const cortina = tanda.querySelector("cortina-element");
+        if (cortina) {
+          tanda.replaceChild(event.target.cloneNode(true), cortina);
+        }
+      });
+      document.addEventListener("changeCortina", (event) => {
+        console.log("Request to change cortina", event.detail);
+        this.targetTanda = event.detail;
+        this.cortinaWindow?.classList.remove("hidden");
+        this.chooseCortina();
+      });
+      this.folderSelect.addEventListener("change", () => {
+        const selectedFolder = this.folderSelect.value;
+        this.lastSelection = selectedFolder;
+        this.saveSelection(selectedFolder);
+        this.renderList();
+      });
+      this.renderList();
+    }
+    loadPreviousSelection() {
+      return localStorage.getItem("selectedFolder");
+    }
+    saveSelection(folder) {
+      localStorage.setItem("selectedFolder", folder);
+    }
+    renderList() {
+      const cortinas = this.folders?.get(this.lastSelection) || [];
+      this.cortinaList.innerHTML = "";
+      let html = "";
+      cortinas.forEach((cortina, index) => {
+        html += renderTrackDetail(index, cortina, "cortina");
+      });
+      this.cortinaList.innerHTML = html;
+    }
+    async load() {
+      this.cortinas = await this.dbManager.processEntriesInBatches("cortina", (cortina) => {
+        return true;
+      });
+      this.folders = this.parseFolders(this.cortinas);
+      this.folderSelect.innerHTML = "";
+      this.folderSelect.appendChild(new Option("Select a folder", ""));
+      this.folders.forEach((_, folder) => {
+        this.folderSelect.appendChild(new Option(folder, folder));
+      });
+    }
+    parseFolders(cortinas) {
+      const folderMap = /* @__PURE__ */ new Map();
+      cortinas.forEach((cortina) => {
+        const path = cortina.name;
+        const folder = path.split("/").slice(2, path.split("/").length - 1).join("-");
+        if (!folderMap.has(folder)) {
+          folderMap.set(folder, []);
+        }
+        folderMap.get(folder)?.push(cortina);
+      });
+      return folderMap;
+    }
+    async chooseCortina() {
+    }
+  };
 
   // dist/app.js
   var SYSTEM = {
@@ -2823,24 +3120,25 @@
   async function processQuery(dbManager, query, selectedStyle) {
     console.log("Search", query, selectedStyle);
     let testResult = await dbManager.search(query);
+    console.log("Raw results", testResult);
+    if (testResult.length == 0) {
+      return { queryNo: 0, tracks: [], tandas: [] };
+    }
     let tracks = await dbManager.processEntriesInBatches("track", (track, idx) => true);
     let trackMap = /* @__PURE__ */ new Map();
     tracks.forEach((track) => {
       trackMap.set(convert(track.name).toLowerCase(), track);
     });
-    console.log("Track map ", trackMap);
     let maxScore = 0;
     testResult.forEach((result) => {
       maxScore = maxScore < result.score ? result.score : maxScore;
     });
     let minScore = maxScore * 0.6;
-    console.log("Score threshold", minScore);
     let trackResults = [];
     testResult.forEach((result) => {
       if (result.score >= minScore) {
         let prefix = result.id.split("-");
         let key = convert(result.id.substring([prefix[0], prefix[1]].join("-").length + 1)).toLowerCase();
-        console.log("Fetching key", key, trackMap.get(key));
         let track = trackMap.get(key);
         if (track) {
           if (selectedStyle == "all" || track.metadata?.style?.toLowerCase() == selectedStyle)
@@ -2848,7 +3146,29 @@
         }
       }
     });
-    return { tracks: trackResults.filter((x) => x), tandas: [] };
+    let tandaResults = /* @__PURE__ */ new Set();
+    let allTandas = await dbManager.processEntriesInBatches("tanda", (tanda) => {
+      return true;
+    });
+    let tandaMap = /* @__PURE__ */ new Map();
+    allTandas.forEach((tanda) => {
+      tanda.tracks.forEach((track) => {
+        let key = convert(track).toLowerCase();
+        if (!tandaMap.has(key)) {
+          tandaMap.set(key, [tanda]);
+        } else {
+          let list = tandaMap.get(key);
+          list.push(tanda);
+        }
+      });
+    });
+    trackResults.forEach((track) => {
+      let key = convert(track.name).toLowerCase();
+      if (tandaMap.has(key)) {
+        [...tandaMap.get(key)].map((item) => tandaResults.add(item));
+      }
+    });
+    return { queryNo: 0, tracks: trackResults.filter((x) => x), tandas: [...tandaResults] };
   }
   async function populateOutputDeviceOptions(config) {
     const outputDevices = await enumerateOutputDevices();
@@ -2873,10 +3193,12 @@
       throw error;
     }
     eventBus.on("error", (error) => {
-      console.error(error);
+      alert(error);
     });
     const dbManager = await DatabaseManager();
     let config = await InitialiseConfig(dbManager);
+    const cortinaPicker = new CortinaPicker(dbManager);
+    await cortinaPicker.load();
     let quickClickHandlers = {
       askUserPermission: async () => {
         await openMusicFolder(dbManager, config).then(() => {
@@ -2887,11 +3209,13 @@
           alert(error);
         });
       },
-      rescanButton: () => {
-        scanFileSystem(config, dbManager, false);
+      rescanButton: async () => {
+        await scanFileSystem(config, dbManager, false);
+        await cortinaPicker.load();
       },
-      rescanAnalyzeButton: () => {
-        scanFileSystem(config, dbManager, true);
+      rescanAnalyzeButton: async () => {
+        await scanFileSystem(config, dbManager, true);
+        await cortinaPicker.load();
       },
       settingsPanelButton: () => {
         getDomElement("#settingsPanel").classList.remove("hiddenPanel");
@@ -2910,6 +3234,7 @@
       },
       loadLibraryButton: async () => {
         await loadLibraryIntoDB(config, dbManager);
+        await cortinaPicker.load();
       },
       refreshAudioLists: () => {
         populateOutputDeviceOptions(config);
@@ -2923,19 +3248,28 @@
       stopPlayAll: () => {
         eventBus.emit("stopAll");
       },
+      cortinaPickerButtonClose: () => {
+        getDomElement("#cortinaPicker").classList.add("hidden");
+      },
       createTandaButton: () => {
         const scratchPad = getDomElement("#scratchPad");
         const newTanda = document.createElement("tanda-element");
-        newTanda.setAttribute("style", "undefined");
+        newTanda.dataset.style = "undefined";
         scratchPad.appendChild(newTanda);
+      },
+      collapsePlaylist: () => {
+        const allTandas = Array.from(document.querySelectorAll("tanda-element"));
+        allTandas.forEach((tanda) => {
+          tanda.collapse();
+        });
       },
       extendPlaylist: () => {
         const container = getDomElement("#playlistContainer");
         const sequence = "3T 3T 3W 3T 3T 3M";
         const styleMap = {
-          "T": "Tango",
-          "W": "Waltz",
-          "M": "Milonga"
+          T: "Tango",
+          W: "Waltz",
+          M: "Milonga"
         };
         for (let t of sequence.split(" ")) {
           let n = parseInt(t);
@@ -2969,10 +3303,10 @@
       eventBus.emit("config-change");
     });
     const tabs = ["Search", "Favourites", "Recent"];
-    const tabsContainer = new TabsContainer(getDomElement("#tabsContainer"), tabs);
+    const tabsContainer = new TabsContainer(getDomElement("#tabsContainer"), tabs, dbManager);
     eventBus.on("query", async (payload) => {
       const results = await processQuery(dbManager, payload.searchData, payload.selectedStyle);
-      eventBus.emit("queryResults", results);
+      eventBus.emit("queryResults", { ...results, search: payload.search, queryNo: payload.queryNo });
     });
     await requestAudioPermission();
     populateOutputDeviceOptions(config);
@@ -2998,6 +3332,53 @@
     const playlistContainer = getDomElement("#playlistContainer");
     const playlistService = new PlaylistService(playlistContainer, async (type, name) => {
       return await dbManager.getDataByName(type, name);
+    });
+    scheduleEventEvery(1, () => {
+      const tandas = Array.from(playlistContainer.querySelectorAll("tanda-element"));
+      const playingTanda = playlistContainer.querySelector("tanda-element.playing");
+      if (!playingTanda) {
+        tandas.forEach((tanda) => {
+          tanda.scheduledPlayingTime("");
+        });
+      }
+      let startTime = /* @__PURE__ */ new Date();
+      const timings = {
+        preCortina: 3,
+        postCortina: 3,
+        interTrack: 2
+      };
+      let donePlayingTanda = false;
+      let foundPlayingTrack = false;
+      tandas.forEach((tanda) => {
+        donePlayingTanda ||= tanda == playingTanda;
+        if (donePlayingTanda) {
+          tanda.scheduledPlayingTime(startTime.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit"
+          }));
+          const hasCortina = tanda.querySelector("cortina-element");
+          const tracks2 = Array.from(tanda.querySelectorAll("track-element"));
+          let duration = 0;
+          if (hasCortina) {
+            duration += timings.preCortina + timings.postCortina;
+          } else {
+            duration += timings.interTrack;
+          }
+          duration += tracks2.length * timings.interTrack;
+          duration += tracks2.reduce((total, track) => {
+            foundPlayingTrack ||= track.classList.contains("playing") || (hasCortina?.classList.contains("playing") || false);
+            if (foundPlayingTrack) {
+              const duration2 = timeStringToSeconds(track.dataset.duration || "0:0");
+              return total + (typeof duration2 == "number" ? duration2 : 0);
+            } else {
+              return total;
+            }
+          }, 0);
+          startTime.setSeconds(startTime.getSeconds() + duration);
+        } else {
+          tanda.scheduledPlayingTime("");
+        }
+      });
     });
     playlistContainer.addEventListener("clickedTrack", async (event) => {
       try {
@@ -3072,7 +3453,8 @@
           playlistService.playingCortina(false);
         }
         headerField.textContent = data.display;
-      }
+      },
+      notify: eventBus.emit.bind(eventBus)
     };
     let headphonePlaylist = [];
     const headphonesPlayerConfig = {
@@ -3128,7 +3510,7 @@
       if (!detail.playing) {
         headphonesOutputPlayer.stop();
       } else {
-        const table = track.dataset.title.split(/\/|\\/g)[1] == "music" ? "track" : "cortina";
+        const table = track.dataset.type;
         headphonePlaylist[0] = await dbManager.getDataById(table, parseInt(track.dataset.trackId));
         headphonesOutputPlayer.stop();
         await headphonesOutputPlayer.updatePosition(-1);
@@ -3140,7 +3522,6 @@
       const N = playlistService.getNowPlayingN();
       console.log("Changed playlist - now playing", N, speakerOutputPlayer);
       await speakerOutputPlayer.updatePosition(N);
-      await speakerOutputPlayer.loadNext();
     });
     const tracks = await dbManager.processEntriesInBatches("track", (record) => true);
     const cortinas = await dbManager.processEntriesInBatches("cortina", (record) => true);

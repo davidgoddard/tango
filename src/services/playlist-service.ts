@@ -4,7 +4,7 @@ import { allTracks, getDomElement, renderTrackDetail } from "./utils";
 import { TrackElement } from "../components/track.element";
 import { TandaElement } from "../components/tanda.element";
 import { addDragDropHandlers } from "./drag-drop.service";
-
+import "../components/schedule.element"
 type PlayDetail = {
   N: number;
   track: Track;
@@ -112,14 +112,16 @@ export class PlaylistService {
             })()
             : "";
 
+          const styles = new Set();
           const trackElements = await Promise.all(
             tanda.tracks.map(async (trackName: string) => {
               let track = await this.getDetail("track", trackName);
+              styles.add(track.metadata.style)
               return renderTrackDetail(idx, track, "track");
             })
           );
 
-          return `<tanda-element data-tanda-id="${idx}" data-style='unknown'>
+          return `<tanda-element data-tanda-id="${idx}" data-style='${styles.size != 1 ? 'unknown' : [...styles][0]}'>
                         ${await cortinaElement}
                         ${trackElements.join("")}
                     </tanda-element>`;

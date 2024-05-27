@@ -12,6 +12,7 @@ export interface PlayerOptions {
   useSoundLevelling: boolean;
   fetchNext: (N: number) => Promise<{ track?: Track; silence: number }>;
   progress?: (data: ProgressData) => void;
+  notify?: (event: string, payload?: any) => void;
 }
 
 export interface ProgressData {
@@ -202,12 +203,13 @@ export class Player {
           };
 
           this.next = next;
-          eventBus.emit("next-track-ready");
+          if ( this.options.notify ) this.options.notify("next-track-ready");
         }
       } else {
         this.next = null;
       }
     } catch (error) {
+      eventBus.emit('error', error)
       this.next = null;
     }
   }
@@ -231,14 +233,14 @@ export class Player {
         autoplay: false,
         ctx: this.options.ctx,
         onplay: () => {
-          eventBus.emit("startingPlaying", {
+          if ( this.options.notify ) this.options.notify("startingPlaying", {
             player: this,
             track,
             N,
           });
         },
         onstop: () => {
-          eventBus.emit("stoppedPlaying", {
+          if ( this.options.notify ) this.options.notify("stoppedPlaying", {
             player: this,
             track,
             N,
@@ -291,13 +293,13 @@ export class Player {
   startNext() {
     if (!this.next) return this.reportProgress("Stopped");
     if (this.current?.track.type == "cortina") {
-      eventBus.emit("tanda");
+      if ( this.options.notify ) this.options.notify("tanda");
     }
     this.current = this.next;
     this.next = null;
     this.playlistPos = this.current.position;
     if (this.current.track.type == "cortina") {
-      eventBus.emit("cortina");
+      if ( this.options.notify ) this.options.notify("cortina");
     }
     if (this.current.silence > 0) {
       this.reportProgress("Waiting");

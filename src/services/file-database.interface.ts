@@ -222,12 +222,9 @@ export async function loadLibraryIntoDB(
     for (let tanda of tandas) {
       tanda.tracks = tanda.tracks.map((track: string) => "/" + track);
       if (tanda.cortina && tanda.cortina[0]) {
-        tanda.cortina = await dbManager.getDataByName(
-          "cortina",
-          tanda.cortina.map(
-            (cortina: { track: string }) => "/" + cortina.track
-          )[0]
-        );
+        tanda.cortina = tanda.cortina.map(
+          (cortina: { track: string }) => "/" + cortina.track
+        )[0]
       } else {
         tanda.cortina = undefined;
       }

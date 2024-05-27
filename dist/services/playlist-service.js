@@ -1,6 +1,7 @@
 import { eventBus } from "../events/event-bus";
 import { allTracks, getDomElement, renderTrackDetail } from "./utils";
 import { addDragDropHandlers } from "./drag-drop.service";
+import "../components/schedule.element";
 export class PlaylistService {
     container;
     getDetail;
@@ -72,11 +73,13 @@ export class PlaylistService {
                     return renderTrackDetail(idx, track, "cortina");
                 })()
                 : "";
+            const styles = new Set();
             const trackElements = await Promise.all(tanda.tracks.map(async (trackName) => {
                 let track = await this.getDetail("track", trackName);
+                styles.add(track.metadata.style);
                 return renderTrackDetail(idx, track, "track");
             }));
-            return `<tanda-element data-tanda-id="${idx}" data-style='unknown'>
+            return `<tanda-element data-tanda-id="${idx}" data-style='${styles.size != 1 ? 'unknown' : [...styles][0]}'>
                         ${await cortinaElement}
                         ${trackElements.join("")}
                     </tanda-element>`;

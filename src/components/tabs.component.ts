@@ -1,5 +1,8 @@
+import { IndexedDBManager } from "../services/database";
+import { SearchElement } from "./search.element";
+
 export class TabsContainer {
-  constructor(private container: HTMLElement, private tabs: string[]) {
+  constructor(private container: HTMLElement, private tabs: string[], private dbManager: IndexedDBManager) {
     this.render();
   }
 
@@ -22,6 +25,11 @@ export class TabsContainer {
     }).join('')}
   </div>
 `;
+
+    // Give each search its own database access
+
+    const searchComponents = Array.from(document.querySelectorAll('search-element')) as SearchElement[];
+    searchComponents.forEach((search)=>search.setDB(this.dbManager))
 
     // Now add clicks to tabs to select
     const tabs = Array.from(this.container.querySelectorAll('.tab')) as HTMLElement[];

@@ -25,6 +25,8 @@
         <button class="active" id="settingsPanelButton" aria-label="Open menu">⚙️</button>
         <h1>Tanda Player Lite</h1>
         <label>View: <select id="modeSelector"></select></label>
+        <button class="active" id="light-theme-btn" aria-label="Choose light theme"><img src="./icons/sun.png"></button>
+        <button class="active" id="dark-theme-btn" aria-label="Choose dark theme"><img src="./icons/moon.png"></button>
     </header>
 
     <div id="iframeContainer"></div>
@@ -125,6 +127,7 @@
                     </section>
                     <section>
                         <button id="extendPlaylist" class="active">Extend</button>
+                        <button id="collapsePlaylist" class="active">Summary</button>
                         <p>Show times:
                             <label>Relative: <input type="radio" name="timingBase" value="relative">
                                 Real: <input type="radio" name="timingBase" value="realtime" checked="checked"></label>
@@ -192,6 +195,18 @@
             <p>Tanda Player needs your permission to read your music files folder for all files. Please click 'Allow' to
                 continue.</p>
             <button class="active" id="askUserPermission">Allow</button>
+        </div>
+    </div>
+
+
+    <div id="cortinaPicker" class="hidden">
+        <div class="cortina-content">
+            <header>
+                <h2>Cortina Selector</h2>
+                <button class="active" id="cortinaPickerButtonClose" aria-label="Close Settings">&times;</button>
+            </header>
+            <label>Choose folder/collection: <select id="folderSelect"></select></label>
+            <div id="cortinaList"></div>
         </div>
     </div>
 

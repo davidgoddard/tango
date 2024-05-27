@@ -202,7 +202,9 @@ export class IndexedDBManager {
   }
 
   public async search(query: string): Promise<{ id: string; score: number }[]> {
-    const queryTokens = this.tokenize(convert(query.toLowerCase()));
+    const queryTokens = this.tokenize(convert(query.toLowerCase())).filter(x => x);
+    console.log('Search tokens', queryTokens)
+    if ( !queryTokens.length ) return []
     const queryTrigrams = new Set<string>();
 
     queryTokens.forEach((token) => {
