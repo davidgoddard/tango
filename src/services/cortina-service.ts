@@ -1,5 +1,6 @@
 import { TandaElement } from "../components/tanda.element";
 import { Tanda, Track } from "../data-types";
+import { eventBus } from "../events/event-bus";
 import { IndexedDBManager } from "./database";
 import { renderTrackDetail } from "./utils";
 
@@ -24,6 +25,8 @@ export class CortinaPicker {
       const cortina = tanda!.querySelector('cortina-element');
       if ( cortina ){
         tanda!.replaceChild(event.target.cloneNode(true), cortina)
+        tanda!.render();
+        eventBus.emit('changed-playlist')
       }
     });
 

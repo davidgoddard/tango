@@ -879,10 +879,12 @@
         this.classList.add("playing");
         this.draggable = false;
         this.shadowRoot.querySelector("#container article")?.classList.add("playing");
+        this.render();
       } else {
         this.classList.remove("playing");
         this.draggable = true;
         this.shadowRoot.querySelector("#container article")?.classList.remove("playing");
+        this.render();
       }
     }
     setPlayed(state) {
@@ -970,12 +972,13 @@
                   margin: 1rem;
                 }
                 #container article.played {
-                  background-color: grey;
+                  background-color: var(--played-tanda-background);
+                  color: var(--played-tanda-foreground);
                 }
                 #container article.placeHolder {
-                  background-color: #d7d6d6;
+                  background-color: var(--placeholder-background);
                   outline: dashed 1px red;
-                  z-index: 99;
+                  z-index: 2;
                   position: relative;
                 }
                 #container article {
@@ -1055,8 +1058,8 @@
                   font-size: 1rem;
                   border-radius: 50%;
                   border: transparent;
-                  background-color: blue;
-                  color: white;
+                  background-color: var(--button-background);
+                  color: var(--text-color);
                   font-weight: bolder;
                   height: 20px;
                   width: 20px;
@@ -1085,13 +1088,13 @@
                                 <section id="actions"></section>
                             </section>
 
-                            <span></span>${summary}   
+                            <span>${summary}</span>   
                         </main>
                     </div>
-                    <div class="details ${this.expanded ? "expanded" : ""}">   
+                    <div class="details ${this.expanded || this.classList.contains("playing") ? "expanded" : ""}">   
                         <slot></slot>                 
                     </div>
-                    <section id="extensions" class="${!this.expanded ? "hidden" : ""}">
+                    <section id="extensions" class="${!(this.expanded || this.classList.contains("playing")) ? "hidden" : ""}">
                       <button id="extendTanda">+</button>
                       <button id="shrinkTanda">-</button>
                     </section>
@@ -1108,11 +1111,9 @@
       if (this.expanded) {
         details.classList.add("expanded");
         extensions.classList.remove("hidden");
-        span.textContent = "\u25BA";
       } else {
         details.classList.remove("expanded");
         extensions.classList.add("hidden");
-        span.textContent = "";
       }
     }
   };
@@ -1267,7 +1268,7 @@
             border-bottom: none;
           }
           .tab.active {
-            background-color: orange;
+            background-color: var(--tab-active);
           }
           .results {
             border: 1px solid #ccc;
@@ -1503,10 +1504,10 @@
       }
         article.playing {
             border: solid 2px orange;
-            background-color: #ffe000a6 !important;
+            background-color: #f9ede191 !important;
         }
         :host-context(track-element:nth-child(2n)) article{
-            background-color: #ffffffa6;
+            background-color: #cececea6;
         }
         :host-context(track-element:nth-child(2n+1)) article{
             background-color: #f9ede1a6;
@@ -1544,6 +1545,9 @@
         .notes {
           color: lightgray;
         }
+        #track-title {
+          font-size: 1.1rem;
+        }
     </style>
     <article class="track ${this.isPlaying ? "playing" : ""}">
         <section class="actions">
@@ -1557,18 +1561,20 @@
         ${this.dataset.title !== "place holder" ? `<button id="headphones" class="${this.isPlayingOnHeadphones ? "playing" : ""}">
             <img src="./icons/headphones.png" alt="Listen on headphones">
         </button>` : "<span></span>"}
-        <h2>${this.dataset.tandaId ? this.dataset.tandaId : ""} ${this.tagName === "CORTINA-ELEMENT" ? "(Cortina) " : ""} ${this.dataset.title}</h2>
+        <h2>
+        <!--${this.dataset.tandaId ? this.dataset.tandaId : ""}-->
+        ${this.tagName === "CORTINA-ELEMENT" ? "(Cortina) " : ""} <span contenteditable="true" id="track-title">${this.dataset.title}</span></h2>
             <div id="floated">
-              ${!/undefined|null/.test(this.dataset.bpm) ? `<span>BPM: <span>${this.dataset.bpm}</span></span>` : ""}
-              ${!/undefined|null/.test(this.dataset.year) ? `<span>Year: ${this.dataset.year}</span></span>` : ""}
+              ${!/undefined|null/.test(this.dataset.bpm) ? `<span>BPM: <span contenteditable="true">${this.dataset.bpm}</span></span>` : ""}
+              ${!/undefined|null/.test(this.dataset.year) ? `<span>Year: <span contenteditable="true">${this.dataset.year}</span></span>` : ""}
               <span>Duration: <span class='duration'>${this.dataset.duration}</span></span>                
             </div>
         </header>
         <main>
             <p>                
-                ${!(this.dataset.style == "undefined") ? `<span><span class='style'>${this.dataset.style}</span></span>` : ""}
-                <span><span class='artist'>${this.dataset.artist}</span></span>
-                ${!/undefined|null/.test(this.dataset.notes) ? `<span><span>${this.dataset.notes}</span></span>` : ""}
+                ${!(this.dataset.style == "undefined") ? `<span><span  contenteditable="true" class='style'>${this.dataset.style}</span></span>` : ""}
+                <span><span  contenteditable="true" class='artist'>${this.dataset.artist}</span></span>
+                ${!/undefined|null/.test(this.dataset.notes) ? `<span><span contenteditable="true">${this.dataset.notes}</span></span>` : ""}
                 </p>
         </main>
     </article>
@@ -1761,23 +1767,32 @@
           justify-content: space-between;
           align-items: center;
           margin: 0.2rem 0.2rem 60px 0.2rem;
+          padding: 3px;
         }
         .drop-target {
           outline: dashed 2px green;
           z-index: 99;
         }
         .controls button img {
-          height: 30px;
-          transition: height 2s ease-in-out;
+          height: 32px;
+          width: 32px;
         }
         .bin-target {
           outline: dashed 3px red;
           z-index: 99;
-          height: 35px;
         }
         button.bin {
           background-color: transparent;
           border: none;
+          border: none;
+          color: var(--header-text-color);
+          cursor: pointer;
+          justify-self: flex-start;
+          flex-grow: 0;
+          margin-right: 1rem;
+          border-radius: 50%;
+          background-color: var(--button-background);
+          padding: 0.5rem;
         }
         `;
       return style;
@@ -2266,11 +2281,9 @@
     }
     playingCortina(state) {
       if (state) {
-        getDomElement("#playAll").classList.add("active");
-        getDomElement("#stopPlayAll").classList.add("active");
+        getDomElement(".cortina-grouped-items").classList.add("active");
       } else {
-        getDomElement("#playAll").classList.remove("active");
-        getDomElement("#stopPlayAll").classList.remove("active");
+        getDomElement(".cortina-grouped-items").classList.remove("active");
       }
     }
     // Detail contains N - nth track in playlist
@@ -2971,28 +2984,65 @@
       if (libraryFileHandles.tandas) {
         tandas = await getJSON(await libraryFileHandles.tandas.getFile());
         console.log("tandas", tandas);
+        for (let tanda of tandas) {
+          tanda.tracks = tanda.tracks.map((track) => "/" + track);
+          if (tanda.cortina && tanda.cortina[0]) {
+            tanda.cortina = tanda.cortina.map((cortina) => "/" + cortina.track)[0];
+          } else {
+            tanda.cortina = void 0;
+          }
+          try {
+            const existing = await dbManager.getDataById("tanda", tanda.id);
+            if (!existing) {
+              await dbManager.addData("tanda", tanda);
+            } else {
+              await dbManager.updateData("tanda", tanda.id, tanda);
+            }
+          } catch (error) {
+            delete tanda.id;
+            await dbManager.addData("tanda", tanda);
+          }
+        }
       }
       if (libraryFileHandles.playlists) {
-        playlists = await getJSON(await libraryFileHandles.playlists.getFile());
-        console.log("playlists", playlists);
-      }
-      for (let tanda of tandas) {
-        tanda.tracks = tanda.tracks.map((track) => "/" + track);
-        if (tanda.cortina && tanda.cortina[0]) {
-          tanda.cortina = tanda.cortina.map((cortina) => "/" + cortina.track)[0];
-        } else {
-          tanda.cortina = void 0;
-        }
-        try {
-          const existing = await dbManager.getDataById("tanda", tanda.id);
-          if (!existing) {
-            await dbManager.addData("tanda", tanda);
-          } else {
-            await dbManager.updateData("tanda", tanda.id, tanda);
+        const originalPlaylists = await getJSON(await libraryFileHandles.playlists.getFile());
+        console.log("playlists", originalPlaylists);
+        for (let playlist of originalPlaylists) {
+          console.log(playlist);
+          for (let tanda of playlist.tandas) {
+            tanda.tracks = tanda.tracks.map((track) => "/" + track);
+            if (tanda.cortina && tanda.cortina[0]) {
+              tanda.cortina = tanda.cortina.map((cortina) => "/" + cortina.track)[0];
+            } else {
+              tanda.cortina = void 0;
+            }
           }
-        } catch (error) {
-          delete tanda.id;
-          await dbManager.addData("tanda", tanda);
+          let newPlaylist = {
+            id: playlist.id,
+            type: "playlist",
+            name: playlist.name,
+            lastPlayed: "",
+            created: playlist.createdDate,
+            pattern: playlist.pattern,
+            trackSpacing: playlist.trackSpacing,
+            preCortinaSpacing: playlist.preCortinaSpacing,
+            postCortinaSpacing: playlist.postCortinaSpacing,
+            cortinaFolder: playlist.useCortina,
+            startTime: playlist.start,
+            endTime: playlist.endTime,
+            tandas: playlist.tandas
+          };
+          try {
+            const existing = await dbManager.getDataByName("playlist", newPlaylist.name);
+            if (!existing || !newPlaylist.id) {
+              await dbManager.addData("playlist", newPlaylist);
+            } else {
+              await dbManager.updateData("playlist", newPlaylist.id, newPlaylist);
+            }
+          } catch (error) {
+            delete newPlaylist.id;
+            await dbManager.addData("playlist", newPlaylist);
+          }
         }
       }
     }
@@ -3018,6 +3068,8 @@
         const cortina = tanda.querySelector("cortina-element");
         if (cortina) {
           tanda.replaceChild(event.target.cloneNode(true), cortina);
+          tanda.render();
+          eventBus.emit("changed-playlist");
         }
       });
       document.addEventListener("changeCortina", (event) => {
@@ -3169,7 +3221,11 @@
         [...tandaMap.get(key)].map((item) => tandaResults.add(item));
       }
     });
-    return { queryNo: 0, tracks: trackResults.filter((x) => x), tandas: [...tandaResults] };
+    return {
+      queryNo: 0,
+      tracks: trackResults.filter((x) => x),
+      tandas: [...tandaResults]
+    };
   }
   async function populateOutputDeviceOptions(config) {
     const outputDevices = await enumerateOutputDevices();
@@ -3224,7 +3280,7 @@
       settingsPanelButtonClose: () => {
         getDomElement("#settingsPanel").classList.add("hiddenPanel");
       },
-      ".playlistSettingsPanelOpenButton": () => {
+      playlistSettingsPanelOpenButton: () => {
         getDomElement(".playlist-settings-panel").classList.remove("hiddenPanel");
       },
       playlistSettingsPanelCloseButton: () => {
@@ -3295,6 +3351,17 @@
     for (const key of Object.keys(quickClickHandlers)) {
       getDomElement((key.charAt(0) != "." ? "#" : "") + key).addEventListener("click", quickClickHandlers[key]);
     }
+    Array.from(document.querySelectorAll("button")).forEach((button) => {
+      button.addEventListener("mousedown", () => {
+        button.style.backgroundColor = "var(--button-clicked)";
+      });
+      button.addEventListener("mouseup", () => {
+        button.style.backgroundColor = "var(--button-background)";
+      });
+      button.addEventListener("mouseleave", () => {
+        button.style.backgroundColor = "var(--button-background)";
+      });
+    });
     await new Promise((resolve) => {
       eventBus.once("UserGrantedPermission", resolve);
     });
@@ -3303,11 +3370,15 @@
       config.useSoundLevelling = useSoundLevelling.checked;
       eventBus.emit("config-change");
     });
-    const tabs = ["Search", "Favourites", "Recent"];
+    const tabs = ["Search", "Favourites", "Recent", "Non-overlapping"];
     const tabsContainer = new TabsContainer(getDomElement("#tabsContainer"), tabs, dbManager);
     eventBus.on("query", async (payload) => {
       const results = await processQuery(dbManager, payload.searchData, payload.selectedStyle);
-      eventBus.emit("queryResults", { ...results, search: payload.search, queryNo: payload.queryNo });
+      eventBus.emit("queryResults", {
+        ...results,
+        search: payload.search,
+        queryNo: payload.queryNo
+      });
     });
     await requestAudioPermission();
     populateOutputDeviceOptions(config);
@@ -3353,21 +3424,31 @@
       tandas.forEach((tanda) => {
         donePlayingTanda ||= tanda == playingTanda;
         if (donePlayingTanda) {
+          let extra = "";
+          if (tanda == playingTanda) {
+            let allTracks2 = Array.from(tanda.querySelectorAll("track-element"));
+            if (allTracks2) {
+              let playing = tanda.querySelector("track-element.playing");
+              if (playing) {
+                extra = ` ${String(allTracks2.indexOf(playing) + 1)}/${String(allTracks2.length)}`;
+              }
+            }
+          }
           tanda.scheduledPlayingTime(startTime.toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit"
-          }));
+          }) + extra);
           const hasCortina = tanda.querySelector("cortina-element");
-          const tracks2 = Array.from(tanda.querySelectorAll("track-element"));
+          const tracks = Array.from(tanda.querySelectorAll("track-element"));
           let duration = 0;
           if (hasCortina) {
             duration += timings.preCortina + timings.postCortina;
           } else {
             duration += timings.interTrack;
           }
-          duration += tracks2.length * timings.interTrack;
-          duration += tracks2.reduce((total, track) => {
-            foundPlayingTrack ||= track.classList.contains("playing") || (hasCortina?.classList.contains("playing") || false);
+          duration += tracks.length * timings.interTrack;
+          duration += tracks.reduce((total, track) => {
+            foundPlayingTrack ||= track.classList.contains("playing") || hasCortina?.classList.contains("playing") || false;
             if (foundPlayingTrack) {
               const duration2 = timeStringToSeconds(track.dataset.duration || "0:0");
               return total + (typeof duration2 == "number" ? duration2 : 0);
@@ -3524,32 +3605,19 @@
       console.log("Changed playlist - now playing", N, speakerOutputPlayer);
       await speakerOutputPlayer.updatePosition(N);
     });
-    const tracks = await dbManager.processEntriesInBatches("track", (record) => true);
-    const cortinas = await dbManager.processEntriesInBatches("cortina", (record) => true);
-    let t = 0;
-    let c = 0;
-    const allTandas = [];
-    if (tracks.length > 0 && cortinas.length > 0) {
-      while (t < Math.min(tracks.length, 60)) {
-        if (c >= cortinas.length) {
-          c = 0;
-        }
-        const tanda = {
-          type: "tanda",
-          name: "Dummy",
-          style: "Unknown",
-          cortina: cortinas[c++].name,
-          tracks: []
-        };
-        for (let i = 0; i < 4 && t < tracks.length; i++) {
-          tanda.tracks.push(tracks[t++].name);
-        }
-        allTandas.push(tanda);
-      }
+    const playlistPicker = getDomElement("#playlistPicker");
+    const playlists = await dbManager.processEntriesInBatches("playlist", (record) => true);
+    for (const playlist of playlists) {
+      const option = document.createElement("option");
+      option.value = playlist.name;
+      option.textContent = playlist.name;
+      playlistPicker.appendChild(option);
     }
-    console.log(allTandas);
-    await playlistService.setTandas(allTandas);
-    speakerOutputPlayer.startNext();
+    playlistPicker.addEventListener("change", async () => {
+      const chosenPlaylist = playlistPicker.value;
+      const tandas = (await dbManager.getDataByName("playlist", chosenPlaylist)).tandas;
+      playlistService.setTandas(tandas);
+    });
   }
 })();
 /*! howler.js v2.2.4 | (c) 2013-2020, James Simpson of GoldFire Studios | MIT License | howlerjs.com */

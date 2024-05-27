@@ -127,10 +127,10 @@ class BaseTrackElement extends HTMLElement {
       }
         article.playing {
             border: solid 2px orange;
-            background-color: #ffe000a6 !important;
+            background-color: #f9ede191 !important;
         }
         :host-context(track-element:nth-child(2n)) article{
-            background-color: #ffffffa6;
+            background-color: #cececea6;
         }
         :host-context(track-element:nth-child(2n+1)) article{
             background-color: #f9ede1a6;
@@ -168,6 +168,9 @@ class BaseTrackElement extends HTMLElement {
         .notes {
           color: lightgray;
         }
+        #track-title {
+          font-size: 1.1rem;
+        }
     </style>
     <article class="track ${this.isPlaying ? "playing" : ""}">
         <section class="actions">
@@ -189,18 +192,20 @@ class BaseTrackElement extends HTMLElement {
         </button>`
             : "<span></span>"
         }
-        <h2>${this.dataset.tandaId ? this.dataset.tandaId : ""} ${
+        <h2>
+        <!--${this.dataset.tandaId ? this.dataset.tandaId : ""}-->
+        ${
       this.tagName === "CORTINA-ELEMENT" ? "(Cortina) " : ""
-    } ${this.dataset.title}</h2>
+    } <span contenteditable="true" id="track-title">${this.dataset.title}</span></h2>
             <div id="floated">
               ${
                 !/undefined|null/.test(this.dataset.bpm!)
-                  ? `<span>BPM: <span>${this.dataset.bpm}</span></span>`
+                  ? `<span>BPM: <span contenteditable="true">${this.dataset.bpm}</span></span>`
                   : ""
               }
               ${
                 !/undefined|null/.test(this.dataset.year!)
-                  ? `<span>Year: ${this.dataset.year}</span></span>`
+                  ? `<span>Year: <span contenteditable="true">${this.dataset.year}</span></span>`
                   : ""
               }
               <span>Duration: <span class='duration'>${
@@ -212,13 +217,13 @@ class BaseTrackElement extends HTMLElement {
             <p>                
                 ${
                   !(this.dataset.style == "undefined")
-                    ? `<span><span class='style'>${this.dataset.style}</span></span>`
+                    ? `<span><span  contenteditable="true" class='style'>${this.dataset.style}</span></span>`
                     : ""
                 }
-                <span><span class='artist'>${this.dataset.artist}</span></span>
+                <span><span  contenteditable="true" class='artist'>${this.dataset.artist}</span></span>
                 ${
                   !/undefined|null/.test(this.dataset.notes!)
-                    ? `<span><span>${this.dataset.notes}</span></span>`
+                    ? `<span><span contenteditable="true">${this.dataset.notes}</span></span>`
                     : ""
                 }
                 </p>

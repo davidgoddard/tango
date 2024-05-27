@@ -106,10 +106,12 @@ class TandaElement extends HTMLElement {
       this.classList.add('playing');
       this.draggable = false;
       this.shadowRoot!.querySelector('#container article')?.classList.add('playing');
+      this.render();
     } else {
       this.classList.remove('playing');
       this.draggable = true;
       this.shadowRoot!.querySelector('#container article')?.classList.remove('playing');
+      this.render();
     }
   }
 
@@ -221,12 +223,13 @@ class TandaElement extends HTMLElement {
                   margin: 1rem;
                 }
                 #container article.played {
-                  background-color: grey;
+                  background-color: var(--played-tanda-background);
+                  color: var(--played-tanda-foreground);
                 }
                 #container article.placeHolder {
-                  background-color: #d7d6d6;
+                  background-color: var(--placeholder-background);
                   outline: dashed 1px red;
-                  z-index: 99;
+                  z-index: 2;
                   position: relative;
                 }
                 #container article {
@@ -306,8 +309,8 @@ class TandaElement extends HTMLElement {
                   font-size: 1rem;
                   border-radius: 50%;
                   border: transparent;
-                  background-color: blue;
-                  color: white;
+                  background-color: var(--button-background);
+                  color: var(--text-color);
                   font-weight: bolder;
                   height: 20px;
                   width: 20px;
@@ -339,13 +342,13 @@ class TandaElement extends HTMLElement {
                                 <section id="actions"></section>
                             </section>
 
-                            <span></span>${summary}   
+                            <span>${summary}</span>   
                         </main>
                     </div>
-                    <div class="details ${this.expanded ? "expanded" : ""}">   
+                    <div class="details ${(this.expanded || this.classList.contains('playing')) ? "expanded" : ""}">   
                         <slot></slot>                 
                     </div>
-                    <section id="extensions" class="${!this.expanded ? "hidden" : ""}">
+                    <section id="extensions" class="${!(this.expanded || this.classList.contains('playing')) ? "hidden" : ""}">
                       <button id="extendTanda">+</button>
                       <button id="shrinkTanda">-</button>
                     </section>
@@ -364,11 +367,9 @@ class TandaElement extends HTMLElement {
     if (this.expanded) {
       details!.classList.add("expanded");
       extensions!.classList.remove("hidden");
-      span!.textContent = "►";
     } else {
       details!.classList.remove("expanded");
       extensions!.classList.add("hidden");
-      span!.textContent = "";
     }
   }
 

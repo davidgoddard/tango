@@ -40,23 +40,32 @@ class ScratchPadElement extends HTMLElement {
           justify-content: space-between;
           align-items: center;
           margin: 0.2rem 0.2rem 60px 0.2rem;
+          padding: 3px;
         }
         .drop-target {
           outline: dashed 2px green;
           z-index: 99;
         }
         .controls button img {
-          height: 30px;
-          transition: height 2s ease-in-out;
+          height: 32px;
+          width: 32px;
         }
         .bin-target {
           outline: dashed 3px red;
           z-index: 99;
-          height: 35px;
         }
         button.bin {
           background-color: transparent;
           border: none;
+          border: none;
+          color: var(--header-text-color);
+          cursor: pointer;
+          justify-self: flex-start;
+          flex-grow: 0;
+          margin-right: 1rem;
+          border-radius: 50%;
+          background-color: var(--button-background);
+          padding: 0.5rem;
         }
         `;
     return style;

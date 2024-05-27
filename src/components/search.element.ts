@@ -47,7 +47,7 @@ export class SearchElement extends HTMLElement {
             border-bottom: none;
           }
           .tab.active {
-            background-color: orange;
+            background-color: var(--tab-active);
           }
           .results {
             border: 1px solid #ccc;

@@ -1,7 +1,8 @@
 //=====================================================================================
 // Utility methods
 
-import { ConfigOptions, Track } from "../data-types";
+import { ConfigOptions, Playlist, Track } from "../data-types";
+import { eventBus } from "../events/event-bus";
 import { IndexedDBManager } from "./database";
 import { fetchLibraryFiles, getAllFiles } from "./file-system";
 import { convert, getDomElement } from "./utils";
@@ -213,31 +214,69 @@ export async function loadLibraryIntoDB(
     if (libraryFileHandles.tandas) {
       tandas = await getJSON(await libraryFileHandles.tandas.getFile());
       console.log("tandas", tandas);
+      for (let tanda of tandas) {
+        tanda.tracks = tanda.tracks.map((track: string) => "/" + track);
+        if (tanda.cortina && tanda.cortina[0]) {
+          tanda.cortina = tanda.cortina.map(
+            (cortina: { track: string }) => "/" + cortina.track
+          )[0];
+        } else {
+          tanda.cortina = undefined;
+        }
+        try {
+          const existing = await dbManager.getDataById("tanda", tanda.id);
+          if (!existing) {
+            await dbManager.addData("tanda", tanda);
+          } else {
+            await dbManager.updateData("tanda", tanda.id, tanda);
+          }
+        } catch (error) {
+          delete tanda.id;
+          await dbManager.addData("tanda", tanda);
+        }
+      }
     }
     if (libraryFileHandles.playlists) {
-      playlists = await getJSON(await libraryFileHandles.playlists.getFile());
-      console.log("playlists", playlists);
-    }
-
-    for (let tanda of tandas) {
-      tanda.tracks = tanda.tracks.map((track: string) => "/" + track);
-      if (tanda.cortina && tanda.cortina[0]) {
-        tanda.cortina = tanda.cortina.map(
-          (cortina: { track: string }) => "/" + cortina.track
-        )[0]
-      } else {
-        tanda.cortina = undefined;
-      }
-      try {
-        const existing = await dbManager.getDataById("tanda", tanda.id);
-        if (!existing) {
-          await dbManager.addData("tanda", tanda);
-        } else {
-          await dbManager.updateData("tanda", tanda.id, tanda);
+      const originalPlaylists = await getJSON(await libraryFileHandles.playlists.getFile());
+      console.log("playlists", originalPlaylists);
+      for ( let playlist of originalPlaylists){
+        console.log(playlist)
+        for (let tanda of playlist.tandas) {
+          tanda.tracks = tanda.tracks.map((track: string) => "/" + track);
+          if (tanda.cortina && tanda.cortina[0]) {
+            tanda.cortina = tanda.cortina.map(
+              (cortina: { track: string }) => "/" + cortina.track
+            )[0];
+          } else {
+            tanda.cortina = undefined;
+          }
         }
-      } catch (error) {
-        delete tanda.id;
-        await dbManager.addData("tanda", tanda);
+        let newPlaylist: Playlist = {
+          id: playlist.id,
+          type: "playlist",
+          name: playlist.name,
+          lastPlayed: '',
+          created: playlist.createdDate,
+          pattern: playlist.pattern,
+          trackSpacing: playlist.trackSpacing,
+          preCortinaSpacing: playlist.preCortinaSpacing,
+          postCortinaSpacing: playlist.postCortinaSpacing,
+          cortinaFolder: playlist.useCortina,
+          startTime: playlist.start,
+          endTime: playlist.endTime,
+          tandas: playlist.tandas,
+        }
+        try {
+          const existing = await dbManager.getDataByName("playlist", newPlaylist.name);
+          if (!existing || !newPlaylist.id) {
+            await dbManager.addData("playlist", newPlaylist);
+          } else {
+            await dbManager.updateData("playlist", newPlaylist.id, newPlaylist);
+          }
+        } catch (error) {
+          delete newPlaylist.id;
+          await dbManager.addData("playlist", newPlaylist);
+        }
       }
     }
   }

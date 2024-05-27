@@ -2,9 +2,7 @@
 
 :root {
   --background-color: #e9ecef;
-  --text-color: #000000;
-  --button-background-color: #f0f0f0;
-  --button-text-color: #000000;
+  --text-color: #2e2e2e;
 
   --border-color: #ffb30e;
 
@@ -12,12 +10,22 @@
   --header-text-color: white;
 
   --header-select-background: white;
-  --header-select-text: black;
+  --header-select-text: #2e2e2e;
 
   --side-panel-background: #d3cec8;
   --side-panel-text: #710404;
 
-  --track-text-color: black;
+  --track-text-color: #2e2e2e;
+
+  --button-background: #ffcc7c;
+  --button-clicked: #fff47c;
+
+  --played-tanda-background: #5b5b5b;
+  --played-tanda-foreground: #989898;
+
+  --placeholder-background: #d7d6d6;
+
+  --tab-active: orange;
 }
 
 * {
@@ -36,11 +44,9 @@ body {
 
 body.light-theme {
   --background-color: #e9ecef;
-  --text-color: #000000;
+  --text-color: #2e2e2e;
   --button-background-color: #f0f0f0;
   --button-text-color: #000000;
-
-  --border-color: #ffb30e;
 
   --header-background-color: #353536;
   --header-text-color: white;
@@ -53,36 +59,49 @@ body.light-theme {
 }
 
 body.dark-theme {
-  --background-color: #000000;
+  --background-color: #2e2e2e;
   --text-color: #ffffff;
   --button-background-color: #333333;
   --button-text-color: #ffffff;
   --track-text-color: white;
+  --header-background-color: #545353;
+  --placeholder-background: #766666;
+  --border-color: #8d6206;
+  --tab-active: #eea61f;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background-color: #000000;
+    --background-color: #2e2e2e;
     --text-color: #ffffff;
     --button-background-color: #333333;
     --button-text-color: #ffffff;
     --track-text-color: white;
+    --header-background-color: #545353;
+    --placeholder-background: #766666;
+    --border-color: #8d6206;
+    --tab-active: #eea61f;
   }
 }
 
 @media (prefers-color-scheme: light) {
   :root {
-    --background-color: #ffffff;
-    --text-color: #000000;
+    --background-color: #e9ecef;
+    --text-color: #2e2e2e;
     --button-background-color: #f0f0f0;
     --button-text-color: #000000;
-    --track-text-color: black;
-  }
-}
 
-img {
-  height: 20px;
-  width: 20px;
+    --border-color: #ffb30e;
+
+    --header-background-color: #353536;
+    --header-text-color: white;
+
+    --header-select-background: white;
+    --header-select-text: black;
+
+    --side-panel-background: #d3cec8;
+    --side-panel-text: #710404;
+  }
 }
 
 header {
@@ -130,25 +149,31 @@ header > label {
   color: var(--header-text-color);
 }
 
-header button {
+.content menu {
+  padding: 0.5rem;
+}
+
+button {
   background: none;
   border: none;
   color: var(--header-text-color);
-  font-size: 30px;
   cursor: pointer;
   justify-self: flex-start;
   display: none;
   flex-grow: 0;
-  margin-right: 1rem;
+  margin-right: 0.5rem;
+  border-radius: 50%;
+  background-color: var(--button-background);
+  padding: 0.5rem;
 }
 
-header button.active {
+button.active {
   display: flex;
 }
 
-header button img {
-  height: 40px;
-  width: 40px;
+button img {
+  height: 25px;
+  width: 25px;
 }
 
 header select {
@@ -165,7 +190,7 @@ header select {
   height: 100%;
   width: 800px; /* Fixed width for the panel */
   position: fixed;
-  z-index: 1;
+  z-index: 10;
   top: 0;
   transform: translateX(0px);
   left: 0px; /* Start off-screen */
@@ -189,18 +214,6 @@ header select {
 
 #settingsPanelButton {
   margin-right: 1rem;
-}
-
-#settingsPanelButtonClose,
-#playlistSettingsPanelCloseButton {
-  justify-self: flex-end;
-  font-size: 3rem;
-  border: none;
-  background: none;
-  color: white;
-  cursor: pointer;
-  line-height: 1rem;
-  align-items: center;
 }
 
 .hidden {
@@ -268,7 +281,7 @@ main.searchOnly > *:nth-child(5) {
 
 .content {
   padding: 0.5rem;
-  grid-template-rows: auto auto 1fr;
+  grid-template-rows: auto 1fr;
 }
 
 .tab-headers {
@@ -312,11 +325,6 @@ main.searchOnly > *:nth-child(5) {
   margin: 4px;
 }
 
-.playlistSettingsPanelOpenButton {
-  cursor: pointer;
-  font-size: 24px;
-}
-
 .playlist-settings-content,
 #settingsPanel {
   padding: 20px;
@@ -340,11 +348,17 @@ form p {
   margin-top: 2rem 2rem 2rem 0;
 }
 
+.scratch-pad-heading {
+  width: 100%;
+  padding: 0.2rem 0.2rem 0.2rem 0.5rem;
+  align-items: center;
+}
 .playlistHeading {
   display: grid;
   width: 100%;
   padding: 0.2rem 0.2rem 0.2rem 0.5rem;
   grid-template-columns: auto auto auto;
+  align-items: center;
 }
 
 .playlistHeading #stopButton {
@@ -353,6 +367,7 @@ form p {
 
 .playlistHeading section {
   text-align: right;
+  display: flex;
 }
 
 h2 {
@@ -369,8 +384,8 @@ h2 {
 }
 
 .playlist-settings-panel header {
-  background: #353536;
-  color: white;
+  background: var(--header-background-color);
+  color: var(--header-text-color);
   display: flex;
   flex-direction: row;
 }
@@ -429,8 +444,8 @@ label img {
 }
 
 #playlistContainer {
-  display: grid;
-  grid-template-rows: auto;
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
   padding: 3px;
 }
@@ -467,6 +482,7 @@ track-element {
   height: 100%;
   margin: 0px;
   display: flex;
+  z-index: 99;
 }
 
 #cortinaPicker .cortina-content {
@@ -485,3 +501,20 @@ track-element {
   overflow-y: auto;
   width: 800px;
 }
+
+.cortina-grouped-items {
+  border: dashed 1px var(--border-color);
+  display: none;
+  width: 160px;
+  justify-content: space-evenly;
+  padding: 0.2rem;
+}
+
+.cortina-grouped-items.active {
+  display: flex;
+}
+
+.cortina-grouped-items button {
+  margin: 0;
+}
+

@@ -47,11 +47,9 @@ export class PlaylistService {
 
   playingCortina(state: boolean) {
     if (state) {
-      getDomElement("#playAll").classList.add("active");
-      getDomElement("#stopPlayAll").classList.add("active");
+      getDomElement(".cortina-grouped-items").classList.add("active");
     } else {
-      getDomElement("#playAll").classList.remove("active");
-      getDomElement("#stopPlayAll").classList.remove("active");
+      getDomElement(".cortina-grouped-items").classList.remove("active");
     }
   }
 
