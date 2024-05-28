@@ -1,5 +1,6 @@
 import { eventBus } from "../events/event-bus";
 import { formatTime, timeStringToSeconds } from "../services/utils";
+import { TrackElement } from "./track.element";
 
 let nextId = 1;
 
@@ -15,11 +16,13 @@ class TandaElement extends HTMLElement {
   private isPlaying: boolean = false;
   private hasPlayed: boolean = false;
   private playingTime: string = '';
+  private editable: boolean = false;
   
   private handleExtendBound: EventListener;
   private handleShrinkBound: EventListener;
   private handleToggleBound: EventListener;
   private handleChangeCortinaBound: EventListener;
+  private handleChangeEditBound: EventListener;
 
   constructor() {
     super();
@@ -28,6 +31,7 @@ class TandaElement extends HTMLElement {
     this.handleShrinkBound = this.handleShrink.bind(this);
     this.handleToggleBound = this.toggleExpand.bind(this);
     this.handleChangeCortinaBound = this.handleChangeCortina.bind(this);
+    this.handleChangeEditBound = this.handleEdit.bind(this);
   }
 
   public scheduledPlayingTime(time: string){
@@ -63,7 +67,7 @@ class TandaElement extends HTMLElement {
   }
 
   private handleChangeCortina(event: any){
-    event.preventDefault(); // Necessary to allow a drop
+    event.preventDefault();
     event.stopPropagation();
     console.log('Change cortina')
     const newEvent = new CustomEvent("changeCortina", {
@@ -71,6 +75,17 @@ class TandaElement extends HTMLElement {
       bubbles: true,
     });
     this.dispatchEvent(newEvent);    
+  }
+
+  private handleEdit(event: any){
+    event.preventDefault();
+    event.stopPropagation();
+    this.editable = !this.editable;
+    console.log('Enable edit')
+    const tracks = Array.from(this.querySelectorAll('track-element, cortina-element')) as TrackElement[];
+    tracks.forEach((track) => {
+      track.enableEdit(this.editable);
+    })
   }
 
   private findMinMaxYears(years: (string | null)[]): string {
@@ -133,6 +148,7 @@ class TandaElement extends HTMLElement {
     this.shadowRoot!.querySelector('#shrinkTanda')!.addEventListener('click', this.handleShrinkBound);
     this.shadowRoot!.querySelector("#toggle main")!.addEventListener("click", this.handleToggleBound);
     this.shadowRoot!.querySelector('#changeCortinaButton')!.addEventListener('click', this.handleChangeCortinaBound);
+    this.shadowRoot!.querySelector('#editContentButton')!.addEventListener('click', this.handleChangeEditBound);
   }
 
   private removeEventListeners() {
@@ -140,6 +156,7 @@ class TandaElement extends HTMLElement {
     this.shadowRoot!.querySelector('#shrinkTanda')!.removeEventListener('click', this.handleShrinkBound);
     this.shadowRoot!.querySelector("#toggle main")!.removeEventListener("click", this.handleToggleBound);
     this.shadowRoot!.querySelector('#changeCortinaButton')!.removeEventListener('click', this.handleChangeCortinaBound);
+    this.shadowRoot!.querySelector('#editContentButton')!.removeEventListener('click', this.handleChangeEditBound);
   }
 
   public collapse(){
@@ -270,8 +287,8 @@ class TandaElement extends HTMLElement {
                     display: none;
                 }
                 button img {
-                    height: 20px;
-                    width: 20px;
+                    height: 25px;
+                    width: 25px;
                 }
                 .cortinaControls {
                     display: none;
@@ -312,18 +329,15 @@ class TandaElement extends HTMLElement {
                   background-color: var(--button-background);
                   color: var(--text-color);
                   font-weight: bolder;
-                  height: 20px;
-                  width: 20px;
                   margin: 0.2rem;
+                  padding: 0.4rem;
+                  display: flex;
                 }
-                #extendTanda {
-                  padding: 0px;
-                  line-height: 1.3rem;
+                #extensions button img {
+                  height: 25px;
+                  width: 25px;
                 }
-                #shrinkTanda {
-                  padding: 0px;
-                  line-height: 0.3rem;
-                }
+
             </style>
             <div id="container" class="${this.hasPlayed ? 'played' : ''}">
                 <span id="play-time">${this.playingTime ? `${this.playingTime}` : ''}</span>
@@ -349,8 +363,9 @@ class TandaElement extends HTMLElement {
                         <slot></slot>                 
                     </div>
                     <section id="extensions" class="${!(this.expanded || this.classList.contains('playing')) ? "hidden" : ""}">
-                      <button id="extendTanda">+</button>
-                      <button id="shrinkTanda">-</button>
+                      <button id="editContentButton"><img src="./icons/edit.svg"></button>
+                      <button id="extendTanda"><img src="./icons/add.svg"></button>
+                      <button id="shrinkTanda"><img src="./icons/subtract.svg"></button>
                     </section>
                 </article>
             </div>

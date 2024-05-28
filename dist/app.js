@@ -23,23 +23,53 @@ import { CortinaPicker } from "./services/cortina-service";
 //       });
 //   });
 // }
-const SYSTEM = {
-    defaultTandaStyleSequence: "4T 4T 3W 4T 3M",
-    useSoundLevelling: true,
-};
 const CONFIG_ID = 1;
+let musicFolder;
+async function getConfigPreferences(dbManager) {
+    const options = {};
+    const form = getDomElement("#settingsPanel");
+    const inputs = Array.from(form.querySelectorAll("input, select, #folderPath"));
+    for (const input of inputs) {
+        const id = input.id;
+        const value = input.type == "checkbox"
+            ? input.checked
+            : input.type == "text"
+                ? input.value
+                : input.textContent;
+        console.log(id, value, input);
+        options[id] = value;
+    }
+    options.musicFolder = musicFolder;
+    await dbManager.updateData("system", CONFIG_ID, options).catch(async (error) => {
+        await dbManager.addData("system", options);
+    });
+    return options;
+}
+function setConfigPreferences(options) {
+    musicFolder = options.musicFolder;
+    const form = getDomElement("#settingsPanel");
+    const inputs = Array.from(form.querySelectorAll("input, select, #folderPath"));
+    for (const input of inputs) {
+        const id = input.id;
+        if (input.type == "checkbox") {
+            input.checked = options[id];
+        }
+        else if (input.type == "text") {
+            input.value = options[id];
+        }
+        else {
+            input.textContent = options[id];
+        }
+    }
+}
 async function InitialiseConfig(dbManager) {
     try {
         const config = await dbManager.getDataById("system", CONFIG_ID);
         if (!config) {
             // Set defaults
-            await dbManager.addData("system", SYSTEM);
-        }
-        else {
-            await dbManager.updateData("system", config.id, {
-                ...SYSTEM,
-                ...config,
-            });
+            let newConfig = await getConfigPreferences(dbManager);
+            newConfig.source = 'Initialisation';
+            await dbManager.addData("system", newConfig);
         }
     }
     catch (error) {
@@ -64,10 +94,7 @@ async function getSystemLevel(dbManager) {
 // THIS MUST ONLY BE CALLED FROM A BUTTON
 async function deleteDatabase(dbManager) {
     await dbManager.resetDatabase();
-    await dbManager.addData("system", SYSTEM);
-    let config = (await dbManager.getDataById("system", CONFIG_ID));
-    await openMusicFolder(dbManager, config);
-    return config;
+    return await getConfigPreferences(dbManager);
 }
 async function processQuery(dbManager, query, selectedStyle) {
     console.log("Search", query, selectedStyle);
@@ -86,6 +113,7 @@ async function processQuery(dbManager, query, selectedStyle) {
         maxScore = maxScore < result.score ? result.score : maxScore;
     });
     let minScore = maxScore * 0.6;
+    console.log("Min/Max", minScore, maxScore);
     let trackResults = [];
     testResult.forEach((result) => {
         if (result.score >= minScore) {
@@ -94,8 +122,10 @@ async function processQuery(dbManager, query, selectedStyle) {
             let track = trackMap.get(key);
             if (track) {
                 if (selectedStyle == "all" ||
-                    track.metadata?.style?.toLowerCase() == selectedStyle)
+                    track.metadata?.style?.toLowerCase() == selectedStyle) {
+                    console.log('Match', result);
                     trackResults.push(track);
+                }
             }
         }
     });
@@ -161,10 +191,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
     const dbManager = await DatabaseManager();
     let config = await InitialiseConfig(dbManager);
+    setConfigPreferences(config);
     const cortinaPicker = new CortinaPicker(dbManager);
     await cortinaPicker.load();
+    config = await getConfigPreferences(dbManager);
+    console.log("DEBUG CONFIG", config);
+    await dbManager.cacheIndexData();
     // Setup the quick key click to function mappings
     let quickClickHandlers = {
+        folderPicker: async () => {
+            try {
+                if (!window.showDirectoryPicker) {
+                    alert("Your browser does not support the File System Access API");
+                    return;
+                }
+                const directoryHandle = await window.showDirectoryPicker();
+                musicFolder = directoryHandle;
+                const folderPathElement = document.getElementById("folderPath");
+                folderPathElement.textContent = directoryHandle.name;
+                folderPathElement.dataset.path = directoryHandle.name; // Store the path for later use
+            }
+            catch (error) {
+                console.error("Error selecting folder:", error);
+            }
+        },
         askUserPermission: async () => {
             await openMusicFolder(dbManager, config)
                 .then(() => {
@@ -177,18 +227,21 @@ document.addEventListener("DOMContentLoaded", async () => {
             });
         },
         rescanButton: async () => {
+            config = await getConfigPreferences(dbManager);
             await scanFileSystem(config, dbManager, false);
             await cortinaPicker.load();
         },
         rescanAnalyzeButton: async () => {
+            config = await getConfigPreferences(dbManager);
             await scanFileSystem(config, dbManager, true);
             await cortinaPicker.load();
         },
         settingsPanelButton: () => {
             getDomElement("#settingsPanel").classList.remove("hiddenPanel");
         },
-        settingsPanelButtonClose: () => {
+        settingsPanelButtonClose: async () => {
             getDomElement("#settingsPanel").classList.add("hiddenPanel");
+            config = await getConfigPreferences(dbManager);
         },
         playlistSettingsPanelOpenButton: () => {
             getDomElement(".playlist-settings-panel").classList.remove("hiddenPanel");
@@ -200,6 +253,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             config = await deleteDatabase(dbManager);
         },
         loadLibraryButton: async () => {
+            config = await getConfigPreferences(dbManager);
             await loadLibraryIntoDB(config, dbManager);
             await cortinaPicker.load();
         },
@@ -276,10 +330,19 @@ document.addEventListener("DOMContentLoaded", async () => {
         eventBus.once("UserGrantedPermission", resolve);
     });
     // Handle configuration changes
-    const useSoundLevelling = getDomElement("#useSoundLevelling");
-    useSoundLevelling.addEventListener("change", () => {
-        config.useSoundLevelling = useSoundLevelling.checked;
+    const configPanel = getDomElement("#settingsPanel");
+    configPanel.addEventListener("change", async () => {
+        config = await getConfigPreferences(dbManager);
         eventBus.emit("config-change");
+    });
+    eventBus.on("changeTrackData", async (payload) => {
+        console.log("Changed text values", payload);
+        const track = await dbManager.getDataById(payload.type, parseInt(payload.trackId));
+        if (track?.id) {
+            let x = new Function("track", payload.field + ' = "' + payload.value.replace('"', '"') + '"')(track);
+            console.log("Old value:", x, "New value:", track);
+            await dbManager.updateData(payload.type, track.id, track);
+        }
     });
     // Set up the search tabs
     // Main application logic

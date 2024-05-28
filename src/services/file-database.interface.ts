@@ -50,10 +50,11 @@ export async function scanFileSystem(
     }
     const scanProgress = getDomElement("#scanProgress");
     const scanFilePath = getDomElement("#scanFilePath");
-    scanFilePath.textContent = analyze
-      ? "Please wait - progress is reported in batches ..."
-      : "";
+    scanFilePath.textContent =
+      "Please wait - progress is reported in batches ...";
     scanProgress.textContent = "";
+
+    await dbManager.cacheIndexData();
 
     let files = await getAllFiles(
       config.musicFolder as FileSystemDirectoryHandle
@@ -85,48 +86,60 @@ export async function scanFileSystem(
         scanFilePath.textContent = item.relativeFileName;
         scanProgress.textContent = ++n + "/" + files.length;
 
+        const folderName = indexFileName.split(/\/|\\/g)[1];
         const table =
-          indexFileName.split(/\/|\\/g)[1] == "music" ? "track" : "cortina";
+          folderName == config.cortinaSubFolder
+            ? "cortina"
+            : folderName == config.musicSubFolder
+            ? "track"
+            : "";
 
-        // Create new version of the record
+        if (table) {
+          // Create new version of the record
 
-        let metadata: any = analysis
-          ? analysis[batchIdx]
-          : {
-              start: 0,
-              end: -1,
-              meanVolume: -20,
-              maxVolume: 0,
-              tags: { title: indexFileName, artist: "unknown" },
-            };
+          let metadata: any = analysis
+            ? analysis[batchIdx]
+            : {
+                start: 0,
+                end: -1,
+                meanVolume: -20,
+                maxVolume: 0,
+                tags: { title: indexFileName, artist: "unknown" },
+              };
 
-        const newData: Track = {
-          type: table,
-          name: indexFileName,
-          fileHandle: item.fileHandle,
-          metadata,
-          classifiers: {
-            favourite: true,
-          },
-        };
+          const newData: Track = {
+            type: table,
+            name: indexFileName,
+            fileHandle: item.fileHandle,
+            metadata,
+            classifiers: {
+              favourite: true,
+            },
+          };
 
-        try {
-          // Look up filename to see if we already have a trackid for it
-          let { id }: Track = (await dbManager.getDataByName(
-            table,
-            indexFileName
-          )) as Track;
+          try {
+            // Look up filename to see if we already have a trackid for it
+            let { id }: Track = (await dbManager.getDataByName(
+              table,
+              indexFileName
+            )) as Track;
 
-          if (!id) {
+            if (!id) {
+              await dbManager.addData(table, newData);
+              dbManager.index(newData);
+            } else {
+              await dbManager.updateData(table, id!, newData);
+              dbManager.index(newData);
+            }
+          } catch (error) {
             await dbManager.addData(table, newData);
-          } else {
-            await dbManager.updateData(table, id!, newData);
+            dbManager.index(newData);
           }
-        } catch (error) {
-          await dbManager.addData(table, newData);
         }
       }
     }
+
+    await dbManager.commitChanges();
 
     console.log("Have now updated the database with all tracks");
   } catch (error) {
@@ -237,10 +250,12 @@ export async function loadLibraryIntoDB(
       }
     }
     if (libraryFileHandles.playlists) {
-      const originalPlaylists = await getJSON(await libraryFileHandles.playlists.getFile());
+      const originalPlaylists = await getJSON(
+        await libraryFileHandles.playlists.getFile()
+      );
       console.log("playlists", originalPlaylists);
-      for ( let playlist of originalPlaylists){
-        console.log(playlist)
+      for (let playlist of originalPlaylists) {
+        console.log(playlist);
         for (let tanda of playlist.tandas) {
           tanda.tracks = tanda.tracks.map((track: string) => "/" + track);
           if (tanda.cortina && tanda.cortina[0]) {
@@ -255,7 +270,7 @@ export async function loadLibraryIntoDB(
           id: playlist.id,
           type: "playlist",
           name: playlist.name,
-          lastPlayed: '',
+          lastPlayed: "",
           created: playlist.createdDate,
           pattern: playlist.pattern,
           trackSpacing: playlist.trackSpacing,
@@ -265,9 +280,12 @@ export async function loadLibraryIntoDB(
           startTime: playlist.start,
           endTime: playlist.endTime,
           tandas: playlist.tandas,
-        }
+        };
         try {
-          const existing = await dbManager.getDataByName("playlist", newPlaylist.name);
+          const existing = await dbManager.getDataByName(
+            "playlist",
+            newPlaylist.name
+          );
           if (!existing || !newPlaylist.id) {
             await dbManager.addData("playlist", newPlaylist);
           } else {

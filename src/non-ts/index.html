@@ -61,7 +61,7 @@
 
       <h3>Audio Output Selector</h3>
 
-      <button class="active" id="refreshAudioLists">
+      <button class="active textButton" id="refreshAudioLists">
         Refresh Audio Device Lists
       </button>
       <br />
@@ -87,48 +87,94 @@
         <li>Edit preferred text items</li>
       </ul>
 
-      <h3>Playback options</h3>
-      <form>
-        <legend>Defaults</legend>
+      <fieldset>
+        <legend>Playback options</legend>
+        <form>
+          <label
+            >Use sound levelling:
+            <input type="checkbox" id="useSoundLevelling" checked="checked"
+          /></label>
+        </form>
+      </fieldset>
+
+      <fieldset>
+        <legend>Default playlist options</legend>
+        <form>
+          <label
+            >Tanda Style Sequence:
+            <input
+              type="text"
+              placeholder="E.g. 4T 4T 3W 4T 3M"
+              value="4T 4T 3W 4T 3M"
+              id="defaultTandaStyleSequence"
+          /></label>
+        </form>
+      </fieldset>
+
+      <fieldset>
+        <legend>File locations and databases</legend>
+        <p>
+          To use another folder as the source of music files requires clearing
+          the old database which is stored in the browser. If you wish to save
+          the current library of tandas etc. that goes with the current folder,
+          then use the "Export" feature first.
+        </p>
+        <button class="active textButton" id="exportDatabase">
+          Export Database
+        </button>
+
+        <hr/>
+
+        <p>
+          Music folders: point the system at the folder that contains a folder
+          with the music in it. I.e. the system needs two folders of music
+          files; cortinas and tango music.
+        </p>
+        <p>
+          Point the system at the folder above this so that the cortina's folder
+          name is part of the file's path.
+        </p>
+        <p>Note that resetting the database will ask you where the music files are and this location must contain both the music and cortina sub-folders.</p>
+        <button class="active textButton" id="deleteDBButton">
+          Reset Database
+        </button>
+
+        <hr/>
+
+        <label for="folderPicker">Selected Folder</label>
+            <div id="folderPath">No folder selected</div>
+            <button id="folderPicker" class="active textButton">Pick a Folder</button>
+
         <label
-          >Use sound levelling:
-          <input type="checkbox" id="useSoundLevelling" checked="checked"
+          >Music sub-folder:
+          <input type="text" id="musicSubFolder" value="music"
         /></label>
-      </form>
-
-      <h3>Default Playlist options</h3>
-      <form>
-        <legend>Defaults</legend>
         <label
-          >Tanda Style Sequence:
-          <input
-            type="text"
-            placeholder="E.g. 4T 4T 3W 4T 3M"
-            value="4T 4T 3W 4T 3M"
-            id="defaultTandaStyleSequence"
+          >Cortina sub-folder:
+          <input type="text" id="cortinaSubFolder" value="cortina"
         /></label>
-      </form>
 
-      <h3>File locations and databases</h3>
-      <p>
-        To use another folder as the source of music files requires clearing the
-        old database which is stored in the browser. If you wish to save the
-        current library of tandas etc. that goes with the current folder, then
-        use the "Export" feature first.
-      </p>
-      <button class="active" id="exportDatabase">Export Database</button>
-      <button class="active" id="rescanButton">Scan for new files only</button>
-      <button class="active" id="rescanAnalyzeButton">Scan and Analyze</button>
-      <button class="active" id="deleteDBButton">Reset Database</button>
-      <button class="active" id="loadLibraryButton">
-        Open existing Tanda Player Library
-      </button>
+        <button class="active textButton" id="rescanButton">
+          Scan for new files only
+        </button>
 
-      <section id="scannerProgress">
-        <h3>File Scanner Progress</h3>
-        <p id="scanProgress"></p>
-        <p id="scanFilePath"></p>
-      </section>
+        <button class="active textButton" id="rescanAnalyzeButton">
+          Scan and Analyze
+        </button>
+
+        <hr/>
+
+        <p>Users of previous Tanda Player system can use the same music library and resetting the database and pointing the system at it will allow all tracks, tandas and playlists to be imported.</p>
+        <button class="active textButton" id="loadLibraryButton">
+          Open existing Tanda Player Library
+        </button>
+
+        <section id="scannerProgress">
+          <h3>File Scanner Progress</h3>
+          <p id="scanProgress"></p>
+          <p id="scanFilePath"></p>
+        </section>
+      </fieldset>
     </div>
 
     <!-- ===================================================================================================================== -->

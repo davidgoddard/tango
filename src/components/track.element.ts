@@ -18,6 +18,7 @@ class BaseTrackElement extends HTMLElement {
   private isPlaying = false;
   private isPlayingOnHeadphones = false;
   private actions = new Set();
+  private editable: boolean = false;
 
   constructor() {
     super();
@@ -39,6 +40,11 @@ class BaseTrackElement extends HTMLElement {
         this.handleTrackClick.bind(this)
       );
     }
+  }
+
+  enableEdit(state: boolean) {
+    this.editable = state;
+    this.render();
   }
 
   stopPlayingOnHeadphones() {
@@ -173,15 +179,6 @@ class BaseTrackElement extends HTMLElement {
         }
     </style>
     <article class="track ${this.isPlaying ? "playing" : ""}">
-        <section class="actions">
-        ${([...this.actions] as Action[])
-          .sort((a: Action, b: Action) => {
-            return a.sortOrder - b.sortOrder;
-          })
-          .map((action) => {
-            return `<button id="${action.id}"><img src="${action.image}" alt="${action.alt}"></button>`;
-          })}
-        </section>
         <header>
         ${
           this.dataset.title !== "place holder"
@@ -195,17 +192,17 @@ class BaseTrackElement extends HTMLElement {
         <h2>
         <!--${this.dataset.tandaId ? this.dataset.tandaId : ""}-->
         ${
-      this.tagName === "CORTINA-ELEMENT" ? "(Cortina) " : ""
-    } <span contenteditable="true" id="track-title">${this.dataset.title}</span></h2>
+          this.tagName === "CORTINA-ELEMENT" ? "(Cortina) " : ""
+        } <span id="track-title">${this.dataset.title}</span></h2>
             <div id="floated">
               ${
-                !/undefined|null/.test(this.dataset.bpm!)
-                  ? `<span>BPM: <span contenteditable="true">${this.dataset.bpm}</span></span>`
+                this.editable || !/undefined|null/.test(this.dataset.bpm!)
+                  ? `<span>BPM: <span id="bpmValue">${this.dataset.bpm}</span></span>`
                   : ""
               }
               ${
-                !/undefined|null/.test(this.dataset.year!)
-                  ? `<span>Year: <span contenteditable="true">${this.dataset.year}</span></span>`
+                this.editable || !/undefined|null/.test(this.dataset.year!)
+                  ? `<span>Year: <span id="yearValue">${this.dataset.year}</span></span>`
                   : ""
               }
               <span>Duration: <span class='duration'>${
@@ -216,20 +213,51 @@ class BaseTrackElement extends HTMLElement {
         <main>
             <p>                
                 ${
-                  !(this.dataset.style == "undefined")
-                    ? `<span><span  contenteditable="true" class='style'>${this.dataset.style}</span></span>`
+                  this.editable || !(this.dataset.style == "undefined")
+                    ? `<span><span id="styleValue" class='style'>${this.dataset.style}</span></span>`
                     : ""
                 }
-                <span><span  contenteditable="true" class='artist'>${this.dataset.artist}</span></span>
+                <span><span id="artistValue" class='artist'>${
+                  this.dataset.artist
+                }</span></span>
                 ${
-                  !/undefined|null/.test(this.dataset.notes!)
-                    ? `<span><span contenteditable="true">${this.dataset.notes}</span></span>`
+                  this.editable || !/undefined|null/.test(this.dataset.notes!)
+                    ? `<span><span id="notesValue">${this.dataset.notes}</span></span>`
                     : ""
                 }
                 </p>
         </main>
     </article>
         `;
+
+    const editableElements: { [key:string]: string} = {
+      "track-title" : 'track.metadata.tags.title',
+      "bpmValue" : 'track.metadata.tags.title',
+      "yearValue" : 'track.metadata.tags.year',
+      "styleValue" : 'track.metadata.style',
+      "artistValue" : 'track.metadata.tags.artist',
+      "notesValue" : 'track.metadata.tags.notes',
+    };
+    Object.keys(editableElements).forEach((item) => {
+      let element = this.shadowRoot!.querySelector("#" + item)! as HTMLElement;
+      if (element) {
+        element.contentEditable = this.editable ? "true" : "false";
+        if (this.editable) {
+          element.addEventListener("input", () => {
+            console.log("Content changed:", element.innerHTML);
+          });
+          element.addEventListener("blur", () => {
+            console.log("Editing finished:", element.innerHTML);
+            eventBus.emit('changeTrackData', {
+              field: editableElements[item],
+              value: element.textContent,
+              trackId: this.dataset.trackId,
+              type: this.tagName == 'CORTINA-ELEMENT' ? 'cortina' : 'track'
+            })
+          });
+        }
+      }
+    });
   }
 }
 

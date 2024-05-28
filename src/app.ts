@@ -50,12 +50,53 @@ import { CortinaPicker } from "./services/cortina-service";
 //   });
 // }
 
-const SYSTEM: ConfigOptions = {
-  defaultTandaStyleSequence: "4T 4T 3W 4T 3M",
-  useSoundLevelling: true,
-};
-
 const CONFIG_ID = 1;
+
+let musicFolder: FileSystemDirectoryHandle;
+
+async function getConfigPreferences(
+  dbManager: IndexedDBManager
+): Promise<ConfigOptions> {
+  const options: any = {};
+  const form = getDomElement("#settingsPanel");
+  const inputs = Array.from(
+    form.querySelectorAll("input, select, #folderPath")
+  ) as HTMLInputElement[];
+  for (const input of inputs) {
+    const id = input.id;
+    const value =
+      input.type == "checkbox"
+        ? input.checked
+        : input.type == "text"
+        ? input.value
+        : input.textContent;
+    console.log(id, value, input);
+    options[id] = value;
+  }
+  options.musicFolder = musicFolder;
+  await dbManager.updateData("system", CONFIG_ID, options).catch(async (error)=>{
+    await dbManager.addData("system", options);
+  });
+  return options;
+}
+
+function setConfigPreferences(options: any) {
+  musicFolder = options.musicFolder;
+  const form = getDomElement("#settingsPanel");
+  const inputs = Array.from(
+    form.querySelectorAll("input, select, #folderPath")
+  ) as any[];
+  for (const input of inputs) {
+    const id = input.id;
+    if (input.type == "checkbox") {
+      input.checked = options[id];
+    } else if (input.type == "text") {
+      input.value = options[id];
+    } else {
+      input.textContent = options[id];
+    }
+  }
+}
 
 async function InitialiseConfig(
   dbManager: IndexedDBManager
@@ -64,12 +105,9 @@ async function InitialiseConfig(
     const config = await dbManager.getDataById("system", CONFIG_ID);
     if (!config) {
       // Set defaults
-      await dbManager.addData("system", SYSTEM);
-    } else {
-      await dbManager.updateData("system", config.id!, {
-        ...SYSTEM,
-        ...config,
-      });
+      let newConfig = await getConfigPreferences(dbManager);
+      newConfig.source = 'Initialisation'
+      await dbManager.addData("system", newConfig);
     }
   } catch (error) {
     console.error("Database operation failed", error);
@@ -99,13 +137,7 @@ async function deleteDatabase(
   dbManager: IndexedDBManager
 ): Promise<ConfigOptions> {
   await dbManager.resetDatabase();
-  await dbManager.addData("system", SYSTEM);
-  let config = (await dbManager.getDataById(
-    "system",
-    CONFIG_ID
-  )) as ConfigOptions;
-  await openMusicFolder(dbManager, config);
-  return config;
+  return await getConfigPreferences(dbManager);
 }
 
 async function processQuery(
@@ -138,6 +170,7 @@ async function processQuery(
   });
 
   let minScore = maxScore * 0.6;
+  console.log("Min/Max", minScore, maxScore)
 
   let trackResults: any[] = [];
   testResult.forEach((result: { id: string; score: number }) => {
@@ -151,8 +184,10 @@ async function processQuery(
         if (
           selectedStyle == "all" ||
           track.metadata?.style?.toLowerCase() == selectedStyle
-        )
+        ){
+          console.log('Match', result)
           trackResults.push(track);
+        }
       }
     }
   });
@@ -228,13 +263,34 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const dbManager = await DatabaseManager();
   let config = await InitialiseConfig(dbManager);
+  setConfigPreferences(config);
 
   const cortinaPicker = new CortinaPicker(dbManager);
   await cortinaPicker.load();
 
+  config = await getConfigPreferences(dbManager);
+  console.log("DEBUG CONFIG", config);
+
+  await dbManager.cacheIndexData();
+
   // Setup the quick key click to function mappings
 
   let quickClickHandlers: { [key: string]: EventListener } = {
+    folderPicker: async () => {
+      try {
+        if (!window.showDirectoryPicker) {
+          alert("Your browser does not support the File System Access API");
+          return;
+        }
+        const directoryHandle = await window.showDirectoryPicker();
+        musicFolder = directoryHandle;
+        const folderPathElement = document.getElementById("folderPath")!;
+        folderPathElement.textContent = directoryHandle.name;
+        folderPathElement.dataset.path = directoryHandle.name; // Store the path for later use
+      } catch (error) {
+        console.error("Error selecting folder:", error);
+      }
+    },
     askUserPermission: async () => {
       await openMusicFolder(dbManager, config)
         .then(() => {
@@ -247,18 +303,21 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
     },
     rescanButton: async () => {
+      config = await getConfigPreferences(dbManager);
       await scanFileSystem(config, dbManager, false);
       await cortinaPicker.load();
     },
     rescanAnalyzeButton: async () => {
+      config = await getConfigPreferences(dbManager);
       await scanFileSystem(config, dbManager, true);
       await cortinaPicker.load();
     },
     settingsPanelButton: () => {
       getDomElement("#settingsPanel").classList.remove("hiddenPanel");
     },
-    settingsPanelButtonClose: () => {
+    settingsPanelButtonClose: async () => {
       getDomElement("#settingsPanel").classList.add("hiddenPanel");
+      config = await getConfigPreferences(dbManager);
     },
     playlistSettingsPanelOpenButton: () => {
       getDomElement(".playlist-settings-panel").classList.remove("hiddenPanel");
@@ -270,6 +329,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       config = await deleteDatabase(dbManager);
     },
     loadLibraryButton: async () => {
+      config = await getConfigPreferences(dbManager);
       await loadLibraryIntoDB(config, dbManager);
       await cortinaPicker.load();
     },
@@ -341,31 +401,47 @@ document.addEventListener("DOMContentLoaded", async () => {
     );
   }
 
-  (Array.from(document.querySelectorAll("button")) as HTMLElement[]).forEach((button) => {
-    button.addEventListener("mousedown", () => {
-      button.style.backgroundColor = "var(--button-clicked)";
-    });
+  (Array.from(document.querySelectorAll("button")) as HTMLElement[]).forEach(
+    (button) => {
+      button.addEventListener("mousedown", () => {
+        button.style.backgroundColor = "var(--button-clicked)";
+      });
 
-    button.addEventListener("mouseup", () => {
-      button.style.backgroundColor = "var(--button-background)";
-    });
+      button.addEventListener("mouseup", () => {
+        button.style.backgroundColor = "var(--button-background)";
+      });
 
-    button.addEventListener("mouseleave", () => {
-      button.style.backgroundColor = "var(--button-background)";
-    });
-  });
+      button.addEventListener("mouseleave", () => {
+        button.style.backgroundColor = "var(--button-background)";
+      });
+    }
+  );
 
   await new Promise((resolve) => {
     eventBus.once("UserGrantedPermission", resolve);
   });
 
   // Handle configuration changes
-  const useSoundLevelling = getDomElement(
-    "#useSoundLevelling"
-  )! as HTMLInputElement;
-  useSoundLevelling.addEventListener("change", () => {
-    config.useSoundLevelling = useSoundLevelling.checked;
+  const configPanel = getDomElement("#settingsPanel")!;
+  configPanel.addEventListener("change", async () => {
+    config = await getConfigPreferences(dbManager);
     eventBus.emit("config-change");
+  });
+
+  eventBus.on("changeTrackData", async (payload: any) => {
+    console.log("Changed text values", payload);
+    const track = await dbManager.getDataById(
+      payload.type,
+      parseInt(payload.trackId)
+    );
+    if (track?.id) {
+      let x = new Function(
+        "track",
+        payload.field + ' = "' + payload.value.replace('"', '"') + '"'
+      )(track);
+      console.log("Old value:", x, "New value:", track);
+      await dbManager.updateData(payload.type, track.id, track);
+    }
   });
 
   // Set up the search tabs

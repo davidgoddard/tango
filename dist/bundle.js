@@ -804,10 +804,12 @@
     isPlaying = false;
     hasPlayed = false;
     playingTime = "";
+    editable = false;
     handleExtendBound;
     handleShrinkBound;
     handleToggleBound;
     handleChangeCortinaBound;
+    handleChangeEditBound;
     constructor() {
       super();
       this.attachShadow({ mode: "open" });
@@ -815,6 +817,7 @@
       this.handleShrinkBound = this.handleShrink.bind(this);
       this.handleToggleBound = this.toggleExpand.bind(this);
       this.handleChangeCortinaBound = this.handleChangeCortina.bind(this);
+      this.handleChangeEditBound = this.handleEdit.bind(this);
     }
     scheduledPlayingTime(time) {
       this.playingTime = time;
@@ -854,6 +857,16 @@
         bubbles: true
       });
       this.dispatchEvent(newEvent);
+    }
+    handleEdit(event) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.editable = !this.editable;
+      console.log("Enable edit");
+      const tracks = Array.from(this.querySelectorAll("track-element, cortina-element"));
+      tracks.forEach((track) => {
+        track.enableEdit(this.editable);
+      });
     }
     findMinMaxYears(years) {
       const numericYears = years.map((year) => year ? Number(year) : NaN).filter((year) => !isNaN(year));
@@ -904,12 +917,14 @@
       this.shadowRoot.querySelector("#shrinkTanda").addEventListener("click", this.handleShrinkBound);
       this.shadowRoot.querySelector("#toggle main").addEventListener("click", this.handleToggleBound);
       this.shadowRoot.querySelector("#changeCortinaButton").addEventListener("click", this.handleChangeCortinaBound);
+      this.shadowRoot.querySelector("#editContentButton").addEventListener("click", this.handleChangeEditBound);
     }
     removeEventListeners() {
       this.shadowRoot.querySelector("#extendTanda").removeEventListener("click", this.handleExtendBound);
       this.shadowRoot.querySelector("#shrinkTanda").removeEventListener("click", this.handleShrinkBound);
       this.shadowRoot.querySelector("#toggle main").removeEventListener("click", this.handleToggleBound);
       this.shadowRoot.querySelector("#changeCortinaButton").removeEventListener("click", this.handleChangeCortinaBound);
+      this.shadowRoot.querySelector("#editContentButton").removeEventListener("click", this.handleChangeEditBound);
     }
     collapse() {
       this.expanded = false;
@@ -1019,8 +1034,8 @@
                     display: none;
                 }
                 button img {
-                    height: 20px;
-                    width: 20px;
+                    height: 25px;
+                    width: 25px;
                 }
                 .cortinaControls {
                     display: none;
@@ -1061,18 +1076,15 @@
                   background-color: var(--button-background);
                   color: var(--text-color);
                   font-weight: bolder;
-                  height: 20px;
-                  width: 20px;
                   margin: 0.2rem;
+                  padding: 0.4rem;
+                  display: flex;
                 }
-                #extendTanda {
-                  padding: 0px;
-                  line-height: 1.3rem;
+                #extensions button img {
+                  height: 25px;
+                  width: 25px;
                 }
-                #shrinkTanda {
-                  padding: 0px;
-                  line-height: 0.3rem;
-                }
+
             </style>
             <div id="container" class="${this.hasPlayed ? "played" : ""}">
                 <span id="play-time">${this.playingTime ? `${this.playingTime}` : ""}</span>
@@ -1095,8 +1107,9 @@
                         <slot></slot>                 
                     </div>
                     <section id="extensions" class="${!(this.expanded || this.classList.contains("playing")) ? "hidden" : ""}">
-                      <button id="extendTanda">+</button>
-                      <button id="shrinkTanda">-</button>
+                      <button id="editContentButton"><img src="./icons/edit.svg"></button>
+                      <button id="extendTanda"><img src="./icons/add.svg"></button>
+                      <button id="shrinkTanda"><img src="./icons/subtract.svg"></button>
                     </section>
                 </article>
             </div>
@@ -1411,6 +1424,7 @@
     isPlaying = false;
     isPlayingOnHeadphones = false;
     actions = /* @__PURE__ */ new Set();
+    editable = false;
     constructor() {
       super();
       this.attachShadow({ mode: "open" });
@@ -1423,6 +1437,10 @@
         this.shadowRoot.querySelector("#headphones").addEventListener("click", this.playOnHeadphones.bind(this));
         this.shadowRoot.querySelector(".track").addEventListener("click", this.handleTrackClick.bind(this));
       }
+    }
+    enableEdit(state) {
+      this.editable = state;
+      this.render();
     }
     stopPlayingOnHeadphones() {
       this.isPlayingOnHeadphones = false;
@@ -1550,35 +1568,56 @@
         }
     </style>
     <article class="track ${this.isPlaying ? "playing" : ""}">
-        <section class="actions">
-        ${[...this.actions].sort((a, b) => {
-        return a.sortOrder - b.sortOrder;
-      }).map((action) => {
-        return `<button id="${action.id}"><img src="${action.image}" alt="${action.alt}"></button>`;
-      })}
-        </section>
         <header>
         ${this.dataset.title !== "place holder" ? `<button id="headphones" class="${this.isPlayingOnHeadphones ? "playing" : ""}">
             <img src="./icons/headphones.png" alt="Listen on headphones">
         </button>` : "<span></span>"}
         <h2>
         <!--${this.dataset.tandaId ? this.dataset.tandaId : ""}-->
-        ${this.tagName === "CORTINA-ELEMENT" ? "(Cortina) " : ""} <span contenteditable="true" id="track-title">${this.dataset.title}</span></h2>
+        ${this.tagName === "CORTINA-ELEMENT" ? "(Cortina) " : ""} <span id="track-title">${this.dataset.title}</span></h2>
             <div id="floated">
-              ${!/undefined|null/.test(this.dataset.bpm) ? `<span>BPM: <span contenteditable="true">${this.dataset.bpm}</span></span>` : ""}
-              ${!/undefined|null/.test(this.dataset.year) ? `<span>Year: <span contenteditable="true">${this.dataset.year}</span></span>` : ""}
+              ${this.editable || !/undefined|null/.test(this.dataset.bpm) ? `<span>BPM: <span id="bpmValue">${this.dataset.bpm}</span></span>` : ""}
+              ${this.editable || !/undefined|null/.test(this.dataset.year) ? `<span>Year: <span id="yearValue">${this.dataset.year}</span></span>` : ""}
               <span>Duration: <span class='duration'>${this.dataset.duration}</span></span>                
             </div>
         </header>
         <main>
             <p>                
-                ${!(this.dataset.style == "undefined") ? `<span><span  contenteditable="true" class='style'>${this.dataset.style}</span></span>` : ""}
-                <span><span  contenteditable="true" class='artist'>${this.dataset.artist}</span></span>
-                ${!/undefined|null/.test(this.dataset.notes) ? `<span><span contenteditable="true">${this.dataset.notes}</span></span>` : ""}
+                ${this.editable || !(this.dataset.style == "undefined") ? `<span><span id="styleValue" class='style'>${this.dataset.style}</span></span>` : ""}
+                <span><span id="artistValue" class='artist'>${this.dataset.artist}</span></span>
+                ${this.editable || !/undefined|null/.test(this.dataset.notes) ? `<span><span id="notesValue">${this.dataset.notes}</span></span>` : ""}
                 </p>
         </main>
     </article>
         `;
+      const editableElements = {
+        "track-title": "track.metadata.tags.title",
+        "bpmValue": "track.metadata.tags.title",
+        "yearValue": "track.metadata.tags.year",
+        "styleValue": "track.metadata.style",
+        "artistValue": "track.metadata.tags.artist",
+        "notesValue": "track.metadata.tags.notes"
+      };
+      Object.keys(editableElements).forEach((item) => {
+        let element = this.shadowRoot.querySelector("#" + item);
+        if (element) {
+          element.contentEditable = this.editable ? "true" : "false";
+          if (this.editable) {
+            element.addEventListener("input", () => {
+              console.log("Content changed:", element.innerHTML);
+            });
+            element.addEventListener("blur", () => {
+              console.log("Editing finished:", element.innerHTML);
+              eventBus.emit("changeTrackData", {
+                field: editableElements[item],
+                value: element.textContent,
+                trackId: this.dataset.trackId,
+                type: this.tagName == "CORTINA-ELEMENT" ? "cortina" : "track"
+              });
+            });
+          }
+        }
+      });
     }
   };
   var TrackElement = class extends BaseTrackElement {
@@ -2353,6 +2392,8 @@
     dbVersion = 1;
     // Increment this for upgrades
     db = null;
+    docVectors = /* @__PURE__ */ new Map();
+    trigramIndex = /* @__PURE__ */ new Map();
     constructor() {
       console.log("Created Database object");
     }
@@ -2438,8 +2479,46 @@
         };
       });
     }
-    index(data) {
-      const stringValues = [
+    async cacheIndexData() {
+      const transaction = this.db?.transaction(["records"], "readonly");
+      const recordsStore = transaction?.objectStore("records");
+      const recordsRequest = recordsStore?.getAll();
+      recordsRequest.onsuccess = () => {
+        const records = recordsRequest.result;
+        records.forEach((record) => {
+          this.docVectors.set(record.id, new Map(Object.entries(record.vector)));
+        });
+      };
+      return new Promise((resolve, reject) => {
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = (event) => reject(event.target.error);
+      });
+    }
+    addToMemoryIndex(id, content) {
+      const tokens = this.tokenize(content);
+      const tf = /* @__PURE__ */ new Map();
+      tokens.forEach((token) => {
+        const trigrams = this.generateTrigrams("__" + token + "__");
+        trigrams.forEach((trigram) => {
+          if (!tf.has(trigram)) {
+            tf.set(trigram, 0);
+          }
+          tf.set(trigram, tf.get(trigram) + 1 / token.length);
+          if (!this.trigramIndex.has(trigram)) {
+            this.trigramIndex.set(trigram, /* @__PURE__ */ new Set());
+          }
+          this.trigramIndex.get(trigram).add(id);
+        });
+      });
+      const length = Math.sqrt(Array.from(tf.values()).reduce((sum, val) => sum + val * val, 0));
+      const normalizedTf = /* @__PURE__ */ new Map();
+      tf.forEach((value, key) => {
+        normalizedTf.set(key, value / length);
+      });
+      this.docVectors.set(id, normalizedTf);
+    }
+    async index(data) {
+      const content = [
         data.id,
         data.label,
         data.name,
@@ -2448,7 +2527,7 @@
         data.metadata?.tags?.year,
         data.metadata?.tags?.notes
       ].filter((x) => x).join(" ").toLowerCase();
-      this.addToIndex(convert(`${data.type}-${data.id}-${data.name}`), convert(stringValues));
+      this.addToMemoryIndex(`${data.type}-${data.id}-${data.name}`, convert(content));
     }
     // Helper function to tokenize a string into words
     tokenize(text) {
@@ -2462,77 +2541,62 @@
       }
       return trigrams;
     }
-    async addToIndex(id, text) {
-      const tokens = this.tokenize(text);
-      const trigrams = /* @__PURE__ */ new Set();
-      tokens.forEach((token) => {
-        this.generateTrigrams("__" + token + "__").forEach((trigram) => {
-          trigrams.add(trigram);
-        });
-      });
+    async commitChanges() {
       const transaction = this.db?.transaction(["records", "trigrams"], "readwrite");
       const recordsStore = transaction?.objectStore("records");
       const trigramsStore = transaction?.objectStore("trigrams");
-      const recordRequest = recordsStore?.put({ id, content: text });
-      recordRequest.onsuccess = async () => {
-        for (const trigram of trigrams) {
-          const trigramRequest = trigramsStore?.get(trigram);
-          trigramRequest.onsuccess = () => {
-            let recordIds = trigramRequest.result?.recordIds || [];
-            if (!recordIds.includes(id)) {
-              recordIds.push(id);
-            }
-            trigramsStore?.put({ trigram, recordIds });
-          };
-        }
-      };
+      this.docVectors.forEach((vector, id) => {
+        recordsStore?.put({ id, vector: Object.fromEntries(vector) });
+      });
+      this.trigramIndex.forEach((recordIds, trigram) => {
+        trigramsStore?.put({ trigram, recordIds: Array.from(recordIds) });
+      });
       return new Promise((resolve, reject) => {
         transaction.oncomplete = () => resolve();
         transaction.onerror = (event) => reject(event.target.error);
       });
     }
+    calculateCosineSimilarity(vectorA, vectorB) {
+      let dotProduct = 0;
+      let normA = 0;
+      let normB = 0;
+      vectorA.forEach((value, key) => {
+        dotProduct += value * (vectorB.get(key) || 0);
+        normA += value * value;
+      });
+      vectorB.forEach((value) => {
+        normB += value * value;
+      });
+      if (normA === 0 || normB === 0)
+        return 0;
+      return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+    }
     async search(query) {
-      const queryTokens = this.tokenize(convert(query.toLowerCase())).filter((x) => x);
-      console.log("Search tokens", queryTokens);
-      if (!queryTokens.length)
-        return [];
-      const queryTrigrams = /* @__PURE__ */ new Set();
-      queryTokens.forEach((token) => {
-        this.generateTrigrams("__" + token + "__").forEach((trigram) => {
-          queryTrigrams.add(trigram);
+      const tokens = this.tokenize(query.toLowerCase());
+      const tf = /* @__PURE__ */ new Map();
+      tokens.forEach((token) => {
+        const trigrams = this.generateTrigrams("__" + token + "__");
+        trigrams.forEach((trigram) => {
+          if (!tf.has(trigram)) {
+            tf.set(trigram, 0);
+          }
+          tf.set(trigram, tf.get(trigram) + 1 / token.length);
         });
       });
-      const transaction = this.db?.transaction(["trigrams"], "readonly");
-      const trigramsStore = transaction?.objectStore("trigrams");
-      const candidateScores = /* @__PURE__ */ new Map();
-      return new Promise((resolve, reject) => {
-        let remainingTrigrams = queryTrigrams.size;
-        queryTrigrams.forEach((trigram) => {
-          const request = trigramsStore?.get(trigram);
-          request.onsuccess = () => {
-            const recordIds = request.result?.recordIds || [];
-            recordIds.forEach((id) => {
-              if (!candidateScores.has(id)) {
-                candidateScores.set(id, 0);
-              }
-              candidateScores.set(id, candidateScores.get(id) + 1);
-            });
-            remainingTrigrams -= 1;
-            if (remainingTrigrams === 0) {
-              const results = [];
-              candidateScores.forEach((score, id) => {
-                results.push({ id, score });
-              });
-              results.sort((a, b) => b.score - a.score);
-              resolve(results);
-            }
-          };
-          request.onerror = (event) => {
-            console.error("Error fetching trigram data: ", event.target.error);
-            reject(event.target.error);
-          };
-        });
+      const length = Math.sqrt(Array.from(tf.values()).reduce((sum, val) => sum + val * val, 0));
+      const normalizedTf = /* @__PURE__ */ new Map();
+      tf.forEach((value, key) => {
+        normalizedTf.set(key, value / length);
       });
+      const results = [];
+      this.docVectors.forEach((docVector, id) => {
+        const score = this.calculateCosineSimilarity(normalizedTf, docVector);
+        if (score > 0) {
+          results.push({ id, score });
+        }
+      });
+      results.sort((a, b) => b.score - a.score);
+      return results;
     }
     async updateData(table, id, updates) {
       return new Promise((resolve, reject) => {
@@ -2867,8 +2931,9 @@
       }
       const scanProgress = getDomElement("#scanProgress");
       const scanFilePath = getDomElement("#scanFilePath");
-      scanFilePath.textContent = analyze ? "Please wait - progress is reported in batches ..." : "";
+      scanFilePath.textContent = "Please wait - progress is reported in batches ...";
       scanProgress.textContent = "";
+      await dbManager.cacheIndexData();
       let files = await getAllFiles(config.musicFolder);
       let batchSize = 20;
       const batches = splitArrayIntoBatches(files, batchSize);
@@ -2883,35 +2948,42 @@
           let indexFileName = convert(item.relativeFileName);
           scanFilePath.textContent = item.relativeFileName;
           scanProgress.textContent = ++n + "/" + files.length;
-          const table = indexFileName.split(/\/|\\/g)[1] == "music" ? "track" : "cortina";
-          let metadata = analysis ? analysis[batchIdx] : {
-            start: 0,
-            end: -1,
-            meanVolume: -20,
-            maxVolume: 0,
-            tags: { title: indexFileName, artist: "unknown" }
-          };
-          const newData = {
-            type: table,
-            name: indexFileName,
-            fileHandle: item.fileHandle,
-            metadata,
-            classifiers: {
-              favourite: true
-            }
-          };
-          try {
-            let { id } = await dbManager.getDataByName(table, indexFileName);
-            if (!id) {
+          const folderName = indexFileName.split(/\/|\\/g)[1];
+          const table = folderName == config.cortinaSubFolder ? "cortina" : folderName == config.musicSubFolder ? "track" : "";
+          if (table) {
+            let metadata = analysis ? analysis[batchIdx] : {
+              start: 0,
+              end: -1,
+              meanVolume: -20,
+              maxVolume: 0,
+              tags: { title: indexFileName, artist: "unknown" }
+            };
+            const newData = {
+              type: table,
+              name: indexFileName,
+              fileHandle: item.fileHandle,
+              metadata,
+              classifiers: {
+                favourite: true
+              }
+            };
+            try {
+              let { id } = await dbManager.getDataByName(table, indexFileName);
+              if (!id) {
+                await dbManager.addData(table, newData);
+                dbManager.index(newData);
+              } else {
+                await dbManager.updateData(table, id, newData);
+                dbManager.index(newData);
+              }
+            } catch (error) {
               await dbManager.addData(table, newData);
-            } else {
-              await dbManager.updateData(table, id, newData);
+              dbManager.index(newData);
             }
-          } catch (error) {
-            await dbManager.addData(table, newData);
           }
         }
       }
+      await dbManager.commitChanges();
       console.log("Have now updated the database with all tracks");
     } catch (error) {
       console.error(error);
@@ -3129,21 +3201,46 @@
   };
 
   // dist/app.js
-  var SYSTEM = {
-    defaultTandaStyleSequence: "4T 4T 3W 4T 3M",
-    useSoundLevelling: true
-  };
   var CONFIG_ID2 = 1;
+  var musicFolder;
+  async function getConfigPreferences(dbManager) {
+    const options = {};
+    const form = getDomElement("#settingsPanel");
+    const inputs = Array.from(form.querySelectorAll("input, select, #folderPath"));
+    for (const input of inputs) {
+      const id = input.id;
+      const value = input.type == "checkbox" ? input.checked : input.type == "text" ? input.value : input.textContent;
+      console.log(id, value, input);
+      options[id] = value;
+    }
+    options.musicFolder = musicFolder;
+    await dbManager.updateData("system", CONFIG_ID2, options).catch(async (error) => {
+      await dbManager.addData("system", options);
+    });
+    return options;
+  }
+  function setConfigPreferences(options) {
+    musicFolder = options.musicFolder;
+    const form = getDomElement("#settingsPanel");
+    const inputs = Array.from(form.querySelectorAll("input, select, #folderPath"));
+    for (const input of inputs) {
+      const id = input.id;
+      if (input.type == "checkbox") {
+        input.checked = options[id];
+      } else if (input.type == "text") {
+        input.value = options[id];
+      } else {
+        input.textContent = options[id];
+      }
+    }
+  }
   async function InitialiseConfig(dbManager) {
     try {
       const config = await dbManager.getDataById("system", CONFIG_ID2);
       if (!config) {
-        await dbManager.addData("system", SYSTEM);
-      } else {
-        await dbManager.updateData("system", config.id, {
-          ...SYSTEM,
-          ...config
-        });
+        let newConfig = await getConfigPreferences(dbManager);
+        newConfig.source = "Initialisation";
+        await dbManager.addData("system", newConfig);
       }
     } catch (error) {
       console.error("Database operation failed", error);
@@ -3165,10 +3262,7 @@
   }
   async function deleteDatabase(dbManager) {
     await dbManager.resetDatabase();
-    await dbManager.addData("system", SYSTEM);
-    let config = await dbManager.getDataById("system", CONFIG_ID2);
-    await openMusicFolder(dbManager, config);
-    return config;
+    return await getConfigPreferences(dbManager);
   }
   async function processQuery(dbManager, query, selectedStyle) {
     console.log("Search", query, selectedStyle);
@@ -3187,6 +3281,7 @@
       maxScore = maxScore < result.score ? result.score : maxScore;
     });
     let minScore = maxScore * 0.6;
+    console.log("Min/Max", minScore, maxScore);
     let trackResults = [];
     testResult.forEach((result) => {
       if (result.score >= minScore) {
@@ -3194,8 +3289,10 @@
         let key = convert(result.id.substring([prefix[0], prefix[1]].join("-").length + 1)).toLowerCase();
         let track = trackMap.get(key);
         if (track) {
-          if (selectedStyle == "all" || track.metadata?.style?.toLowerCase() == selectedStyle)
+          if (selectedStyle == "all" || track.metadata?.style?.toLowerCase() == selectedStyle) {
+            console.log("Match", result);
             trackResults.push(track);
+          }
         }
       }
     });
@@ -3254,9 +3351,28 @@
     });
     const dbManager = await DatabaseManager();
     let config = await InitialiseConfig(dbManager);
+    setConfigPreferences(config);
     const cortinaPicker = new CortinaPicker(dbManager);
     await cortinaPicker.load();
+    config = await getConfigPreferences(dbManager);
+    console.log("DEBUG CONFIG", config);
+    await dbManager.cacheIndexData();
     let quickClickHandlers = {
+      folderPicker: async () => {
+        try {
+          if (!window.showDirectoryPicker) {
+            alert("Your browser does not support the File System Access API");
+            return;
+          }
+          const directoryHandle = await window.showDirectoryPicker();
+          musicFolder = directoryHandle;
+          const folderPathElement = document.getElementById("folderPath");
+          folderPathElement.textContent = directoryHandle.name;
+          folderPathElement.dataset.path = directoryHandle.name;
+        } catch (error) {
+          console.error("Error selecting folder:", error);
+        }
+      },
       askUserPermission: async () => {
         await openMusicFolder(dbManager, config).then(() => {
           const modal = getDomElement("#permissionModal");
@@ -3267,18 +3383,21 @@
         });
       },
       rescanButton: async () => {
+        config = await getConfigPreferences(dbManager);
         await scanFileSystem(config, dbManager, false);
         await cortinaPicker.load();
       },
       rescanAnalyzeButton: async () => {
+        config = await getConfigPreferences(dbManager);
         await scanFileSystem(config, dbManager, true);
         await cortinaPicker.load();
       },
       settingsPanelButton: () => {
         getDomElement("#settingsPanel").classList.remove("hiddenPanel");
       },
-      settingsPanelButtonClose: () => {
+      settingsPanelButtonClose: async () => {
         getDomElement("#settingsPanel").classList.add("hiddenPanel");
+        config = await getConfigPreferences(dbManager);
       },
       playlistSettingsPanelOpenButton: () => {
         getDomElement(".playlist-settings-panel").classList.remove("hiddenPanel");
@@ -3290,6 +3409,7 @@
         config = await deleteDatabase(dbManager);
       },
       loadLibraryButton: async () => {
+        config = await getConfigPreferences(dbManager);
         await loadLibraryIntoDB(config, dbManager);
         await cortinaPicker.load();
       },
@@ -3365,10 +3485,19 @@
     await new Promise((resolve) => {
       eventBus.once("UserGrantedPermission", resolve);
     });
-    const useSoundLevelling = getDomElement("#useSoundLevelling");
-    useSoundLevelling.addEventListener("change", () => {
-      config.useSoundLevelling = useSoundLevelling.checked;
+    const configPanel = getDomElement("#settingsPanel");
+    configPanel.addEventListener("change", async () => {
+      config = await getConfigPreferences(dbManager);
       eventBus.emit("config-change");
+    });
+    eventBus.on("changeTrackData", async (payload) => {
+      console.log("Changed text values", payload);
+      const track = await dbManager.getDataById(payload.type, parseInt(payload.trackId));
+      if (track?.id) {
+        let x = new Function("track", payload.field + ' = "' + payload.value.replace('"', '"') + '"')(track);
+        console.log("Old value:", x, "New value:", track);
+        await dbManager.updateData(payload.type, track.id, track);
+      }
     });
     const tabs = ["Search", "Favourites", "Recent", "Non-overlapping"];
     const tabsContainer = new TabsContainer(getDomElement("#tabsContainer"), tabs, dbManager);

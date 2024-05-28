@@ -3,13 +3,14 @@
 import { Track, BaseRecord, Playlist, TableNames } from "../data-types";
 import { convert } from "./utils";
 
-
 export type IndexedDBRecord = BaseRecord | Track | Playlist;
 
 export class IndexedDBManager {
   private readonly dbName = "Tanda Player Database";
   private readonly dbVersion = 1; // Increment this for upgrades
   private db: IDBDatabase | null = null;
+  private docVectors: Map<string, Map<string, number>> = new Map();
+  private trigramIndex: Map<string, Set<string>> = new Map();
 
   constructor() {
     console.log("Created Database object");
@@ -93,31 +94,29 @@ export class IndexedDBManager {
         });
 
         // Handle special indexing tables
-        
+
         let objectStore: IDBObjectStore;
 
-        if (!db.objectStoreNames.contains('records')) {
-          objectStore = db.createObjectStore('records', {
-            keyPath: "id"
+        if (!db.objectStoreNames.contains("records")) {
+          objectStore = db.createObjectStore("records", {
+            keyPath: "id",
           });
         } else {
           objectStore = (event.target as IDBRequest).transaction?.objectStore(
-            'records'
+            "records"
           ) as IDBObjectStore;
         }
 
-        if (!db.objectStoreNames.contains('trigrams')) {
-          objectStore = db.createObjectStore('trigrams', {
-            keyPath: "trigram"
+        if (!db.objectStoreNames.contains("trigrams")) {
+          objectStore = db.createObjectStore("trigrams", {
+            keyPath: "trigram",
           });
         } else {
           objectStore = (event.target as IDBRequest).transaction?.objectStore(
-            'trigrams'
+            "trigrams"
           ) as IDBObjectStore;
         }
-
-
-    };
+      };
 
       request.onsuccess = (event: Event) => {
         console.log("Success in opening database");
@@ -127,8 +126,59 @@ export class IndexedDBManager {
     });
   }
 
-  private index(data: any): void {
-    const stringValues = [
+  async cacheIndexData(): Promise<void> {
+    const transaction = this.db?.transaction(["records"], "readonly");
+    const recordsStore = transaction?.objectStore("records");
+
+    const recordsRequest = recordsStore?.getAll();
+    recordsRequest!.onsuccess = () => {
+      const records = recordsRequest!.result;
+      records.forEach((record: any) => {
+        this.docVectors.set(record.id, new Map(Object.entries(record.vector)));
+      });
+    };
+
+    return new Promise((resolve, reject) => {
+      transaction!.oncomplete = () => resolve();
+      transaction!.onerror = (event: Event) =>
+        reject((event.target as IDBRequest).error);
+    });
+  }
+
+  private addToMemoryIndex(id: string, content: string): void {
+    const tokens = this.tokenize(content);
+    const tf: Map<string, number> = new Map();
+
+    tokens.forEach((token) => {
+      const trigrams = this.generateTrigrams("__" + token + "__");
+      trigrams.forEach((trigram) => {
+        if (!tf.has(trigram)) {
+          tf.set(trigram, 0);
+        }
+        tf.set(trigram, tf.get(trigram)! + 1 / token.length);
+
+        // Update trigram index
+        if (!this.trigramIndex.has(trigram)) {
+          this.trigramIndex.set(trigram, new Set());
+        }
+        this.trigramIndex.get(trigram)!.add(id);
+      });
+    });
+
+    // Normalize the TF vector
+    const length = Math.sqrt(
+      Array.from(tf.values()).reduce((sum, val) => sum + val * val, 0)
+    );
+    const normalizedTf = new Map<string, number>();
+    tf.forEach((value, key) => {
+      normalizedTf.set(key, value / length);
+    });
+
+    this.docVectors.set(id, normalizedTf);
+  }
+
+  public async index(data: any): Promise<void> {
+    const content = [
       data.id,
       data.label,
       data.name,
@@ -141,10 +191,7 @@ export class IndexedDBManager {
       .join(" ")
       .toLowerCase();
 
-    this.addToIndex(
-      convert(`${data.type}-${data.id}-${data.name}`),
-      convert(stringValues)
-    );
+    this.addToMemoryIndex(`${data.type}-${data.id}-${data.name}`, convert(content));
   }
 
   // Helper function to tokenize a string into words
@@ -161,16 +208,7 @@ export class IndexedDBManager {
     return trigrams;
   }
 
-  private async addToIndex(id: string, text: string): Promise<void> {
-    const tokens = this.tokenize(text);
-    const trigrams = new Set<string>();
-
-    tokens.forEach((token) => {
-      this.generateTrigrams('__' + token + '__').forEach((trigram) => {
-        trigrams.add(trigram);
-      });
-    });
-
+  async commitChanges(): Promise<void> {
     const transaction = this.db?.transaction(
       ["records", "trigrams"],
       "readwrite"
@@ -178,21 +216,15 @@ export class IndexedDBManager {
     const recordsStore = transaction?.objectStore("records");
     const trigramsStore = transaction?.objectStore("trigrams");
 
-    // Add or update the record
-    const recordRequest = recordsStore?.put({ id, content: text });
-    recordRequest!.onsuccess = async () => {
-      // Update trigrams
-      for (const trigram of trigrams) {
-        const trigramRequest = trigramsStore?.get(trigram);
-        trigramRequest!.onsuccess = () => {
-          let recordIds = trigramRequest!.result?.recordIds || [];
-          if (!recordIds.includes(id)) {
-            recordIds.push(id);
-          }
-          trigramsStore?.put({ trigram, recordIds });
-        };
-      }
-    };
+    // Commit records
+    this.docVectors.forEach((vector, id) => {
+      recordsStore?.put({ id, vector: Object.fromEntries(vector) });
+    });
+
+    // Commit trigrams
+    this.trigramIndex.forEach((recordIds, trigram) => {
+      trigramsStore?.put({ trigram, recordIds: Array.from(recordIds) });
+    });
 
     return new Promise((resolve, reject) => {
       transaction!.oncomplete = () => resolve();
@@ -201,54 +233,61 @@ export class IndexedDBManager {
     });
   }
 
+  private calculateCosineSimilarity(
+    vectorA: Map<string, number>,
+    vectorB: Map<string, number>
+  ): number {
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+
+    vectorA.forEach((value, key) => {
+      dotProduct += value * (vectorB.get(key) || 0);
+      normA += value * value;
+    });
+
+    vectorB.forEach((value) => {
+      normB += value * value;
+    });
+
+    if (normA === 0 || normB === 0) return 0;
+    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+  }
+
   public async search(query: string): Promise<{ id: string; score: number }[]> {
-    const queryTokens = this.tokenize(convert(query.toLowerCase())).filter(x => x);
-    console.log('Search tokens', queryTokens)
-    if ( !queryTokens.length ) return []
-    const queryTrigrams = new Set<string>();
+    const tokens = this.tokenize(query.toLowerCase());
+    const tf: Map<string, number> = new Map();
 
-    queryTokens.forEach((token) => {
-      this.generateTrigrams('__' + token + '__').forEach((trigram) => {
-        queryTrigrams.add(trigram);
+    tokens.forEach((token) => {
+      const trigrams = this.generateTrigrams("__" + token + "__");
+      trigrams.forEach((trigram) => {
+        if (!tf.has(trigram)) {
+          tf.set(trigram, 0);
+        }
+        tf.set(trigram, tf.get(trigram)! + 1 / token.length);
       });
     });
 
-    const transaction = this.db?.transaction(["trigrams"], "readonly");
-    const trigramsStore = transaction?.objectStore("trigrams");
-
-    const candidateScores: Map<string, number> = new Map<string, number>();
-
-    return new Promise((resolve, reject) => {
-      let remainingTrigrams = queryTrigrams.size;
-      queryTrigrams.forEach((trigram) => {
-        const request = trigramsStore?.get(trigram);
-        request!.onsuccess = () => {
-          const recordIds = request!.result?.recordIds || [];
-          recordIds.forEach((id: string) => {
-            if (!candidateScores.has(id)) {
-              candidateScores.set(id, 0);
-            }
-            candidateScores.set(id, candidateScores.get(id)! + 1);
-          });
-          remainingTrigrams -= 1;
-          if (remainingTrigrams === 0) {
-            const results: { id: string; score: number }[] = [];
-            candidateScores.forEach((score, id) => {
-              results.push({ id, score });
-            });
-            results.sort((a, b) => b.score - a.score);
-            resolve(results);
-          }
-        };
-        request!.onerror = (event: Event) => {
-          console.error(
-            "Error fetching trigram data: ",
-            (event.target as IDBRequest).error
-          );
-          reject((event.target as IDBRequest).error);
-        };
-      });
+    // Normalize the query TF vector
+    const length = Math.sqrt(
+      Array.from(tf.values()).reduce((sum, val) => sum + val * val, 0)
+    );
+    const normalizedTf = new Map<string, number>();
+    tf.forEach((value, key) => {
+      normalizedTf.set(key, value / length);
     });
+
+    const results: { id: string; score: number }[] = [];
+
+    this.docVectors.forEach((docVector, id) => {
+      const score = this.calculateCosineSimilarity(normalizedTf, docVector);
+      if (score > 0) {
+        results.push({ id, score });
+      }
+    });
+
+    results.sort((a, b) => b.score - a.score);
+    return results;
   }
 
   public async updateData(

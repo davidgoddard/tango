@@ -65,8 +65,11 @@ export interface Tanda extends BaseRecord {
 
 export interface ConfigOptions extends BaseRecord {
   musicFolder?: FileSystemDirectoryHandle;
+  musicSubFolder?: string;
+  cortinaSubFolder?: string;
   defaultTandaStyleSequence: string;
   mainOutput?: string;
   headphoneOutput?: string;
   useSoundLevelling: boolean;
+  source?: string;
 }
