@@ -1,6 +1,6 @@
 import { eventBus } from "../events/event-bus";
 import { Track, Tanda } from "../data-types";
-import { allTracks, getDomElement, renderTrackDetail } from "./utils";
+import { allTracks, getDomElement, getDomElementAll, renderTrackDetail } from "./utils";
 import { TrackElement } from "../components/track.element";
 import { TandaElement } from "../components/tanda.element";
 import { addDragDropHandlers } from "./drag-drop.service";
@@ -46,11 +46,18 @@ export class PlaylistService {
   }
 
   playingCortina(state: boolean) {
-    if (state) {
-      getDomElement(".cortina-grouped-items").classList.add("active");
+    if (state ) {
+      if ( !this.showingCortinaControls()){
+        getDomElement(".cortina-grouped-items").classList.add("active");
+        getDomElement("#playAll").classList.add('active')  
+      }
     } else {
       getDomElement(".cortina-grouped-items").classList.remove("active");
     }
+  }
+
+  showingCortinaControls(){
+    return getDomElement(".cortina-grouped-items").classList.contains("active");
   }
 
   // Detail contains N - nth track in playlist

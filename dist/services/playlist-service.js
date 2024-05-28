@@ -27,11 +27,17 @@ export class PlaylistService {
     }
     playingCortina(state) {
         if (state) {
-            getDomElement(".cortina-grouped-items").classList.add("active");
+            if (!this.showingCortinaControls()) {
+                getDomElement(".cortina-grouped-items").classList.add("active");
+                getDomElement("#playAll").classList.add('active');
+            }
         }
         else {
             getDomElement(".cortina-grouped-items").classList.remove("active");
         }
+    }
+    showingCortinaControls() {
+        return getDomElement(".cortina-grouped-items").classList.contains("active");
     }
     // Detail contains N - nth track in playlist
     markPlaying(details) {

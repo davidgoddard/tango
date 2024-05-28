@@ -340,6 +340,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       eventBus.emit("stopPlaying");
     },
     playAll: () => {
+      getDomElement("#playAll").classList.remove('active')
       eventBus.emit("playAll");
     },
     stopPlayAll: () => {
