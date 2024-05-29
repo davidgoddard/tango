@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Music Analysis</title>
+    <script src="../lib/ffmpeg.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/speech-commands"></script>
+  </head>
+  <body>
+    <input type="file" id="audio-file" />
+    <button onclick="processAudio()">Analyze Audio</button>
+    <pre id="output"></pre>
+    <script src="main.js"></script>
+  </body>
+</html>
