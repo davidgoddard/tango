@@ -13,7 +13,8 @@
     "build": "tsc  && npm run build:cp-public && ls -ltr dist/lib && node esbuild.js",
     "build:cp-public": "cp -R ./src/non-ts/** ./dist",
     "type": "tsc --noEmit",
-    "start": "npx http-server dist --cors"
+    "start": "npx http-server dist --cors",
+    "start-dev": "npx http-server dist -c-1 --cors -o -p 8080 --ssl --cert server.crt --key server.key --headers 'Cross-Origin-Opener-Policy: same-origin' --headers 'Cross-Origin-Embedder-Policy: require-corp'"
   },
   "author": "David Goddard",
   "license": "ISC"
