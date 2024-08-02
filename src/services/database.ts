@@ -134,7 +134,7 @@ export class IndexedDBManager {
     recordsRequest!.onsuccess = () => {
       const records = recordsRequest!.result;
       records.forEach((record: any) => {
-        this.docVectors.set(record.id, new Map(Object.entries(record.vector)));
+        if ( record.vector )  this.docVectors.set(record.id, new Map(Object.entries(record.vector)));
       });
     };
 

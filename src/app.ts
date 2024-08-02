@@ -1,10 +1,11 @@
 import { eventBus } from "./events/event-bus";
+import "./components/page-manager";
 import "./components/tanda.element";
 import "./components/search.element";
 import "./components/track.element";
 import "./components/large-list";
 import "./components/scratch-pad.element";
-import { TabsContainer } from "./components/tabs.component";
+import { SearchTabsContainer } from "./components/tabs.component";
 import { TrackElement } from "./components/track.element";
 import { SearchResult } from "./components/search.element";
 import { TandaElement } from "./components/tanda.element";
@@ -27,6 +28,7 @@ import {
   convert,
   createPlaceHolder,
   getDomElement,
+  getDomElementAll,
   scheduleEventEvery,
   timeStringToSeconds,
 } from "./services/utils";
@@ -39,6 +41,7 @@ import {
   scanFileSystem,
 } from "./services/file-database.interface";
 import { CortinaPicker } from "./services/cortina-service";
+import { PageManager } from "./components/page-manager";
 
 // if ("serviceWorker" in navigator) {
 //   window.addEventListener("load", () => {
@@ -61,20 +64,22 @@ async function getConfigPreferences(
   const form = getDomElement("#settingsPanel");
   const inputs = Array.from(
     form.querySelectorAll("input, select, #folderPath")
-  ) as HTMLInputElement[];
+  ) as unknown as HTMLInputElement[];
   for (const input of inputs) {
     const id = input.id;
-    const value =
-      input.type == "checkbox"
-        ? input.checked
-        : input.type == "text"
-        ? input.value
-        : input.textContent;
+    const value = (() => {
+      switch (input.type) {
+        case 'checkbox': return input.checked;
+        case 'text': return input.value;
+        case 'number': return input.value;
+        default: return input.textContent;
+      }
+    })();
     console.log(id, value, input);
     options[id] = value;
   }
   options.musicFolder = musicFolder;
-  await dbManager.updateData("system", CONFIG_ID, options).catch(async (error)=>{
+  await dbManager.updateData("system", CONFIG_ID, options).catch(async (error) => {
     await dbManager.addData("system", options);
   });
   return options;
@@ -85,7 +90,7 @@ function setConfigPreferences(options: any) {
   const form = getDomElement("#settingsPanel");
   const inputs = Array.from(
     form.querySelectorAll("input, select, #folderPath")
-  ) as any[];
+  ) as unknown as any[];
   for (const input of inputs) {
     const id = input.id;
     if (input.type == "checkbox") {
@@ -184,7 +189,7 @@ async function processQuery(
         if (
           selectedStyle == "all" ||
           track.metadata?.style?.toLowerCase() == selectedStyle
-        ){
+        ) {
           console.log('Match', result)
           trackResults.push(track);
         }
@@ -273,9 +278,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   await dbManager.cacheIndexData();
 
+  const scratchPadPagesData = JSON.parse(localStorage.getItem('scratch pad pages') ?? `[{"label": "Main", "content": []}]`);
+  const scratchPadPages = getDomElement('#scratchPadPages') as unknown as PageManager;
+  scratchPadPages.setPages(scratchPadPagesData);
+  eventBus.on('ScratchPad Renamed', ()=>{
+    console.log('Saving', scratchPadPages.getPages());
+    localStorage.setItem('scratch pad pages', JSON.stringify(scratchPadPages.getPages()))
+  })
+
   // Setup the quick key click to function mappings
 
-  let quickClickHandlers: { [key: string]: EventListener } = {
+  let quickClickHandlers: { [key: string]: (evt: Event) => void | Promise<void>; } = {
     folderPicker: async () => {
       try {
         if (!window.showDirectoryPicker) {
@@ -319,7 +332,22 @@ document.addEventListener("DOMContentLoaded", async () => {
       getDomElement("#settingsPanel").classList.add("hiddenPanel");
       config = await getConfigPreferences(dbManager);
     },
-    playlistSettingsPanelOpenButton: () => {
+    playlistSettingsPanelOpenButton: async () => {
+      let config = await getConfigPreferences(dbManager) as any as { [key: string]: string };
+      let playlistFields = document.querySelectorAll('#settingsContainer input') as unknown as HTMLInputElement[];
+
+      for (let field of playlistFields) {
+        if (!field.value) {
+          let id = field.id.toLowerCase();
+          let defaultId = 'default' + id;
+          Object.keys(config).forEach((key: string) => {
+            console.log('Checking setting', id, defaultId, key, config[key])
+            if (key.toLowerCase() == defaultId) {
+              field.value = config[key];
+            }
+          })
+        }
+      }
       getDomElement(".playlist-settings-panel").classList.remove("hiddenPanel");
     },
     playlistSettingsPanelCloseButton: () => {
@@ -328,7 +356,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     deleteDBButton: async () => {
       config = await deleteDatabase(dbManager);
     },
-    loadLibraryButton: async () => {
+    loadLibraryButton: async (): Promise<void> => {
       config = await getConfigPreferences(dbManager);
       await loadLibraryIntoDB(config, dbManager);
       await cortinaPicker.load();
@@ -356,9 +384,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       scratchPad.appendChild(newTanda);
     },
     collapsePlaylist: () => {
-      const allTandas = Array.from(
-        document.querySelectorAll("tanda-element")
-      ) as TandaElement[];
+      const allTandas = Array.from(document.querySelectorAll("tanda-element")) as unknown as TandaElement[];
       allTandas.forEach((tanda: TandaElement) => {
         tanda.collapse();
       });
@@ -366,7 +392,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     extendPlaylist: () => {
       const container = getDomElement("#playlistContainer");
 
-      const sequence = "3T 3T 3W 3T 3T 3M";
+      const sequence = (getDomElement('#tandaStyleSequence') as HTMLInputElement).value?.toUpperCase();
+
+      console.log(`Sequence used: ${sequence}`)
 
       const styleMap: { [key: string]: string } = {
         T: "Tango",
@@ -396,7 +424,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   };
 
   for (const key of Object.keys(quickClickHandlers)) {
-    getDomElement((key.charAt(0) != "." ? "#" : "") + key).addEventListener(
+    getDomElement((!key.startsWith(".") ? "#" : "") + key).addEventListener(
       "click",
       quickClickHandlers[key]
     );
@@ -423,7 +451,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // Handle configuration changes
-  const configPanel = getDomElement("#settingsPanel")!;
+  const configPanel = getDomElement("#settingsPanel");
   configPanel.addEventListener("change", async () => {
     config = await getConfigPreferences(dbManager);
     eventBus.emit("config-change");
@@ -450,7 +478,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Main application logic
   const tabs = ["Search", "Favourites", "Recent", "Non-overlapping"];
 
-  const tabsContainer = new TabsContainer(
+  const tabsContainer = new SearchTabsContainer(
     getDomElement("#tabsContainer"),
     tabs,
     dbManager
@@ -532,7 +560,7 @@ async function runApplication(
   scheduleEventEvery(1, () => {
     const tandas = Array.from(
       playlistContainer.querySelectorAll("tanda-element")
-    ) as TandaElement[];
+    ) as unknown as TandaElement[];
     const playingTanda = playlistContainer.querySelector(
       "tanda-element.playing"
     ) as TandaElement;
@@ -557,7 +585,7 @@ async function runApplication(
         if (tanda == playingTanda) {
           let allTracks = Array.from(
             tanda.querySelectorAll("track-element")
-          ) as TrackElement[];
+          ) as unknown as TrackElement[];
           if (allTracks) {
             let playing = tanda.querySelector(
               "track-element.playing"
@@ -578,7 +606,7 @@ async function runApplication(
         const hasCortina = tanda.querySelector("cortina-element");
         const tracks = Array.from(
           tanda.querySelectorAll("track-element")
-        ) as HTMLElement[];
+        ) as unknown as HTMLElement[];
         let duration = 0;
         if (hasCortina) {
           duration += timings.preCortina + timings.postCortina;
@@ -667,8 +695,6 @@ async function runApplication(
             silence = 4;
           }
         }
-      } else {
-        silence = 0;
       }
       return { track: nextTrack, silence };
     },
@@ -734,7 +760,7 @@ async function runApplication(
     playlistService.allTracks.forEach((track) => track.setPlaying(false));
     let tandas = Array.from(
       playlistContainer.querySelectorAll("tanda-element")
-    ) as TandaElement[];
+    ) as unknown as TandaElement[];
     tandas.forEach((tanda) => {
       tanda.setPlaying(false);
     });
@@ -786,8 +812,7 @@ async function runApplication(
   playlistPicker.addEventListener("change", async () => {
     const chosenPlaylist = playlistPicker.value;
     const tandas = (
-      (await dbManager.getDataByName("playlist", chosenPlaylist)) as Playlist
-    ).tandas as Tanda[];
+      (await dbManager.getDataByName("playlist", chosenPlaylist)) as Playlist).tandas as unknown as Tanda[];
     playlistService.setTandas(tandas);
   });
 

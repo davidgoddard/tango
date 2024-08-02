@@ -68,6 +68,9 @@ export interface ConfigOptions extends BaseRecord {
   musicSubFolder?: string;
   cortinaSubFolder?: string;
   defaultTandaStyleSequence: string;
+  defaultPlaylistTrackSpacing: number;
+  defaultPlaylistPreCortina: number;
+  defaultPlaylistPostCortina: number;
   mainOutput?: string;
   headphoneOutput?: string;
   useSoundLevelling: boolean;

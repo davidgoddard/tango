@@ -11,19 +11,6 @@ export class PlaylistService {
         eventBus.on("startingPlaying", this.markPlaying.bind(this));
         eventBus.on("stoppedPlaying", this.unmarkPlaying.bind(this));
         addDragDropHandlers(container);
-        function hasPlayed(element) {
-            if (element.classList.contains("playing") ||
-                element.classList.contains("played")) {
-                return true;
-            }
-            if (element.tagName != "TANDA-ELEMENT") {
-                const parent = element.parentElement;
-                if (parent.classList.contains("played")) {
-                    return true;
-                }
-            }
-            return false;
-        }
     }
     playingCortina(state) {
         if (state) {

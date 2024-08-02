@@ -1,10 +1,11 @@
 import { eventBus } from "./events/event-bus";
+import "./components/page-manager";
 import "./components/tanda.element";
 import "./components/search.element";
 import "./components/track.element";
 import "./components/large-list";
 import "./components/scratch-pad.element";
-import { TabsContainer } from "./components/tabs.component";
+import { SearchTabsContainer } from "./components/tabs.component";
 import "./services/themes";
 import { Player } from "./services/player";
 import { PlaylistService } from "./services/playlist-service";
@@ -31,11 +32,14 @@ async function getConfigPreferences(dbManager) {
     const inputs = Array.from(form.querySelectorAll("input, select, #folderPath"));
     for (const input of inputs) {
         const id = input.id;
-        const value = input.type == "checkbox"
-            ? input.checked
-            : input.type == "text"
-                ? input.value
-                : input.textContent;
+        const value = (() => {
+            switch (input.type) {
+                case 'checkbox': return input.checked;
+                case 'text': return input.value;
+                case 'number': return input.value;
+                default: return input.textContent;
+            }
+        })();
         console.log(id, value, input);
         options[id] = value;
     }
@@ -197,6 +201,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     config = await getConfigPreferences(dbManager);
     console.log("DEBUG CONFIG", config);
     await dbManager.cacheIndexData();
+    const scratchPadPagesData = JSON.parse(localStorage.getItem('scratch pad pages') ?? `[{"label": "Main", "content": []}]`);
+    const scratchPadPages = getDomElement('#scratchPadPages');
+    scratchPadPages.setPages(scratchPadPagesData);
+    eventBus.on('ScratchPad Renamed', () => {
+        console.log('Saving', scratchPadPages.getPages());
+        localStorage.setItem('scratch pad pages', JSON.stringify(scratchPadPages.getPages()));
+    });
     // Setup the quick key click to function mappings
     let quickClickHandlers = {
         folderPicker: async () => {
@@ -243,7 +254,21 @@ document.addEventListener("DOMContentLoaded", async () => {
             getDomElement("#settingsPanel").classList.add("hiddenPanel");
             config = await getConfigPreferences(dbManager);
         },
-        playlistSettingsPanelOpenButton: () => {
+        playlistSettingsPanelOpenButton: async () => {
+            let config = await getConfigPreferences(dbManager);
+            let playlistFields = document.querySelectorAll('#settingsContainer input');
+            for (let field of playlistFields) {
+                if (!field.value) {
+                    let id = field.id.toLowerCase();
+                    let defaultId = 'default' + id;
+                    Object.keys(config).forEach((key) => {
+                        console.log('Checking setting', id, defaultId, key, config[key]);
+                        if (key.toLowerCase() == defaultId) {
+                            field.value = config[key];
+                        }
+                    });
+                }
+            }
             getDomElement(".playlist-settings-panel").classList.remove("hiddenPanel");
         },
         playlistSettingsPanelCloseButton: () => {
@@ -287,7 +312,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         },
         extendPlaylist: () => {
             const container = getDomElement("#playlistContainer");
-            const sequence = "3T 3T 3W 3T 3T 3M";
+            const sequence = getDomElement('#tandaStyleSequence').value?.toUpperCase();
+            console.log(`Sequence used: ${sequence}`);
             const styleMap = {
                 T: "Tango",
                 W: "Waltz",
@@ -314,7 +340,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         },
     };
     for (const key of Object.keys(quickClickHandlers)) {
-        getDomElement((key.charAt(0) != "." ? "#" : "") + key).addEventListener("click", quickClickHandlers[key]);
+        getDomElement((!key.startsWith(".") ? "#" : "") + key).addEventListener("click", quickClickHandlers[key]);
     }
     Array.from(document.querySelectorAll("button")).forEach((button) => {
         button.addEventListener("mousedown", () => {
@@ -348,7 +374,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Set up the search tabs
     // Main application logic
     const tabs = ["Search", "Favourites", "Recent", "Non-overlapping"];
-    const tabsContainer = new TabsContainer(getDomElement("#tabsContainer"), tabs, dbManager);
+    const tabsContainer = new SearchTabsContainer(getDomElement("#tabsContainer"), tabs, dbManager);
     // Handle searches
     eventBus.on("query", async (payload) => {
         // Process the query (e.g., fetch data from a server)
@@ -514,9 +540,6 @@ async function runApplication(dbManager, config) {
                         silence = 4;
                     }
                 }
-            }
-            else {
-                silence = 0;
             }
             return { track: nextTrack, silence };
         },

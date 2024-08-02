@@ -205,7 +205,7 @@ class BaseTrackElement extends HTMLElement {
                   ? `<span>Year: <span id="yearValue">${this.dataset.year}</span></span>`
                   : ""
               }
-              <span>Duration: <span class='duration'>${
+              <span>Duration: <span class='duration' title="Duration">${
                 this.dataset.duration
               }</span></span>                
             </div>
@@ -214,15 +214,15 @@ class BaseTrackElement extends HTMLElement {
             <p>                
                 ${
                   this.editable || !(this.dataset.style == "undefined")
-                    ? `<span><span id="styleValue" class='style'>${this.dataset.style}</span></span>`
+                    ? `<span><span id="styleValue" class='style' title="Style">${this.dataset.style}</span></span>`
                     : ""
                 }
-                <span><span id="artistValue" class='artist'>${
+                <span><span id="artistValue" class='artist' title="Artist">${
                   this.dataset.artist
                 }</span></span>
                 ${
                   this.editable || !/undefined|null/.test(this.dataset.notes!)
-                    ? `<span><span id="notesValue">${this.dataset.notes}</span></span>`
+                    ? `<span><span id="notesValue" title="Notes">${this.dataset.notes}</span></span>`
                     : ""
                 }
                 </p>
@@ -232,7 +232,7 @@ class BaseTrackElement extends HTMLElement {
 
     const editableElements: { [key:string]: string} = {
       "track-title" : 'track.metadata.tags.title',
-      "bpmValue" : 'track.metadata.tags.title',
+      "bpmValue" : 'track.metadata.tags.bpm',
       "yearValue" : 'track.metadata.tags.year',
       "styleValue" : 'track.metadata.style',
       "artistValue" : 'track.metadata.tags.artist',

@@ -27,6 +27,7 @@
   --placeholder-background: #d7d6d6;
 
   --tab-active: orange;
+
 }
 
 * {
@@ -60,13 +61,13 @@ body.light-theme {
 }
 
 body.dark-theme {
-  --background-color: #2e2e2e;
+  --background-color: #262626;
   --text-color: #ffffff;
   --button-background-color: #333333;
   --button-text-color: #ffffff;
   --track-text-color: white;
   --header-background-color: #545353;
-  --placeholder-background: #766666;
+  --placeholder-background: #645e5e;
   --border-color: #8d6206;
   --tab-active: #eea61f;
 }
@@ -79,7 +80,7 @@ body.dark-theme {
     --button-text-color: #ffffff;
     --track-text-color: white;
     --header-background-color: #545353;
-    --placeholder-background: #766666;
+    --placeholder-background: #645e5e;
     --border-color: #8d6206;
     --tab-active: #eea61f;
   }
@@ -518,10 +519,11 @@ track-element {
 
 #cortinaList {
   margin-top: 1rem;
-  background-color: grey;
+  background-color: var(--background-color);
   height: 60vh;
   overflow-y: auto;
   width: 800px;
+  padding: 0.5rem;
 }
 
 .cortina-grouped-items {

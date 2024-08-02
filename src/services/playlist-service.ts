@@ -1,6 +1,6 @@
 import { eventBus } from "../events/event-bus";
 import { Track, Tanda } from "../data-types";
-import { allTracks, getDomElement, getDomElementAll, renderTrackDetail } from "./utils";
+import { allTracks, getDomElement, renderTrackDetail } from "./utils";
 import { TrackElement } from "../components/track.element";
 import { TandaElement } from "../components/tanda.element";
 import { addDragDropHandlers } from "./drag-drop.service";
@@ -27,22 +27,6 @@ export class PlaylistService {
     eventBus.on("stoppedPlaying", this.unmarkPlaying.bind(this));
     addDragDropHandlers(container)
 
-    function hasPlayed(element: HTMLElement): boolean {
-      if (
-        element.classList.contains("playing") ||
-        element.classList.contains("played")
-      ) {
-        return true;
-      }
-      if (element.tagName != "TANDA-ELEMENT") {
-        const parent = element.parentElement!;
-        if (parent.classList.contains("played")) {
-          return true;
-        }
-      }
-      return false;
-    }
-    
   }
 
   playingCortina(state: boolean) {
@@ -66,14 +50,14 @@ export class PlaylistService {
     // Get all tracks and pick Nth
 
     let all = this.allTracks;
-    const trackElement = all[details.N] as TrackElement;
+    const trackElement = all[details.N] as unknown as TrackElement;
     
     // Set it to playing
     all.forEach(track => track.setPlaying(false))
     trackElement.setPlaying(true);
 
     // Find tanda and set it to playing too
-    const tandaElement = trackElement.closest('tanda-element')! as TandaElement;
+    const tandaElement = trackElement.closest('tanda-element')! as unknown as TandaElement;
     tandaElement.setPlaying(true);
 
     // Work out progress through tanda
@@ -87,7 +71,7 @@ export class PlaylistService {
 
     const allTandas = Array.from(
       this.container.querySelectorAll("tanda-element")
-    ) as TandaElement[];
+    ) as unknown as TandaElement[];
 
     // Find N of the tanda being played
     let tandaN = allTandas.findIndex(tanda => tanda == tandaElement);
@@ -99,7 +83,7 @@ export class PlaylistService {
   }
 
   unmarkPlaying(details: PlayDetail) {
-    const trackElement = this.allTracks[details.N] as TrackElement;
+    const trackElement = this.allTracks[details.N] as unknown as TrackElement;
     console.log("Found track to unmark as playing", trackElement);
     trackElement.setPlaying(false);
   }
@@ -145,7 +129,7 @@ export class PlaylistService {
   }
 
   fetchElement(N: number): TrackElement {
-    return this.allTracks[N] as TrackElement;
+    return this.allTracks[N] as unknown as TrackElement;
   }
 
   getN(track: TrackElement) {

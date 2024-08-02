@@ -182,7 +182,7 @@ class ScratchPadElement extends HTMLElement {
   }
 
   render() {
-    const children = Array.from(this!.children) as HTMLElement[];
+    const children = Array.from(this.children) as HTMLElement[];
     children.forEach((child) => {
       const type = child.tagName.toLowerCase();
       const style = child.dataset.style;

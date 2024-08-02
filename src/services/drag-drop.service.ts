@@ -67,9 +67,9 @@ function swapElements(element1: HTMLElement, element2: HTMLElement) {
   temp.parentNode!.removeChild(temp);
 
   // Go up to the nearest tanda and re-render it
-  [element1, element2].forEach((element: HTMLElement) => {
+  new Array(element1, element2).forEach((element: HTMLElement) => {
     let tanda = element;
-    if (!(tanda.tagName === "TANDA-ELEMENT")) {
+    if (tanda.tagName !== "TANDA-ELEMENT") {
       tanda = tanda.closest("tanda-element")!;
     }
     if (tanda) (tanda as TandaElement).render();
@@ -110,14 +110,14 @@ export function dragDropHandler(event: any) {
   if (!target) {
     console.log("No target yet - ", event.target);
     if (event.target.tagName === "SCRATCH-PAD-ELEMENT") {
+      // If dragging from the playlist to the scratch-pad...
       if (draggingElement.closest("#playlistContainer")) {
-        // Create a dummy object to swap it with
+        // Create a dummy object to swap back into the playlist
         const swap = document.createElement(draggingElement.tagName);
         if (draggingElement.tagName === "TANDA-ELEMENT") {
           swap.dataset.style = draggingElement.dataset.style;
           let html = "";
-          for (let i = 0; i < draggingElement.children.length; i++) {
-            let child = draggingElement.children[i];
+          for (const child of draggingElement.children) {
             html += createPlaceHolder(child.tagName, swap.dataset.style!);
           }
           swap.innerHTML = html;
@@ -134,6 +134,7 @@ export function dragDropHandler(event: any) {
         }
       }
     }
+
 
     eventBus.emit("changed-playlist");
     return; // early
@@ -155,6 +156,11 @@ export function dragDropHandler(event: any) {
         targetParent.insertBefore(draggingElement.cloneNode(true), target);
         const scratchpad = document.querySelector("#scratchPad");
         scratchpad?.appendChild(target);
+
+        console.log('Drop target parent', targetParent)
+        if ( targetParent.tagName === 'TANDA-ELEMENT'){
+          (targetParent as unknown as TandaElement).render();
+        }
       } else {
         swapElements(draggingElement, target);
       }

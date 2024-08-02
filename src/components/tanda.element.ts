@@ -165,12 +165,13 @@ class TandaElement extends HTMLElement {
   }
   public render(firstCall: boolean = false) {
     if ( !firstCall ) this.removeEventListeners();
-    const tracks = Array.from(this.querySelectorAll("track-element")) as HTMLElement[];
-    const cortina = Array.from(this.querySelectorAll("cortina-element")) as HTMLElement[];
+    const tracks = Array.from(this.querySelectorAll("track-element")) as unknown as HTMLElement[];
+    const cortina = Array.from(this.querySelectorAll("cortina-element")) as unknown as HTMLElement[];
     const titles = [...tracks, ...cortina]
       .map((track) => track.dataset.title)
       .filter((x) => x);
     const titleSet = new Set(titles);
+    console.log("Title Set", titleSet)
     const artists = new Set(
       tracks.map((track) => track.dataset.artist).filter((x) => x)
     );
@@ -192,8 +193,7 @@ class TandaElement extends HTMLElement {
     let isPlaceHolder = [...titleSet].find(title => title == "place holder");
     const summary = `(${tracks.length} Tracks; Duration: ${formatTime(
       duration
-    )}):  ${isPlaceHolder ? "Place Holder" : ""
-      } ${this.findMinMaxYears(years)} ${[...artists].join(", ")}`;
+    )}):  ${isPlaceHolder ? "Incomplete!" : ""} ${this.findMinMaxYears(years)} ${[...artists].join(", ")}`;
 
     const track = cortina[0];
     let cortinaArtist;
@@ -378,7 +378,6 @@ class TandaElement extends HTMLElement {
     this.expanded = !this.expanded;
     let details = this.shadowRoot!.querySelector(".details");
     let extensions = this.shadowRoot!.querySelector("#extensions");
-    let span = this.shadowRoot!.querySelector("main span");
     if (this.expanded) {
       details!.classList.add("expanded");
       extensions!.classList.remove("hidden");

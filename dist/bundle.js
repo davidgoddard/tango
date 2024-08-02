@@ -722,6 +722,89 @@
   };
   var eventBus = new EventBus();
 
+  // dist/components/page-manager.js
+  var PageManager = class extends HTMLElement {
+    shadow;
+    pages = [];
+    constructor() {
+      super();
+      this.shadow = this.attachShadow({ mode: "open" });
+    }
+    static get observedAttributes() {
+      return ["pages"];
+    }
+    attributeChangedCallback(name, oldValue, newValue) {
+      if (name === "pages" && oldValue !== newValue) {
+        this.render();
+      }
+    }
+    setPages(pageData) {
+      this.pages = pageData;
+      this.render();
+    }
+    getPages() {
+      return this.pages;
+    }
+    connectedCallback() {
+      this.render();
+    }
+    render() {
+      const style = `
+            <style>
+                .tabs { display: flex; border-bottom: 1px solid #ccc; flex-wrap: wrap;}
+                .tab { margin: 0; padding: 10px; cursor: pointer; position: relative; }
+                .tab-content { display: none; padding: 10px; }
+                .tab-content.active { display: block; }
+                .tab .delete, .tab .add { position: absolute; right: 5px; top: 5px; cursor: pointer; }
+                .tab .add { right: 25px; }
+                .tab[contenteditable]:hover { background: #f0f0f0; }
+            </style>
+        `;
+      const tabs = this.pages.map((page, index) => `
+            <div draggable=true class="tab" data-index="${index}" contenteditable="true">
+                ${page.label}
+            </div>
+        `).join("");
+      const tabContents = this.pages.map((page, index) => `
+            <div class="tab-content" data-index="${index}">
+                ${page.content.map((item) => `<p>${item}</p>`).join("")}
+            </div>
+        `).join("");
+      this.shadow.innerHTML = `
+            ${style}
+            <div class="tabs">
+                ${tabs}
+                <div class="tab add">\u2795</div>
+            </div>
+            ${tabContents}
+        `;
+      let tabElements = this.shadow.querySelectorAll(".tab");
+      tabElements.forEach((tab) => {
+        tab.addEventListener("click", () => this.switchTab(tab));
+        tab.addEventListener("input", (e) => this.handleTabEdit(e, tab));
+      });
+      this.shadow.querySelector(".add")?.addEventListener("click", () => this.addTab());
+      this.shadow.querySelectorAll(".tab-content")[0]?.classList.add("active");
+    }
+    handleTabEdit(e, tab) {
+      const index = tab.dataset.index;
+      if (index !== void 0) {
+        this.pages[Number(index)].label = tab.textContent?.trim() ?? "";
+        eventBus.emit("ScratchPad Renamed");
+      }
+    }
+    switchTab(tab) {
+      const index = tab.dataset.index;
+      this.shadow.querySelectorAll(".tab-content").forEach((content) => content.classList.remove("active"));
+      this.shadow.querySelector(`.tab-content[data-index="${index}"]`)?.classList.add("active");
+    }
+    addTab() {
+      this.pages.push({ label: "New Page", content: [] });
+      this.render();
+    }
+  };
+  customElements.define("page-manager", PageManager);
+
   // dist/services/utils.js
   function convert(input) {
     return input.normalize("NFC");
@@ -937,6 +1020,7 @@
       const cortina = Array.from(this.querySelectorAll("cortina-element"));
       const titles = [...tracks, ...cortina].map((track2) => track2.dataset.title).filter((x) => x);
       const titleSet = new Set(titles);
+      console.log("Title Set", titleSet);
       const artists = new Set(tracks.map((track2) => track2.dataset.artist).filter((x) => x));
       const years = tracks.map((track2) => track2.dataset.year).filter((x) => x).map((year) => year.substring(0, 4));
       const styles = new Set(tracks.map((track2) => track2.dataset.style)?.filter((x) => x));
@@ -946,7 +1030,7 @@
       let duration = 0;
       tracks.forEach((track2) => duration += timeStringToSeconds(track2.dataset.duration));
       let isPlaceHolder = [...titleSet].find((title) => title == "place holder");
-      const summary = `(${tracks.length} Tracks; Duration: ${formatTime(duration)}):  ${isPlaceHolder ? "Place Holder" : ""} ${this.findMinMaxYears(years)} ${[...artists].join(", ")}`;
+      const summary = `(${tracks.length} Tracks; Duration: ${formatTime(duration)}):  ${isPlaceHolder ? "Incomplete!" : ""} ${this.findMinMaxYears(years)} ${[...artists].join(", ")}`;
       const track = cortina[0];
       let cortinaArtist;
       let cortinaTitle;
@@ -1120,7 +1204,6 @@
       this.expanded = !this.expanded;
       let details = this.shadowRoot.querySelector(".details");
       let extensions = this.shadowRoot.querySelector("#extensions");
-      let span = this.shadowRoot.querySelector("main span");
       if (this.expanded) {
         details.classList.add("expanded");
         extensions.classList.remove("hidden");
@@ -1162,9 +1245,9 @@
     element2.parentNode.insertBefore(element1, element2);
     temp.parentNode.insertBefore(element2, temp);
     temp.parentNode.removeChild(temp);
-    [element1, element2].forEach((element) => {
+    new Array(element1, element2).forEach((element) => {
       let tanda = element;
-      if (!(tanda.tagName === "TANDA-ELEMENT")) {
+      if (tanda.tagName !== "TANDA-ELEMENT") {
         tanda = tanda.closest("tanda-element");
       }
       if (tanda)
@@ -1205,8 +1288,7 @@
           if (draggingElement.tagName === "TANDA-ELEMENT") {
             swap.dataset.style = draggingElement.dataset.style;
             let html = "";
-            for (let i = 0; i < draggingElement.children.length; i++) {
-              let child = draggingElement.children[i];
+            for (const child of draggingElement.children) {
               html += createPlaceHolder(child.tagName, swap.dataset.style);
             }
             swap.innerHTML = html;
@@ -1236,6 +1318,10 @@
           targetParent.insertBefore(draggingElement.cloneNode(true), target);
           const scratchpad = document.querySelector("#scratchPad");
           scratchpad?.appendChild(target);
+          console.log("Drop target parent", targetParent);
+          if (targetParent.tagName === "TANDA-ELEMENT") {
+            targetParent.render();
+          }
         } else {
           swapElements(draggingElement, target);
         }
@@ -1578,21 +1664,21 @@
             <div id="floated">
               ${this.editable || !/undefined|null/.test(this.dataset.bpm) ? `<span>BPM: <span id="bpmValue">${this.dataset.bpm}</span></span>` : ""}
               ${this.editable || !/undefined|null/.test(this.dataset.year) ? `<span>Year: <span id="yearValue">${this.dataset.year}</span></span>` : ""}
-              <span>Duration: <span class='duration'>${this.dataset.duration}</span></span>                
+              <span>Duration: <span class='duration' title="Duration">${this.dataset.duration}</span></span>                
             </div>
         </header>
         <main>
             <p>                
-                ${this.editable || !(this.dataset.style == "undefined") ? `<span><span id="styleValue" class='style'>${this.dataset.style}</span></span>` : ""}
-                <span><span id="artistValue" class='artist'>${this.dataset.artist}</span></span>
-                ${this.editable || !/undefined|null/.test(this.dataset.notes) ? `<span><span id="notesValue">${this.dataset.notes}</span></span>` : ""}
+                ${this.editable || !(this.dataset.style == "undefined") ? `<span><span id="styleValue" class='style' title="Style">${this.dataset.style}</span></span>` : ""}
+                <span><span id="artistValue" class='artist' title="Artist">${this.dataset.artist}</span></span>
+                ${this.editable || !/undefined|null/.test(this.dataset.notes) ? `<span><span id="notesValue" title="Notes">${this.dataset.notes}</span></span>` : ""}
                 </p>
         </main>
     </article>
         `;
       const editableElements = {
         "track-title": "track.metadata.tags.title",
-        "bpmValue": "track.metadata.tags.title",
+        "bpmValue": "track.metadata.tags.bpm",
         "yearValue": "track.metadata.tags.year",
         "styleValue": "track.metadata.style",
         "artistValue": "track.metadata.tags.artist",
@@ -1942,30 +2028,38 @@
   var TabsContainer = class {
     container;
     tabs;
-    dbManager;
-    constructor(container, tabs, dbManager) {
+    constructor(container, tabs) {
       this.container = container;
       this.tabs = tabs;
-      this.dbManager = dbManager;
       this.render();
     }
     render() {
       this.container.innerHTML = `
-  <ul class="tab-list" role="tablist">
-    ${this.tabs.map((label, idx) => {
+        <ul class="tab-list" role="tablist">
+          ${this.tabs.map((label, idx) => {
         return `<li class="tab ${idx == 0 ? "active" : ""}" id="tab${idx + 1}" role="tab">${label}</li>`;
       }).join("")}
-  </ul>
-  <div class="tab-panels">
-    ${this.tabs.map((label, idx) => {
+        </ul>
+        <div class="tab-panels">
+          ${this.tabs.map((label, idx) => {
         return `<div class="tab-panel ${idx == 0 ? "" : "hidden"}" id="tab${idx + 1}-panel" role="tabpanel">
-      <!-- Content for Tab ${idx + 1} -->
-      <search-element></search-element>
-    </div>
+            <!-- Content for Tab ${idx + 1} -->
+            <search-element></search-element>
+          </div>
 `;
       }).join("")}
-  </div>
+      </div>
 `;
+    }
+  };
+  var SearchTabsContainer = class extends TabsContainer {
+    dbManager;
+    constructor(container, tabs, dbManager) {
+      super(container, tabs);
+      this.dbManager = dbManager;
+    }
+    render() {
+      super.render();
       const searchComponents = Array.from(document.querySelectorAll("search-element"));
       searchComponents.forEach((search) => search.setDB(this.dbManager));
       const tabs = Array.from(this.container.querySelectorAll(".tab"));
@@ -1976,7 +2070,7 @@
         const childPanel = panels[idx];
         panels.forEach((panel) => panel.classList.add("hidden"));
         childPanel.classList.remove("hidden");
-        childPanel.querySelector("search-element").focus();
+        childPanel?.querySelector("search-element")?.focus();
       }));
     }
   };
@@ -2305,18 +2399,6 @@
       eventBus.on("startingPlaying", this.markPlaying.bind(this));
       eventBus.on("stoppedPlaying", this.unmarkPlaying.bind(this));
       addDragDropHandlers(container);
-      function hasPlayed(element) {
-        if (element.classList.contains("playing") || element.classList.contains("played")) {
-          return true;
-        }
-        if (element.tagName != "TANDA-ELEMENT") {
-          const parent = element.parentElement;
-          if (parent.classList.contains("played")) {
-            return true;
-          }
-        }
-        return false;
-      }
     }
     playingCortina(state) {
       if (state) {
@@ -2492,7 +2574,8 @@
       recordsRequest.onsuccess = () => {
         const records = recordsRequest.result;
         records.forEach((record) => {
-          this.docVectors.set(record.id, new Map(Object.entries(record.vector)));
+          if (record.vector)
+            this.docVectors.set(record.id, new Map(Object.entries(record.vector)));
         });
       };
       return new Promise((resolve, reject) => {
@@ -3215,7 +3298,18 @@
     const inputs = Array.from(form.querySelectorAll("input, select, #folderPath"));
     for (const input of inputs) {
       const id = input.id;
-      const value = input.type == "checkbox" ? input.checked : input.type == "text" ? input.value : input.textContent;
+      const value = (() => {
+        switch (input.type) {
+          case "checkbox":
+            return input.checked;
+          case "text":
+            return input.value;
+          case "number":
+            return input.value;
+          default:
+            return input.textContent;
+        }
+      })();
       console.log(id, value, input);
       options[id] = value;
     }
@@ -3363,6 +3457,13 @@
     config = await getConfigPreferences(dbManager);
     console.log("DEBUG CONFIG", config);
     await dbManager.cacheIndexData();
+    const scratchPadPagesData = JSON.parse(localStorage.getItem("scratch pad pages") ?? `[{"label": "Main", "content": []}]`);
+    const scratchPadPages = getDomElement("#scratchPadPages");
+    scratchPadPages.setPages(scratchPadPagesData);
+    eventBus.on("ScratchPad Renamed", () => {
+      console.log("Saving", scratchPadPages.getPages());
+      localStorage.setItem("scratch pad pages", JSON.stringify(scratchPadPages.getPages()));
+    });
     let quickClickHandlers = {
       folderPicker: async () => {
         try {
@@ -3405,7 +3506,21 @@
         getDomElement("#settingsPanel").classList.add("hiddenPanel");
         config = await getConfigPreferences(dbManager);
       },
-      playlistSettingsPanelOpenButton: () => {
+      playlistSettingsPanelOpenButton: async () => {
+        let config2 = await getConfigPreferences(dbManager);
+        let playlistFields = document.querySelectorAll("#settingsContainer input");
+        for (let field of playlistFields) {
+          if (!field.value) {
+            let id = field.id.toLowerCase();
+            let defaultId = "default" + id;
+            Object.keys(config2).forEach((key) => {
+              console.log("Checking setting", id, defaultId, key, config2[key]);
+              if (key.toLowerCase() == defaultId) {
+                field.value = config2[key];
+              }
+            });
+          }
+        }
         getDomElement(".playlist-settings-panel").classList.remove("hiddenPanel");
       },
       playlistSettingsPanelCloseButton: () => {
@@ -3449,7 +3564,8 @@
       },
       extendPlaylist: () => {
         const container = getDomElement("#playlistContainer");
-        const sequence = "3T 3T 3W 3T 3T 3M";
+        const sequence = getDomElement("#tandaStyleSequence").value?.toUpperCase();
+        console.log(`Sequence used: ${sequence}`);
         const styleMap = {
           T: "Tango",
           W: "Waltz",
@@ -3476,7 +3592,7 @@
       }
     };
     for (const key of Object.keys(quickClickHandlers)) {
-      getDomElement((key.charAt(0) != "." ? "#" : "") + key).addEventListener("click", quickClickHandlers[key]);
+      getDomElement((!key.startsWith(".") ? "#" : "") + key).addEventListener("click", quickClickHandlers[key]);
     }
     Array.from(document.querySelectorAll("button")).forEach((button) => {
       button.addEventListener("mousedown", () => {
@@ -3507,7 +3623,7 @@
       }
     });
     const tabs = ["Search", "Favourites", "Recent", "Non-overlapping"];
-    const tabsContainer = new TabsContainer(getDomElement("#tabsContainer"), tabs, dbManager);
+    const tabsContainer = new SearchTabsContainer(getDomElement("#tabsContainer"), tabs, dbManager);
     eventBus.on("query", async (payload) => {
       const results = await processQuery(dbManager, payload.searchData, payload.selectedStyle);
       eventBus.emit("queryResults", {
@@ -3653,8 +3769,6 @@
               silence = 4;
             }
           }
-        } else {
-          silence = 0;
         }
         return { track: nextTrack, silence };
       },
