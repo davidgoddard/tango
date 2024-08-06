@@ -22,6 +22,28 @@ export const addDragDropHandlers = (
   container.addEventListener("drop", dragDropHandler);
 };
 
+function closestParent(node: Element, selector: string) {
+
+  if (!node) {
+      return null;
+  }
+
+  if (node instanceof ShadowRoot) {
+      return closestParent(node.host, selector);
+  }
+
+  if (node instanceof HTMLElement) {
+      if (node.matches(selector)) {
+          return node;
+      } else {
+          return closestParent(node.parentNode as Element, selector);
+      }
+  }
+
+  return closestParent(node.parentNode as Element, selector);
+
+}
+
 function isValidDropTarget(source: HTMLElement, target: HTMLElement): boolean {
   console.log(
     "Is valid",
@@ -30,7 +52,7 @@ function isValidDropTarget(source: HTMLElement, target: HTMLElement): boolean {
     source.dataset.style,
     target.dataset.style
   );
-  if (target.closest(".results")) {
+  if (closestParent(target, ".results")) {
     return false;
   }
   let valid = sameStyle(
@@ -38,7 +60,7 @@ function isValidDropTarget(source: HTMLElement, target: HTMLElement): boolean {
     target.dataset?.style || ""
   );
   return (
-    target.tagName == "SCRATCH-PAD-ELEMENT" ||
+    closestParent(target, "SCRATCH-PAD-ELEMENT") !== undefined ||
     (source !== target && source.tagName == target.tagName && valid)
   );
 }
@@ -51,6 +73,10 @@ function sameStyle(a: string, b: string): boolean {
 }
 
 function swapElements(element1: HTMLElement, element2: HTMLElement) {
+
+  element1.classList.remove('drop-target');
+  element2.classList.remove('drop-target');
+
   // Create a temporary placeholder element
   const temp = document.createElement("div");
 
@@ -70,7 +96,7 @@ function swapElements(element1: HTMLElement, element2: HTMLElement) {
   new Array(element1, element2).forEach((element: HTMLElement) => {
     let tanda = element;
     if (tanda.tagName !== "TANDA-ELEMENT") {
-      tanda = tanda.closest("tanda-element")!;
+      tanda = closestParent(tanda, "tanda-element")!;
     }
     if (tanda) (tanda as TandaElement).render();
   });
@@ -106,12 +132,12 @@ export function dragDropHandler(event: any) {
   document.querySelector(".drop-target")?.classList.remove("drop-target");
 
   let target: HTMLElement;
-  target = (event.target as HTMLElement).closest(draggingElement.tagName)!;
+  target = closestParent((event.target as HTMLElement), draggingElement.tagName)!;
   if (!target) {
     console.log("No target yet - ", event.target);
-    if (event.target.tagName === "SCRATCH-PAD-ELEMENT") {
+    if (closestParent(event.target, ".scratchpad-tab-content")) {
       // If dragging from the playlist to the scratch-pad...
-      if (draggingElement.closest("#playlistContainer")) {
+      if (closestParent(draggingElement, "#playlistContainer")) {
         // Create a dummy object to swap back into the playlist
         const swap = document.createElement(draggingElement.tagName);
         if (draggingElement.tagName === "TANDA-ELEMENT") {
@@ -128,11 +154,12 @@ export function dragDropHandler(event: any) {
         event.target.appendChild(swap);
         swapElements(draggingElement, swap);
       } else {
-        console.log("Nearest", draggingElement.closest(".results"));
-        if (draggingElement.closest(".results")) {
+        console.log("Nearest", closestParent(draggingElement, ".results"));
+        if (closestParent(draggingElement, ".results")) {
           event.target.appendChild(draggingElement.cloneNode(true));
         }
       }
+      event.target.classList.remove('drop-target');
     }
 
 
@@ -148,8 +175,7 @@ export function dragDropHandler(event: any) {
       console.log("drop", target.id);
       // is this a drop from the search results straight into the playlist
       if (
-        target.closest("#playlistContainer") &&
-        draggingElement.closest(".results")
+        closestParent(draggingElement, ".results")
       ) {
         // Yes - therefore put the target into the scratchpad and leave the source alone
         let targetParent = target.parentElement!;
@@ -158,7 +184,7 @@ export function dragDropHandler(event: any) {
         scratchpad?.appendChild(target);
 
         console.log('Drop target parent', targetParent)
-        if ( targetParent.tagName === 'TANDA-ELEMENT'){
+        if (targetParent.tagName === 'TANDA-ELEMENT') {
           (targetParent as unknown as TandaElement).render();
         }
       } else {
@@ -167,7 +193,7 @@ export function dragDropHandler(event: any) {
     }
   }
   eventBus.emit("changed-playlist");
-  
+
 }
 
 export function dragEndHandler(event: any) {

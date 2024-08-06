@@ -1,5 +1,4 @@
 import { eventBus } from "./events/event-bus";
-import "./components/page-manager";
 import "./components/tanda.element";
 import "./components/search.element";
 import "./components/track.element";
@@ -42,6 +41,7 @@ import {
 } from "./services/file-database.interface";
 import { CortinaPicker } from "./services/cortina-service";
 import { PageManager } from "./components/page-manager";
+import { ScratchPadElement } from "./components/scratch-pad.element";
 
 // if ("serviceWorker" in navigator) {
 //   window.addEventListener("load", () => {
@@ -278,14 +278,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   await dbManager.cacheIndexData();
 
-  const scratchPadPagesData = JSON.parse(localStorage.getItem('scratch pad pages') ?? `[{"label": "Main", "content": []}]`);
-  const scratchPadPages = getDomElement('#scratchPadPages') as unknown as PageManager;
-  scratchPadPages.setPages(scratchPadPagesData);
-  eventBus.on('ScratchPad Renamed', ()=>{
-    console.log('Saving', scratchPadPages.getPages());
-    localStorage.setItem('scratch pad pages', JSON.stringify(scratchPadPages.getPages()))
-  })
-
   // Setup the quick key click to function mappings
 
   let quickClickHandlers: { [key: string]: (evt: Event) => void | Promise<void>; } = {
@@ -378,10 +370,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       getDomElement("#cortinaPicker").classList.add("hidden");
     },
     createTandaButton: () => {
-      const scratchPad = getDomElement("#scratchPad");
-      const newTanda = document.createElement("tanda-element");
-      newTanda.dataset.style = "undefined";
-      scratchPad.appendChild(newTanda);
+      const scratchPad = getDomElement("#scratchPad") as ScratchPadElement;
+      let tab = scratchPad.getActiveTabContents();
+      if (tab) {
+        const newTanda = document.createElement("tanda-element");
+        newTanda.dataset.style = "undefined";
+        tab.appendChild(newTanda);
+      }
     },
     collapsePlaylist: () => {
       const allTandas = Array.from(document.querySelectorAll("tanda-element")) as unknown as TandaElement[];

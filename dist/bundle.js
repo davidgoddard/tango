@@ -722,89 +722,6 @@
   };
   var eventBus = new EventBus();
 
-  // dist/components/page-manager.js
-  var PageManager = class extends HTMLElement {
-    shadow;
-    pages = [];
-    constructor() {
-      super();
-      this.shadow = this.attachShadow({ mode: "open" });
-    }
-    static get observedAttributes() {
-      return ["pages"];
-    }
-    attributeChangedCallback(name, oldValue, newValue) {
-      if (name === "pages" && oldValue !== newValue) {
-        this.render();
-      }
-    }
-    setPages(pageData) {
-      this.pages = pageData;
-      this.render();
-    }
-    getPages() {
-      return this.pages;
-    }
-    connectedCallback() {
-      this.render();
-    }
-    render() {
-      const style = `
-            <style>
-                .tabs { display: flex; border-bottom: 1px solid #ccc; flex-wrap: wrap;}
-                .tab { margin: 0; padding: 10px; cursor: pointer; position: relative; }
-                .tab-content { display: none; padding: 10px; }
-                .tab-content.active { display: block; }
-                .tab .delete, .tab .add { position: absolute; right: 5px; top: 5px; cursor: pointer; }
-                .tab .add { right: 25px; }
-                .tab[contenteditable]:hover { background: #f0f0f0; }
-            </style>
-        `;
-      const tabs = this.pages.map((page, index) => `
-            <div draggable=true class="tab" data-index="${index}" contenteditable="true">
-                ${page.label}
-            </div>
-        `).join("");
-      const tabContents = this.pages.map((page, index) => `
-            <div class="tab-content" data-index="${index}">
-                ${page.content.map((item) => `<p>${item}</p>`).join("")}
-            </div>
-        `).join("");
-      this.shadow.innerHTML = `
-            ${style}
-            <div class="tabs">
-                ${tabs}
-                <div class="tab add">\u2795</div>
-            </div>
-            ${tabContents}
-        `;
-      let tabElements = this.shadow.querySelectorAll(".tab");
-      tabElements.forEach((tab) => {
-        tab.addEventListener("click", () => this.switchTab(tab));
-        tab.addEventListener("input", (e) => this.handleTabEdit(e, tab));
-      });
-      this.shadow.querySelector(".add")?.addEventListener("click", () => this.addTab());
-      this.shadow.querySelectorAll(".tab-content")[0]?.classList.add("active");
-    }
-    handleTabEdit(e, tab) {
-      const index = tab.dataset.index;
-      if (index !== void 0) {
-        this.pages[Number(index)].label = tab.textContent?.trim() ?? "";
-        eventBus.emit("ScratchPad Renamed");
-      }
-    }
-    switchTab(tab) {
-      const index = tab.dataset.index;
-      this.shadow.querySelectorAll(".tab-content").forEach((content) => content.classList.remove("active"));
-      this.shadow.querySelector(`.tab-content[data-index="${index}"]`)?.classList.add("active");
-    }
-    addTab() {
-      this.pages.push({ label: "New Page", content: [] });
-      this.render();
-    }
-  };
-  customElements.define("page-manager", PageManager);
-
   // dist/services/utils.js
   function convert(input) {
     return input.normalize("NFC");
@@ -1042,7 +959,7 @@
         if (cortinaArtist?.length > 15)
           cortinaArtist = cortinaArtist.substring(0, 15) + "...";
       } else {
-        cortinaTitle = "Unknown";
+        cortinaTitle = "No Cortina";
         cortinaArtist = "";
       }
       const cortinaSummary = cortinaTitle.length > 0 ? `<button id="changeCortinaButton" class="cortinaName">${cortinaTitle}</button>` : "";
@@ -1224,13 +1141,29 @@
     container.addEventListener("dragleave", dragLeaveHandler);
     container.addEventListener("drop", dragDropHandler);
   };
+  function closestParent(node, selector) {
+    if (!node) {
+      return null;
+    }
+    if (node instanceof ShadowRoot) {
+      return closestParent(node.host, selector);
+    }
+    if (node instanceof HTMLElement) {
+      if (node.matches(selector)) {
+        return node;
+      } else {
+        return closestParent(node.parentNode, selector);
+      }
+    }
+    return closestParent(node.parentNode, selector);
+  }
   function isValidDropTarget(source, target) {
     console.log("Is valid", source.tagName, target.tagName, source.dataset.style, target.dataset.style);
-    if (target.closest(".results")) {
+    if (closestParent(target, ".results")) {
       return false;
     }
     let valid = sameStyle(source.dataset?.style || "", target.dataset?.style || "");
-    return target.tagName == "SCRATCH-PAD-ELEMENT" || source !== target && source.tagName == target.tagName && valid;
+    return closestParent(target, "SCRATCH-PAD-ELEMENT") !== void 0 || source !== target && source.tagName == target.tagName && valid;
   }
   function sameStyle(a, b) {
     if (a == b)
@@ -1240,6 +1173,8 @@
     return false;
   }
   function swapElements(element1, element2) {
+    element1.classList.remove("drop-target");
+    element2.classList.remove("drop-target");
     const temp = document.createElement("div");
     element1.parentNode.insertBefore(temp, element1);
     element2.parentNode.insertBefore(element1, element2);
@@ -1248,7 +1183,7 @@
     new Array(element1, element2).forEach((element) => {
       let tanda = element;
       if (tanda.tagName !== "TANDA-ELEMENT") {
-        tanda = tanda.closest("tanda-element");
+        tanda = closestParent(tanda, "tanda-element");
       }
       if (tanda)
         tanda.render();
@@ -1279,11 +1214,11 @@
     event.preventDefault();
     document.querySelector(".drop-target")?.classList.remove("drop-target");
     let target;
-    target = event.target.closest(draggingElement.tagName);
+    target = closestParent(event.target, draggingElement.tagName);
     if (!target) {
       console.log("No target yet - ", event.target);
-      if (event.target.tagName === "SCRATCH-PAD-ELEMENT") {
-        if (draggingElement.closest("#playlistContainer")) {
+      if (closestParent(event.target, ".scratchpad-tab-content")) {
+        if (closestParent(draggingElement, "#playlistContainer")) {
           const swap = document.createElement(draggingElement.tagName);
           if (draggingElement.tagName === "TANDA-ELEMENT") {
             swap.dataset.style = draggingElement.dataset.style;
@@ -1299,11 +1234,12 @@
           event.target.appendChild(swap);
           swapElements(draggingElement, swap);
         } else {
-          console.log("Nearest", draggingElement.closest(".results"));
-          if (draggingElement.closest(".results")) {
+          console.log("Nearest", closestParent(draggingElement, ".results"));
+          if (closestParent(draggingElement, ".results")) {
             event.target.appendChild(draggingElement.cloneNode(true));
           }
         }
+        event.target.classList.remove("drop-target");
       }
       eventBus.emit("changed-playlist");
       return;
@@ -1313,7 +1249,7 @@
     if (target) {
       if (draggingElement && isValidDropTarget(draggingElement, target)) {
         console.log("drop", target.id);
-        if (target.closest("#playlistContainer") && draggingElement.closest(".results")) {
+        if (closestParent(draggingElement, ".results")) {
           let targetParent = target.parentElement;
           targetParent.insertBefore(draggingElement.cloneNode(true), target);
           const scratchpad = document.querySelector("#scratchPad");
@@ -1857,45 +1793,87 @@
   // dist/components/scratch-pad.element.js
   var ScratchPadElement = class extends HTMLElement {
     container;
+    draggingElement;
     filterType = "all";
     filterStyle = "";
+    shadow;
+    pages = [];
     constructor() {
       super();
-      this.attachShadow({ mode: "open" });
+      this.shadow = this.attachShadow({ mode: "open" });
+    }
+    setPages(pageData) {
+      this.pages = pageData;
+    }
+    getPages() {
+      return this.pages;
+    }
+    savePages() {
+      localStorage.setItem("scratch pad pages", JSON.stringify(this.getPages()));
+    }
+    savePageState() {
+      this.pages.forEach((page, index) => {
+        let content = this.shadow.querySelector(`.scratchpad-tab-content[data-index="${index}"]`);
+        if (content) {
+          page.content = Array.from(content.querySelectorAll(":scope > *")).map((node) => node.outerHTML);
+        }
+        this.savePages();
+      });
+    }
+    handleTabEdit(e, tab) {
+      const index = tab.dataset.index;
+      if (index !== void 0) {
+        this.pages[Number(index)].label = tab.textContent?.trim() ?? "";
+        this.savePages();
+      }
+    }
+    switchTab(tab) {
+      const index = tab.dataset.index;
+      this.shadow.querySelectorAll(".tab").forEach((content) => content.classList.remove("active"));
+      tab.classList.add("active");
+      this.shadow.querySelectorAll(".scratchpad-tab-content").forEach((content) => content.classList.remove("active"));
+      this.shadow.querySelector(`.scratchpad-tab-content[data-index="${index}"]`)?.classList.add("active");
+    }
+    addTab() {
+      this.pages.push({ label: "New Page", content: [] });
+      this.savePages();
+      this.connectedCallback();
+      let tabs = this.shadow.querySelectorAll(".tab");
+      let index = this.pages.length - 1;
+      this.switchTab(tabs[index]);
     }
     connectedCallback() {
-      this.container = document.createElement("slot");
-      this.shadowRoot?.appendChild(this.createStyles());
-      this.shadowRoot?.appendChild(this.createControls());
-      this.shadowRoot?.appendChild(this.container);
+      const scratchPadPagesData = JSON.parse(localStorage.getItem("scratch pad pages") ?? `[{"label": "Main", "content": []}]`);
+      this.setPages(scratchPadPagesData);
+      this.shadow.innerHTML = "";
+      this.container = document.createElement("section");
+      this.container.appendChild(this.createStyles());
+      this.container.appendChild(this.createControls());
+      this.shadow.appendChild(this.container);
       this.render();
-      addDragDropHandlers(this);
-      this.addEventListener("drop", () => {
-        console.log("debug drop");
-        const styleSelect = this.shadowRoot.querySelector("select");
-        console.log(styleSelect);
-        if (styleSelect)
-          this.updateStyleOptions(styleSelect);
-      });
+    }
+    getActiveTabContents() {
+      return this.shadow.querySelector(".scratchpad-tab-content.active");
     }
     createStyles() {
       const style = document.createElement("style");
       style.textContent = `
-        :host {
-          display: block;
-          border: 1px solid #ccc;
-          padding: 10px;
-          margin: 10px;
+        section {
+          height: 100%;
+          overflow-y: auto; /* Scrollable content area */
+          box-sizing: border-box;
+          display: grid;
+          grid-template-rows: auto auto 1fr;
         }
         .controls {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin: 0.2rem 0.2rem 60px 0.2rem;
+          margin: 0.2rem 0.2rem 0.2rem 0.2rem;
           padding: 3px;
         }
         .drop-target {
-          outline: dashed 2px green;
+          outline: dashed 3px green;
           z-index: 99;
         }
         .controls button img {
@@ -1903,12 +1881,12 @@
           width: 32px;
         }
         .bin-target {
-          outline: dashed 3px red;
+          outline: dashed 3px green;
           z-index: 99;
         }
         button.bin {
           background-color: transparent;
-          border: none;
+          margin: 3px;
           border: none;
           color: var(--header-text-color);
           cursor: pointer;
@@ -1951,6 +1929,7 @@
       styleSelect.addEventListener("change", () => this.setFilterStyle(styleSelect.value));
       controls.appendChild(styleSelect);
       this.updateStyleOptions(styleSelect);
+      let self = this;
       const bin = document.createElement("button");
       bin.classList.add("bin");
       const binImage = document.createElement("img");
@@ -1972,19 +1951,31 @@
         event.stopPropagation();
         console.log("Bin handling drop");
         const id = event.dataTransfer.getData("text/plain");
-        console.log("ID", id);
-        const element = document.querySelector(`[data-id="${id}"]`);
-        console.log(element);
-        if (element) {
-          element.remove();
+        if (id?.startsWith("TAB-")) {
+          let index = id.split("-")[1];
+          console.log("Tab?", index, self.draggingElement);
+          console.log(self.pages[Number(index)]);
+          self.pages.splice(Number(index), 1);
+          console.log("New pages", self.pages);
+          self.savePages();
+          self.connectedCallback();
+        } else {
+          console.log("ID", id);
+          const element = document.querySelector(`[data-id="${id}"]`) || self.shadow.querySelector(`[data-id="${id}"]`);
+          console.log(element);
+          if (element) {
+            element.remove();
+          }
         }
         bin.classList.remove("bin-target");
+        self.savePageState();
         document.querySelector(".drop-target")?.classList.remove("drop-target");
+        self.shadow.querySelector(".drop-target")?.classList.remove("drop-target");
         eventBus.emit("changed-playlist");
       }
       bin.addEventListener("dragleave", handleDragLeave);
       bin.addEventListener("dragover", handleDragOver);
-      bin.addEventListener("drop", handleDrop);
+      bin.addEventListener("drop", handleDrop.bind(this));
       bin.addEventListener("click", () => {
         this.innerHTML = "";
       });
@@ -2011,13 +2002,85 @@
       this.render();
     }
     render() {
+      const style = `
+    <style>
+        .tabs { display: flex; flex-direction: row; flex-wrap: wrap; border-bottom: 1px solid #ccc; height: min-content; }
+        .tab { 
+          position: relative;
+          padding: 0px 20px;
+          cursor: pointer;
+          border: 1px solid #ccc;
+          border-bottom: none;
+          background-color: #f0f0f0;
+          transition: background-color 0.3s;
+          color: black;          
+        }
+        .tab span {
+          line-height: 2rem;
+        }
+        .tab:hover, .tab.active {
+          background-color: var(--tab-active);
+        }
+        .scratchpad-tab-content { display: none; padding: 10px; height: 100%; flex-direction: column; }
+        .scratchpad-tab-content.active { display: flex; margin: 3px;}
+        .tab.delete, .tab.add { }
+        .tab.add { background-color: transparent; border: none; }
+        .tab span[contenteditable]:hover { background: #f0f0f0; }
+
+    </style>
+`;
+      const tabs = this.pages.map((page, index) => `
+    <div draggable="true" data-index="${index}"  class="tab" ><span contenteditable="true" >
+        ${page.label}
+    </span></div>
+`).join("");
+      const tabContents = this.pages.map((page, index) => `
+    <div class="scratchpad-tab-content" data-index="${index}">
+            ${page.content.join("")}
+    </div>
+`).join("");
+      let template2 = document.createElement("template");
+      template2.innerHTML = `
+    ${style}
+      <div class="tabs">
+          ${tabs}
+          <div class="tab add"><span>\u2795</span></div>
+      </div>
+      ${tabContents}
+`;
+      this.container.appendChild(template2.content.cloneNode(true));
+      let tabElements = this.shadow.querySelectorAll(".tab, .tab span");
+      tabElements.forEach((tab) => {
+        tab.addEventListener("click", () => this.switchTab(tab));
+        tab.addEventListener("input", (e) => this.handleTabEdit(e, tab));
+        tab.addEventListener("dragstart", (event) => {
+          const target = event.target;
+          if (target.matches("[draggable]")) {
+            console.log("dragstart", target.dataset.index);
+            event.dataTransfer?.setData("text/plain", "TAB-" + target.dataset.index);
+            this.draggingElement = target;
+          }
+        });
+        tab.addEventListener("dragend", (event) => {
+          this.draggingElement = void 0;
+        });
+      });
+      this.shadow.querySelector(".add")?.addEventListener("click", () => this.addTab());
+      let tabHeadings = this.shadow.querySelectorAll(".tab");
+      tabHeadings[0]?.classList.add("active");
+      let tabContainers = this.shadow.querySelectorAll(".scratchpad-tab-content");
+      tabContainers[0]?.classList.add("active");
+      for (const content of tabContainers) {
+        addDragDropHandlers(content);
+        content.addEventListener("drop", this.savePageState.bind(this));
+      }
       const children = Array.from(this.children);
       children.forEach((child) => {
         const type = child.tagName.toLowerCase();
-        const style = child.dataset.style;
+        const style2 = child.dataset.style;
         const matchesType = this.filterType === "all" || this.filterType === type;
         console.log(type, matchesType, this.filterType, type);
-        const matchesStyle = !this.filterStyle || this.filterStyle === style;
+        const matchesStyle = !this.filterStyle || this.filterStyle === style2;
         child.style.display = matchesType && matchesStyle ? "" : "none";
       });
     }
@@ -3236,6 +3299,10 @@
       document.addEventListener("changeCortina", (event) => {
         console.log("Request to change cortina", event.detail);
         this.targetTanda = event.detail;
+        const current = this.targetTanda?.querySelector("cortina-element");
+        if (!current) {
+          this.targetTanda.innerHTML = createPlaceHolder("cortina-element", "cortina") + this.targetTanda.innerHTML;
+        }
         this.cortinaWindow?.classList.remove("hidden");
         this.chooseCortina();
       });
@@ -3457,13 +3524,6 @@
     config = await getConfigPreferences(dbManager);
     console.log("DEBUG CONFIG", config);
     await dbManager.cacheIndexData();
-    const scratchPadPagesData = JSON.parse(localStorage.getItem("scratch pad pages") ?? `[{"label": "Main", "content": []}]`);
-    const scratchPadPages = getDomElement("#scratchPadPages");
-    scratchPadPages.setPages(scratchPadPagesData);
-    eventBus.on("ScratchPad Renamed", () => {
-      console.log("Saving", scratchPadPages.getPages());
-      localStorage.setItem("scratch pad pages", JSON.stringify(scratchPadPages.getPages()));
-    });
     let quickClickHandlers = {
       folderPicker: async () => {
         try {
@@ -3552,9 +3612,12 @@
       },
       createTandaButton: () => {
         const scratchPad = getDomElement("#scratchPad");
-        const newTanda = document.createElement("tanda-element");
-        newTanda.dataset.style = "undefined";
-        scratchPad.appendChild(newTanda);
+        let tab = scratchPad.getActiveTabContents();
+        if (tab) {
+          const newTanda = document.createElement("tanda-element");
+          newTanda.dataset.style = "undefined";
+          tab.appendChild(newTanda);
+        }
       },
       collapsePlaylist: () => {
         const allTandas = Array.from(document.querySelectorAll("tanda-element"));

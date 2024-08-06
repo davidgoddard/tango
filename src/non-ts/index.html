@@ -20,18 +20,159 @@
 </head>
 
 <body>
-  <header class="content">
-    <button class="active" id="settingsPanelButton" aria-label="Open menu">
-      <img src="./icons/settings.svg" />
-    </button>
-    <h1>Tanda Player Lite</h1>
-    <button class="active" id="light-theme-btn" aria-label="Choose light theme">
-      <img src="./icons/sun.png" />
-    </button>
-    <button class="active" id="dark-theme-btn" aria-label="Choose dark theme">
-      <img src="./icons/moon.png" />
-    </button>
-  </header>
+  <section class="main-page">
+    <header class="content">
+      <button class="active" id="settingsPanelButton" aria-label="Open menu">
+        <img src="./icons/settings.svg" />
+      </button>
+      <h1>Tanda Player Lite</h1>
+      <button class="active" id="light-theme-btn" aria-label="Choose light theme">
+        <img src="./icons/sun.png" />
+      </button>
+      <button class="active" id="dark-theme-btn" aria-label="Choose dark theme">
+        <img src="./icons/moon.png" />
+      </button>
+    </header>
+
+    <!-- ===================================================================================================================== -->
+
+    <main class="all">
+      <div id="searchColumn" class="column content">
+        <header>
+          <h2>Library</h2>
+          <button id="createTandaButton" class="active">
+            <img src="./icons/extend.png" title="Create new empty tanda" />
+          </button>
+        </header>
+        <div id="tabsContainer"></div>
+      </div>
+
+      <!-- ===================================================================================================================== -->
+
+      <div id="scratchpadColumn" class="column content">
+        <header class="scratch-pad-heading">
+          <h2>Notebook</h2>
+          <button id="createTandaButton" class="active">
+            <img src="./icons/extend.png" title="Create new empty tanda" />
+          </button>
+        </header>
+        <scratch-pad-element id="scratchPad" playlistSelector="#playlist">
+        </scratch-pad-element>
+      </div>
+
+      <!-- ===================================================================================================================== -->
+
+      <div id="playlistColumn" class="column content">
+        <section class="fixedColumnContent">
+          <header class="playlistHeading">
+            <h2>Playlist</h2>
+            <section class="controlButtons">
+              <button id="stopButton">
+                <img src="./icons/stop.svg" alt="stop now" />
+              </button>
+              <div class="cortina-grouped-items">
+                <span>Cortina</span>
+                <button id="playAll" class="active">
+                  <img src="./icons/cortina-play-all.svg" alt="Play whole cortina" title="Play whole cortina" />
+                </button>
+                <button id="stopPlayAll" class="active">
+                  <img src="./icons/cortina-stop-early.svg" alt="Stop cortina and continue playlist"
+                    title="Stop cortina and continue playlist" />
+                </button>
+              </div>
+            </section>
+            <section>
+              <button id="extendPlaylist" class="active">
+                <img src="./icons/extend.png" alt="Extend playlist with one of each required tanda style"
+                  title="Extend playlist with one of each required tanda style" />
+              </button>
+              <button id="collapsePlaylist" class="active">
+                <img src="./icons/collapse.png" alt="Collapse each tanda back to its summary view"
+                  title="Collapse each tanda back to its summary view" />
+              </button>
+              <!-- <p>Show times:
+                            <label>Relative: <input type="radio" name="timingBase" value="relative">
+                                Real: <input type="radio" name="timingBase" value="realtime" checked="checked"></label>
+                        </p> -->
+              <button class="active" id="playlistSettingsPanelOpenButton" aria-label="Open menu">
+                <img src="./icons/settings.svg" />
+              </button>
+            </section>
+          </header>
+
+          <!-- ===================================================================================================================== -->
+
+          <div class="playlist-settings-panel slideable-panel hiddenPanel">
+
+            <header>
+              <h2>Current Playlist Settings</h2>
+              <button id="playlistSettingsPanelCloseButton" class="active playlist-settings-close-btn"
+                aria-label="Close Playlist Settings">
+                <img src="./icons/close.svg" />
+              </button>
+            </header>
+            <div id="settingsContainer" class="playlist-settings-content">
+              <select id="playlistPicker"></select>
+              <div>
+                <label class="field-container">Name: <input type="text" id="playlistName" /></label>
+                <label class="field-container">Cortina Set: <input type="text" id="cortinaSetName" /></label>
+                <label class="field-container">Tanda Style Sequence:
+                  <input type="text" id="tandaStyleSequence" placeholder="E.g. 4T 4T 3W 4T 4T 3M" /></label>
+                <p>
+                  Time between tracks causes songs to overlap if a negative
+                  value is given and adds silence if positive. Note that songs
+                  are already trimmed of any leading and trailing silence.
+                </p>
+
+                <label class="field-container">Time between tracks:
+                  <input type="number" id="playlistTrackSpacing" placeholder="Time in seconds between tracks" /></label>
+
+                <label class="field-container">Time before cortina:
+                  <input type="number" id="playlistPreCortina"
+                    placeholder="Time in seconds before cortina (if used)" /></label>
+
+                <label class="field-container">Time after cortina:
+                  <input type="number" id="playlistPostCortina"
+                    placeholder="Time in seconds after cortina (if used)" /></label>
+
+                <button id="savePlaylist">Save Playlist</button>
+                <button id="loadPlaylist">Load Playlist</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===================================================================================================================== -->
+
+        <div id="playlistContainer"></div>
+      </div>
+    </main>
+  </section>
+
+  <div id="permissionModal" class="overlay">
+    <div class="modal">
+      <h2>Permission Request</h2>
+      <p>
+        Tanda Player needs your permission to read your music files folder for
+        all files. Please click 'Allow' to continue.
+      </p>
+      <button class="active" id="askUserPermission">Allow</button>
+    </div>
+  </div>
+
+  <div id="cortinaPicker" class="hidden">
+    <div class="cortina-content">
+      <header>
+        <h2>Cortina Selector</h2>
+        <button class="active" id="cortinaPickerButtonClose" aria-label="Close Settings">
+          <img src="./icons/close.svg">
+        </button>
+      </header>
+      <label>Choose folder/collection:
+        <select id="folderSelect"></select></label>
+      <div id="cortinaList"></div>
+    </div>
+  </div>
 
   <div id="iframeContainer"></div>
 
@@ -156,148 +297,11 @@
     </fieldset>
   </div>
 
-  <!-- ===================================================================================================================== -->
-
-  <main class="all">
-    <div id="searchColumn" class="column content">
-      <div id="tabsContainer"></div>
-    </div>
-    <div class="handle" id="handle1"></div>
-
-    <!-- ===================================================================================================================== -->
-
-    <div id="scratchpadColumn" class="column content">
-      <header class="scratch-pad-heading">
-        <h2>Scratch Pad</h2>
-        <button id="createTandaButton" class="active">
-          <img src="./icons/add-new-tanda.svg" title="Create new empty tanda" />
-        </button>
-      </header>
-      <scratch-pad-element id="scratchPad" playlistSelector="#playlist">
-        <page-manager id="scratchPadPages"></page-manager>
-      </scratch-pad-element>
-    </div>
-    <div class="handle" id="handle2"></div>
-
-    <!-- ===================================================================================================================== -->
-
-    <div id="playlistColumn" class="column content">
-      <section class="fixedColumnContent">
-        <header class="playlistHeading">
-          <h2>Playlist</h2>
-          <section class="controlButtons">
-            <button id="stopButton">
-              <img src="./icons/stop.svg" alt="stop now" />
-            </button>
-            <div class="cortina-grouped-items">
-              <span>Cortina</span>
-              <button id="playAll" class="active">
-                <img src="./icons/cortina-play-all.svg" alt="Play whole cortina" title="Play whole cortina" />
-              </button>
-              <button id="stopPlayAll" class="active">
-                <img src="./icons/cortina-stop-early.svg" alt="Stop cortina and continue playlist"
-                  title="Stop cortina and continue playlist" />
-              </button>
-            </div>
-          </section>
-          <section>
-            <button id="extendPlaylist" class="active">
-              <img src="./icons/extend.png" alt="Extend playlist with one of each required tanda style"
-                title="Extend playlist with one of each required tanda style" />
-            </button>
-            <button id="collapsePlaylist" class="active">
-              <img src="./icons/collapse.png" alt="Collapse each tanda back to its summary view"
-                title="Collapse each tanda back to its summary view" />
-            </button>
-            <!-- <p>Show times:
-                            <label>Relative: <input type="radio" name="timingBase" value="relative">
-                                Real: <input type="radio" name="timingBase" value="realtime" checked="checked"></label>
-                        </p> -->
-            <button class="active" id="playlistSettingsPanelOpenButton" aria-label="Open menu">
-              <img src="./icons/settings.svg" />
-            </button>
-          </section>
-        </header>
-
-        <!-- ===================================================================================================================== -->
-
-        <div class="playlist-settings-panel slideable-panel hiddenPanel">
-
-          <header>
-            <h2>Current Playlist Settings</h2>
-            <button id="playlistSettingsPanelCloseButton" class="active playlist-settings-close-btn"
-              aria-label="Close Playlist Settings">
-              <img src="./icons/close.svg" />
-            </button>
-          </header>
-          <div id="settingsContainer" class="playlist-settings-content">
-            <select id="playlistPicker"></select>
-            <div>
-              <label class="field-container">Name: <input type="text" id="playlistName" /></label>
-              <label class="field-container">Cortina Set: <input type="text" id="cortinaSetName" /></label>
-              <label class="field-container">Tanda Style Sequence:
-                <input type="text" id="tandaStyleSequence" placeholder="E.g. 4T 4T 3W 4T 4T 3M" /></label>
-              <p>
-                Time between tracks causes songs to overlap if a negative
-                value is given and adds silence if positive. Note that songs
-                are already trimmed of any leading and trailing silence.
-              </p>
-
-              <label class="field-container">Time between tracks:
-                <input type="number" id="playlistTrackSpacing" placeholder="Time in seconds between tracks" /></label>
-
-              <label class="field-container">Time before cortina:
-                <input type="number" id="playlistPreCortina"
-                  placeholder="Time in seconds before cortina (if used)" /></label>
-
-              <label class="field-container">Time after cortina:
-                <input type="number" id="playlistPostCortina"
-                  placeholder="Time in seconds after cortina (if used)" /></label>
-
-              <button id="savePlaylist">Save Playlist</button>
-              <button id="loadPlaylist">Load Playlist</button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ===================================================================================================================== -->
-
-      <div id="playlistContainer"></div>
-    </div>
-  </main>
-
-  <!-- <label>Tempo: <input id="tempo" type="range" min="0.8" max="1.3" step="0.01" value="0"><button id="tempoReset">Reset</button></label>
-  <label>Volume: <input id="volume" type="range" min="0" max="100" step="0.1" value="100"></label> -->
-  <div id="output"></div>
 
   <script type="module" src="./lib/howler.min.js"></script>
   <script type="module" src="./bundle.js"></script>
 
-  <div id="permissionModal" class="overlay">
-    <div class="modal">
-      <h2>Permission Request</h2>
-      <p>
-        Tanda Player needs your permission to read your music files folder for
-        all files. Please click 'Allow' to continue.
-      </p>
-      <button class="active" id="askUserPermission">Allow</button>
-    </div>
-  </div>
 
-  <div id="cortinaPicker" class="hidden">
-    <div class="cortina-content">
-      <header>
-        <h2>Cortina Selector</h2>
-        <button class="active" id="cortinaPickerButtonClose" aria-label="Close Settings">
-          <img src="./icons/close.svg">
-        </button>
-      </header>
-      <label>Choose folder/collection:
-        <select id="folderSelect"></select></label>
-      <div id="cortinaList"></div>
-    </div>
-  </div>
 </body>
 
 </html>

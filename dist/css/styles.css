@@ -35,13 +35,12 @@
   padding: 0;
   box-sizing: border-box;
 }
-html,
+
 body {
   height: 100vh; /* Use the viewport height to make body take full height */
   margin: 0;
   padding: 0;
-  display: grid;
-  grid-template-rows: auto 1fr; /* Auto for header and 1fr for the container to take up the rest */
+  overflow: hidden;
 }
 
 body.light-theme {
@@ -106,6 +105,13 @@ body.dark-theme {
   }
 }
 
+section.main-page {
+  display: grid;
+  grid-template-rows: auto 1fr; /* Auto for header and 1fr for the container to take up the rest */
+  grid-template-columns: 1fr;
+  height: 100%;
+}
+
 header {
   background: var(--header-background-color);
   border-bottom: 5px solid var(--border-color);
@@ -121,27 +127,21 @@ header > * {
 
 main {
   display: grid;
-  overflow: hidden;
-}
-main.all {
-  grid-template-columns:
-    minmax(200px, 1fr) minmax(5px, 5px) minmax(100px, 1fr) minmax(5px, 5px)
-    minmax(200px, 1fr);
-}
-
-main.searchOnly {
-  grid-template-columns: minmax(400px, 1fr) minmax(5px, 5px) minmax(100px, 1fr);
-}
-main.playlistOnly {
-  grid-template-columns: minmax(100px, 1fr) minmax(5px, 5px) minmax(400px, 1fr);
+  grid-template-columns: repeat(3, 1fr); /* Three equal columns */
+  gap: 5px; /* gap between columns */
+  background-color: var(--border-color); /* Colour of gap */
 }
 
 .column {
-  overflow-y: auto;
   background-color: var(--background-color);
-  padding: 10px;
+  padding: 0.5rem;
   display: grid;
   grid-template-rows: auto 1fr; /* Header size auto, rest is for body */
+  grid-template-columns: 1fr;
+  height: 100%;
+}
+
+.content {
 }
 
 header > label {
@@ -211,7 +211,7 @@ header select {
 
 .slideable-panel {
   height: 100%;
-  width: 800px; /* Fixed width for the panel */
+  width: 900px; /* Fixed width for the panel */
   position: fixed;
   z-index: 10;
   top: 0;
@@ -225,14 +225,14 @@ header select {
 }
 
 .playlist-settings-panel {
-  transform: translateX(calc(100vw - 800px));
+  transform: translateX(calc(100vw - 900px));
 }
 .playlist-settings-panel.hiddenPanel {
   transform: translateX(calc(100vw));
 }
 
 #settingsPanel.hiddenPanel {
-  transform: translateX(-800px);
+  transform: translateX(-900px);
 }
 
 #settingsPanelButton {
@@ -241,13 +241,6 @@ header select {
 
 .hidden {
   display: none !important;
-}
-
-.column:last-child {
-  border-right: none;
-}
-.column:first-child {
-  border-left: none;
 }
 
 .handle {
@@ -300,11 +293,6 @@ main.searchOnly > *:nth-child(5) {
 }
 .modal button:hover {
   background: #0056b3;
-}
-
-.content {
-  padding: 0.5rem;
-  grid-template-rows: auto 1fr;
 }
 
 .tab-headers {
@@ -371,14 +359,15 @@ form p {
   margin-top: 2rem 2rem 2rem 0;
 }
 
+scratch-pad-element {
+  display: block;
+}
 .scratch-pad-heading {
-  width: 100%;
   padding: 0.2rem 0.2rem 0.2rem 0.5rem;
   align-items: center;
 }
 .playlistHeading {
   display: grid;
-  width: 100%;
   padding: 0.2rem 0.2rem 0.2rem 0.5rem;
   grid-template-columns: auto auto auto;
   align-items: center;

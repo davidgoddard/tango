@@ -1,5 +1,4 @@
 import { eventBus } from "./events/event-bus";
-import "./components/page-manager";
 import "./components/tanda.element";
 import "./components/search.element";
 import "./components/track.element";
@@ -201,13 +200,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     config = await getConfigPreferences(dbManager);
     console.log("DEBUG CONFIG", config);
     await dbManager.cacheIndexData();
-    const scratchPadPagesData = JSON.parse(localStorage.getItem('scratch pad pages') ?? `[{"label": "Main", "content": []}]`);
-    const scratchPadPages = getDomElement('#scratchPadPages');
-    scratchPadPages.setPages(scratchPadPagesData);
-    eventBus.on('ScratchPad Renamed', () => {
-        console.log('Saving', scratchPadPages.getPages());
-        localStorage.setItem('scratch pad pages', JSON.stringify(scratchPadPages.getPages()));
-    });
     // Setup the quick key click to function mappings
     let quickClickHandlers = {
         folderPicker: async () => {
@@ -300,9 +292,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         },
         createTandaButton: () => {
             const scratchPad = getDomElement("#scratchPad");
-            const newTanda = document.createElement("tanda-element");
-            newTanda.dataset.style = "undefined";
-            scratchPad.appendChild(newTanda);
+            let tab = scratchPad.getActiveTabContents();
+            if (tab) {
+                const newTanda = document.createElement("tanda-element");
+                newTanda.dataset.style = "undefined";
+                tab.appendChild(newTanda);
+            }
         },
         collapsePlaylist: () => {
             const allTandas = Array.from(document.querySelectorAll("tanda-element"));

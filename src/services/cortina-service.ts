@@ -2,7 +2,7 @@ import { TandaElement } from "../components/tanda.element";
 import { Tanda, Track } from "../data-types";
 import { eventBus } from "../events/event-bus";
 import { IndexedDBManager } from "./database";
-import { renderTrackDetail } from "./utils";
+import { createPlaceHolder, renderTrackDetail } from "./utils";
 
 export class CortinaPicker {
   private cortinaWindow = document.querySelector("#cortinaPicker");
@@ -33,6 +33,10 @@ export class CortinaPicker {
     document.addEventListener("changeCortina", (event: any) => {
       console.log("Request to change cortina", event.detail);
       this.targetTanda = event.detail;
+      const current = this.targetTanda?.querySelector('cortina-element');
+      if ( !current ){
+        this.targetTanda!.innerHTML = createPlaceHolder("cortina-element", "cortina") + this.targetTanda!.innerHTML;
+      }
       this.cortinaWindow?.classList.remove("hidden");
       this.chooseCortina();
     });

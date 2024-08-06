@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grid Layout with Scrollable Content</title>
+  <style>
+    /* Main container */
+    .container {
+      display: grid;
+      grid-template-rows: auto 1fr; /* Header + Content Area */
+      height: 100vh; /* Full viewport height */
+      grid-template-columns: 1fr; /* Single column layout */
+    }
+
+    .header {
+      background-color: #f0f0f0; /* Header styling */
+      padding: 10px;
+    }
+
+    .content-area {
+      display: grid;
+      grid-template-rows: auto auto 1fr; /* Two headers and a content area */
+      overflow: hidden; /* Prevent overflow issues */
+    }
+
+    .sub-header1, .sub-header2 {
+      background-color: #e0e0e0; /* Header styling */
+      padding: 10px;
+    }
+
+    .scrollable-content {
+      overflow-y: auto; /* Enables vertical scrolling */
+      padding: 10px;
+      box-sizing: border-box; /* Ensures padding is included in height */
+    }
+
+    .list-item {
+      margin-bottom: 10px; /* Spacing between items */
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">Main Header</div>
+    <div class="content-area">
+      <div class="sub-header1">Sub Header 1</div>
+      <div class="sub-header2">Sub Header 2</div>
+      <div class="scrollable-content">
+        <ul>
+          <!-- Example list items -->
+          <li class="list-item">Item 1</li>
+          <li class="list-item">Item 2</li>
+          <li class="list-item">Item 3</li>
+          <li class="list-item">Item 4</li>
+          <li class="list-item">Item 5</li>
+          <!-- Add more items to test scrolling -->
+        </ul>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

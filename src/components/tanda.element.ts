@@ -206,7 +206,7 @@ class TandaElement extends HTMLElement {
       if (cortinaArtist?.length > 15)
         cortinaArtist = cortinaArtist.substring(0, 15) + "...";
     } else {
-      cortinaTitle = "Unknown";
+      cortinaTitle = "No Cortina";
       cortinaArtist = "";
     }
 

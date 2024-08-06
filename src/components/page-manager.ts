@@ -59,7 +59,9 @@ export class PageManager extends HTMLElement {
 
         const tabContents = this.pages.map((page, index) => `
             <div class="tab-content" data-index="${index}">
-                ${page.content.map(item => `<p>${item}</p>`).join('')}
+                <slot>
+                    ${page.content.map(item => `<p>${item}</p>`).join('')}
+                </slot>
             </div>
         `).join('');
 
