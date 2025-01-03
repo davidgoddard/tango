@@ -654,7 +654,7 @@ async function runApplication(
   // Prepare the new music speakerOutputPlayer to play music adjusted to the given system gain
   // and fade songs using the given fade rate.
 
-  const headerField = getDomElement("body > header > h1");
+  const headerField = getDomElement("body > section > header > h1");
   const stopButton = getDomElement("#stopButton");
   const speakerPlayerConfig: PlayerOptions = {
     ctx: config.mainOutput,
