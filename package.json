@@ -17,5 +17,8 @@
     "start-dev": "npx http-server dist -c-1 --cors -o -p 8080 --ssl --cert server.crt --key server.key --headers 'Cross-Origin-Opener-Policy: same-origin' --headers 'Cross-Origin-Embedder-Policy: require-corp'"
   },
   "author": "David Goddard",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "tanda-player-typescript": "file:"
+  }
 }
