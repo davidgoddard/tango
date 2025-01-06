@@ -792,7 +792,7 @@ async function runApplication(
   });
 
   eventBus.on("changed-tanda", async(payload: any) => {
-    console.log("change a tanda", payload)
+    console.log("changed a tanda", payload)
   })
 
   // Populate all playlists into picker
