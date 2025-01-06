@@ -127,3 +127,12 @@ The purpose for creating this app was to provide a base for adding in machine-le
 Some features from the old full "Tanda Player" system are yet to be ported over.  These include:
 - having an auto-dj capable of creating tandas or whole playlists
 - 
+
+
+## Tagging ##
+
+Although not a primary goal of the player, it may be useful to attach labels to tracks whether that is dates or labels such as "fun" etc.
+
+To help standardise on names, as more labels are added, these will appear in the editor for quick filling in.
+If no label is given the text is simply appended to the notes.
+Numeric fields will be separately handled to allow searching by range of values.

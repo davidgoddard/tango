@@ -50,13 +50,18 @@ class TandaElement extends HTMLElement {
     this.removeEventListeners();
   }
 
+  private emitChangedTanda(){
+    eventBus.emit('changed-tanda', this);   
+  }
+
   private handleExtend(event: any) {
     const newTrack = document.createElement('track-element');
     newTrack.dataset.style = this.dataset.style;
     newTrack.dataset.title = 'place holder';
     this.appendChild(newTrack);
     this.render();
-    eventBus.emit('changed-playlist')
+    eventBus.emit('changed-playlist');
+    this.emitChangedTanda();
   }
 
   private handleShrink(event: any) {
@@ -64,6 +69,7 @@ class TandaElement extends HTMLElement {
     if (n > 0) this.removeChild(this.children[n - 1]);
     this.render();
     eventBus.emit('changed-playlist')
+    this.emitChangedTanda();
   }
 
   private handleChangeCortina(event: any){
@@ -75,6 +81,7 @@ class TandaElement extends HTMLElement {
       bubbles: true,
     });
     this.dispatchEvent(newEvent);    
+    this.emitChangedTanda();
   }
 
   private handleEdit(event: any){

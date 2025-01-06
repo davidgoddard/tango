@@ -791,6 +791,10 @@ async function runApplication(
     await speakerOutputPlayer.updatePosition(N);
   });
 
+  eventBus.on("changed-tanda", async(payload: any) => {
+    console.log("change a tanda", payload)
+  })
+
   // Populate all playlists into picker
 
   const playlistPicker = getDomElement("#playlistPicker") as HTMLSelectElement;
